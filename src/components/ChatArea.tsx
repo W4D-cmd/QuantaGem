@@ -4,10 +4,7 @@ import { useRef, useState, useEffect, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-
-export interface MessagePart {
-  text: string;
-}
+import { MessagePart } from "@/app/page";
 
 export interface Message {
   role: "user" | "model";
@@ -77,16 +74,56 @@ function ChatAreaComponent({
                 : "w-full text-foreground self-start"
             }`}
           >
-            {msg.parts.map((part, j) => (
-              <div key={j} className="prose max-w-none">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[[rehypeHighlight, { detect: true }]]}
-                >
-                  {part.text}
-                </ReactMarkdown>
-              </div>
-            ))}
+            {msg.parts.map((part, j) => {
+              if (part.type === "text" && part.text) {
+                return (
+                  <div key={j} className="prose max-w-none prose-customtext">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[[rehypeHighlight, { detect: true }]]}
+                    >
+                      {part.text}
+                    </ReactMarkdown>
+                  </div>
+                );
+              } else if (
+                part.type === "file" &&
+                part.objectName &&
+                part.mimeType &&
+                part.fileName
+              ) {
+                const fileUrl = `/api/files/${part.objectName}`;
+                if (part.mimeType.startsWith("image/")) {
+                  return (
+                    <div key={j} className="my-2">
+                      <img
+                        src={fileUrl}
+                        alt={part.fileName}
+                        className="max-w-full h-auto rounded-lg border border-gray-200"
+                        style={{ maxHeight: "400px" }}
+                      />
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div key={j} className="my-2">
+                      <a
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 underline break-all"
+                      >
+                        {part.fileName} ({part.mimeType},{" "}
+                        {part.size ? `${(part.size / 1024).toFixed(1)} KB` : ""}
+                        )
+                      </a>
+                    </div>
+                  );
+                }
+              }
+
+              return null;
+            })}
           </div>
         ))}
 

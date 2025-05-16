@@ -2,7 +2,7 @@
 
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
-import ChatInput from "@/components/ChatInput";
+import ChatInput, { UploadedFileInfo } from "@/components/ChatInput";
 import { useCallback, useEffect, useState } from "react";
 import ModelSelector from "@/components/ModelSelector";
 import ToggleApiKeyButton from "@/components/ToggleApiKeyButton";
@@ -11,7 +11,12 @@ import Tooltip from "@/components/Tooltip";
 import Toast from "@/components/Toast";
 
 export interface MessagePart {
-  text: string;
+  type: "text" | "file";
+  text?: string;
+  fileName?: string;
+  mimeType?: string;
+  objectName?: string;
+  size?: number;
 }
 
 export interface Message {
@@ -159,8 +164,11 @@ export default function Home() {
     setIsLoading(false);
   };
 
-  const handleSendMessage = async (inputText: string) => {
-    if (!inputText.trim()) return;
+  const handleSendMessage = async (
+    inputText: string,
+    uploadedFiles: UploadedFileInfo[],
+  ) => {
+    if (!inputText.trim() && uploadedFiles.length === 0) return;
     if (!selectedModel) return;
 
     let sessionId = activeChatId;
@@ -178,9 +186,24 @@ export default function Home() {
       isNew = true;
     }
 
+    const newUserMessageParts: MessagePart[] = [];
+    if (inputText.trim()) {
+      newUserMessageParts.push({ type: "text", text: inputText.trim() });
+    }
+
+    uploadedFiles.forEach((file) => {
+      newUserMessageParts.push({
+        type: "file",
+        fileName: file.fileName,
+        mimeType: file.mimeType,
+        objectName: file.objectName,
+        size: file.size,
+      });
+    });
+
     const newUserMessage: Message = {
       role: "user",
-      parts: [{ text: inputText }],
+      parts: newUserMessageParts,
     };
     setMessages((prev) => [...prev, newUserMessage]);
     setIsLoading(true);
@@ -194,7 +217,7 @@ export default function Home() {
     let modelMessageIndex = -1;
     const placeholderMessage: Message = {
       role: "model",
-      parts: [{ text: "" }],
+      parts: [{ type: "text", text: "" }],
     };
     setMessages((prev) => {
       modelMessageIndex = prev.length;
@@ -210,7 +233,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           history: historyForAPI,
-          message: inputText,
+          messageParts: newUserMessageParts,
           chatSessionId: sessionId,
           model: selectedModel!.name,
           keySelection,
@@ -242,7 +265,7 @@ export default function Home() {
         setMessages((prev) =>
           prev.map((msg, idx) =>
             idx === modelMessageIndex
-              ? { ...msg, parts: [{ text: accumulatedResponse }] }
+              ? { ...msg, parts: [{ type: "text", text: accumulatedResponse }] }
               : msg,
           ),
         );

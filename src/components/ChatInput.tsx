@@ -190,7 +190,7 @@ export default function ChatInput({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isLoading}
-                  className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-200 bg-white text-[#5d5d5d] border border-gray-300 hover:bg-gray-100"
+                  className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-[#5d5d5d] border border-gray-300 hover:bg-gray-100"
                 >
                   <PaperClipIcon className="h-5 w-5" />
                 </button>
@@ -209,11 +209,11 @@ export default function ChatInput({
                   disabled
                   onClick={() => setIsSearchActive((v) => !v)}
                   className={`
-                    cursor-not-allowed h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium transition-colors duration-200
+                    cursor-not-allowed h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium transition-colors duration-150
                     ${
                       isSearchActive
                         ? "bg-[#171717] text-white border"
-                        : "bg-white text-[#5d5d5d] border border-gray-300"
+                        : "bg-white text-[#5d5d5d] border border-gray-300 hover:bg-gray-100"
                     }
                   `}
                 >

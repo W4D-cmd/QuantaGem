@@ -17,11 +17,11 @@ export default function ToggleApiKeyButton({
   return (
     <button
       onClick={onToggleAction}
-      className={`cursor-pointer h-9 flex justify-center items-center gap-2 px-4 rounded-full text-sm font-medium transition-colors duration-200
+      className={`cursor-pointer h-9 flex justify-center items-center gap-2 px-4 rounded-full text-sm font-medium transition-colors duration-150
         ${
           isPaid
-            ? "bg-[#171717] text-white border"
-            : "bg-white text-[#5d5d5d] border border-gray-300"
+            ? "bg-[#171717] text-white border hover:bg-[#5d5d5d]"
+            : "bg-white text-[#5d5d5d] border border-gray-300 hover:bg-gray-100"
         }`}
     >
       {isPaid ? (

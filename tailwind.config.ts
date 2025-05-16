@@ -29,6 +29,12 @@ const config: Config = {
             },
           },
         },
+
+        customtext: {
+          css: {
+            "--tw-prose-body": "#0d0d0d",
+          },
+        },
       }),
     },
   },

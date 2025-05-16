@@ -18,6 +18,7 @@ A simple, open-source Next.js web interface for interacting with Google's Gemini
 ## Installation
 
 ### Prerequisites
+
 - [Docker](https://docs.docker.com/get-docker/)
 - Google Gemini API key ([get here](https://aistudio.google.com/))
 

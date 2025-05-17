@@ -30,7 +30,7 @@ git clone https://github.com/W4D-cmd/QuantaGem.git
 
 ### 2. Environment Configuration
 
-Replace the values in the `.env` file with your own Google API keys.
+Create a new file `.env.local` in the root of the repository. Copy and paste the content of the `.env` file into it and set your API keys.
 
 > [!NOTE]
 > If you do not have multiple Google accounts or wish to only use the free API simply put the same key for both entries.
@@ -39,8 +39,6 @@ Replace the values in the `.env` file with your own Google API keys.
 FREE_GOOGLE_API_KEY="your_free_google_api_key"
 PAID_GOOGLE_API_KEY="your_paid_google_api_key"
 ```
-
-**Optional**: Create a `.env.local` file at the root of your project to override the variables of the `.env` file.
 
 ## Running the Application
 

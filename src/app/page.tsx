@@ -1,14 +1,15 @@
 "use client";
 
 import Sidebar from "@/components/Sidebar";
-import ChatArea from "@/components/ChatArea";
+import ChatArea, { ChatAreaHandle } from "@/components/ChatArea";
 import ChatInput, { UploadedFileInfo } from "@/components/ChatInput";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ModelSelector from "@/components/ModelSelector";
 import ToggleApiKeyButton from "@/components/ToggleApiKeyButton";
 import { Model } from "@google/genai";
 import Tooltip from "@/components/Tooltip";
 import Toast from "@/components/Toast";
+import { ArrowDownIcon } from "@heroicons/react/24/solid";
 
 export interface MessagePart {
   type: "text" | "file";
@@ -45,6 +46,17 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
   const [keySelection, setKeySelection] = useState<"free" | "paid">("free");
   const [error, setError] = useState<string | null>(null);
+  const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
+  const chatAreaRef = useRef<ChatAreaHandle>(null);
+
+  const handleAutoScrollChange = useCallback((isEnabled: boolean) => {
+    console.log("Page: handleAutoScrollChange called with:", isEnabled);
+    setIsAutoScrollActive(isEnabled);
+  }, []);
+
+  const handleScrollToBottomClick = () => {
+    chatAreaRef.current?.scrollToBottomAndEnableAutoscroll();
+  };
 
   const handleModelChange = (model: Model) => {
     setSelectedModel(model);
@@ -300,6 +312,8 @@ export default function Home() {
     setMessages([]);
   };
 
+  console.log("Page: Rendering, isAutoScrollActive:", isAutoScrollActive);
+
   return (
     <div className="flex h-screen overflow-hidden">
       {error && <Toast message={error} onClose={() => setError(null)} />}
@@ -312,7 +326,7 @@ export default function Home() {
         onDeleteChat={handleDeleteChat}
         onDeleteAllChats={handleDeleteAllChats}
       />
-      <main className="flex-1 flex flex-col bg-background text-foreground">
+      <main className="flex-1 flex flex-col bg-background text-foreground relative">
         <div className="flex-none sticky top-0 z-10 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
           <ModelSelector
             models={models}
@@ -331,14 +345,30 @@ export default function Home() {
         </div>
 
         <ChatArea
+          ref={chatAreaRef}
           messages={messages}
           isLoading={isLoading}
           streamStarted={streamStarted}
+          onAutoScrollChange={handleAutoScrollChange}
         />
 
         {/* pinned input */}
         <div className="flex-none p-4 bg-background">
           <div className="mx-auto max-w-[52rem]">
+            {/* Floating Scroll to Bottom Button */}
+            <div className="relative h-0">
+              <div
+                className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300 ease-in-out ${isAutoScrollActive ? "opacity-0 pointer-events-none" : "opacity-100"} `}
+              >
+                <button
+                  onClick={handleScrollToBottomClick}
+                  className="cursor-pointer h-9 w-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-150 bg-white text-[#5d5d5d] border border-gray-300 hover:bg-gray-100 shadow-lg"
+                >
+                  <ArrowDownIcon className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
             <ChatInput
               onSendMessageAction={handleSendMessage}
               onCancelAction={handleCancel}

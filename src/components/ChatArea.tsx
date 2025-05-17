@@ -1,6 +1,13 @@
 "use client";
 
-import { useRef, useState, useEffect, memo } from "react";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  memo,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -15,44 +22,122 @@ interface ChatAreaProps {
   messages: Message[];
   isLoading: boolean;
   streamStarted: boolean;
+  onAutoScrollChange?: (isAutoScrollEnabled: boolean) => void;
+}
+
+export interface ChatAreaHandle {
+  scrollToBottomAndEnableAutoscroll: () => void;
 }
 
 export default memo(
-  ChatAreaComponent,
+  forwardRef<ChatAreaHandle, ChatAreaProps>(ChatAreaComponent),
   (prev, next) =>
     prev.messages === next.messages &&
     prev.isLoading === next.isLoading &&
-    prev.streamStarted === next.streamStarted,
+    prev.streamStarted === next.streamStarted &&
+    prev.onAutoScrollChange === next.onAutoScrollChange,
 );
 
-function ChatAreaComponent({
-  messages,
-  isLoading,
-  streamStarted,
-}: ChatAreaProps) {
+function ChatAreaComponent(
+  { messages, isLoading, streamStarted, onAutoScrollChange }: ChatAreaProps,
+  ref: React.Ref<ChatAreaHandle>,
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const justManuallyDisabledRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
+
+  useImperativeHandle(ref, () => ({
+    scrollToBottomAndEnableAutoscroll: () => {
+      setAutoScrollEnabled(true);
+      if (onAutoScrollChange) {
+        onAutoScrollChange(true);
+      }
+      const el = containerRef.current;
+      if (el) {
+        el.scrollTo({
+          top: el.scrollHeight,
+          behavior: "smooth",
+        });
+        el.focus({ preventScroll: true });
+      }
+    },
+  }));
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    const disableAuto = () => setAutoScrollEnabled(false);
-    el.addEventListener("wheel", disableAuto, { passive: true });
-    el.addEventListener("touchstart", disableAuto, { passive: true });
+    lastScrollTopRef.current = el.scrollTop;
+
+    const handleScroll = (event: WheelEvent | TouchEvent) => {
+      const currentScrollTop = el.scrollTop;
+      const isScrollingUp = currentScrollTop < lastScrollTopRef.current;
+      const atBottom = el.scrollHeight - currentScrollTop - el.clientHeight < 1;
+
+      let effectivelyScrollingUp = isScrollingUp;
+      if (event.type === "wheel") {
+        effectivelyScrollingUp = (event as WheelEvent).deltaY < 0;
+      }
+
+      if (effectivelyScrollingUp || !atBottom) {
+        if (autoScrollEnabled) {
+          console.log("ChatArea: disableAuto triggered by scroll/touch");
+          setAutoScrollEnabled(false);
+          justManuallyDisabledRef.current = true;
+          if (onAutoScrollChange) {
+            onAutoScrollChange(false);
+          }
+          setTimeout(() => {
+            justManuallyDisabledRef.current = false;
+          }, 150);
+        }
+      }
+      lastScrollTopRef.current = currentScrollTop;
+    };
+
+    el.addEventListener("wheel", handleScroll as EventListener, {
+      passive: true,
+    });
+    el.addEventListener("touchstart", handleScroll as EventListener, {
+      passive: true,
+    });
 
     const enableIfNearBottom = () => {
+      if (justManuallyDisabledRef.current) {
+        return;
+      }
+
+      const el = containerRef.current;
+      if (!el) return;
+
       const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 20;
-      if (atBottom) setAutoScrollEnabled(true);
+
+      if (atBottom) {
+        if (!autoScrollEnabled) {
+          setAutoScrollEnabled(true);
+          if (onAutoScrollChange) {
+            onAutoScrollChange(true);
+          }
+        }
+      } else {
+        if (autoScrollEnabled) {
+          setAutoScrollEnabled(false);
+          if (onAutoScrollChange) {
+            onAutoScrollChange(false);
+          }
+        }
+      }
     };
+
     el.addEventListener("scroll", enableIfNearBottom, { passive: true });
 
     return () => {
-      el.removeEventListener("wheel", disableAuto);
-      el.removeEventListener("touchstart", disableAuto);
+      el.removeEventListener("wheel", handleScroll as EventListener);
+      el.removeEventListener("touchstart", handleScroll as EventListener);
       el.removeEventListener("scroll", enableIfNearBottom);
     };
-  }, []);
+  }, [onAutoScrollChange, autoScrollEnabled]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -60,16 +145,28 @@ function ChatAreaComponent({
 
     if (isLoading) {
       if (!streamStarted) {
+        const shouldEnable = autoScrollEnabled;
         setAutoScrollEnabled(true);
+        if (onAutoScrollChange && !shouldEnable) onAutoScrollChange(true);
         el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
       } else if (autoScrollEnabled) {
         el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
       }
     }
-  }, [messages, isLoading, streamStarted, autoScrollEnabled]);
+  }, [
+    messages,
+    isLoading,
+    streamStarted,
+    autoScrollEnabled,
+    onAutoScrollChange,
+  ]);
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-2">
+    <div
+      ref={containerRef}
+      className="flex-1 overflow-y-auto px-4 py-2 focus:outline-none"
+      tabIndex={-1}
+    >
       <div className="mx-auto max-w-[52rem] p-4 space-y-4">
         {messages.map((msg, i) => (
           <div

@@ -36,6 +36,13 @@ const config: Config = {
           },
         },
       }),
+      colors: {
+        gray: {
+          100: "#f9f9f9",
+          200: "#ececec",
+          300: "#e3e3e3",
+        },
+      },
     },
   },
 

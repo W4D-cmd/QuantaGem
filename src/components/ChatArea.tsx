@@ -82,7 +82,6 @@ function ChatAreaComponent(
 
       if (effectivelyScrollingUp || !atBottom) {
         if (autoScrollEnabled) {
-          console.log("ChatArea: disableAuto triggered by scroll/touch");
           setAutoScrollEnabled(false);
           justManuallyDisabledRef.current = true;
           if (onAutoScrollChange) {

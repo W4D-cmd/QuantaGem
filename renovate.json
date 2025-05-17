@@ -1,19 +1,31 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:base"],
+  "extends": [
+    "config:recommended"
+  ],
   "packageRules": [
     {
-      "matchPackagePatterns": ["^next", "^@next/", "react", "react-dom"],
       "groupName": "Next.js and React stack",
-      "groupSlug": "nextjs-react-stack"
+      "groupSlug": "nextjs-react-stack",
+      "matchPackageNames": [
+        "/^next/",
+        "/^@next//",
+        "/react/",
+        "/react-dom/"
+      ]
     },
     {
-      "matchPackagePatterns": ["tailwindcss", "^@tailwindcss/"],
       "groupName": "Tailwind CSS stack",
-      "groupSlug": "tailwindcss-stack"
+      "groupSlug": "tailwindcss-stack",
+      "matchPackageNames": [
+        "/tailwindcss/",
+        "/^@tailwindcss//"
+      ]
     },
     {
-      "matchDatasources": ["docker"],
+      "matchDatasources": [
+        "docker"
+      ],
       "groupName": "Docker image updates",
       "groupSlug": "docker-images"
     }

@@ -44,7 +44,7 @@ export default function ModelSelector({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center h-11 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors text-[#5d5d5d] text-[18px] font-medium"
+        className="inline-flex items-center h-11 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors text-[#5d5d5d] text-[18px] font-medium focus:outline-none"
         disabled={models.length === 0}
       >
         {selected ? (

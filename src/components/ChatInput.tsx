@@ -233,7 +233,7 @@ export default function ChatInput({
               disabled={
                 isLoading ? false : !input.trim() && selectedFiles.length === 0
               }
-              className="cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:text-primary transition-colors duration-150"
+              className="cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:text-[#5d5d5d] transition-colors duration-150"
             >
               {isLoading ? (
                 <StopCircleIcon className="h-10 w-10" />

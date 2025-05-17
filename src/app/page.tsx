@@ -50,7 +50,6 @@ export default function Home() {
   const chatAreaRef = useRef<ChatAreaHandle>(null);
 
   const handleAutoScrollChange = useCallback((isEnabled: boolean) => {
-    console.log("Page: handleAutoScrollChange called with:", isEnabled);
     setIsAutoScrollActive(isEnabled);
   }, []);
 
@@ -311,8 +310,6 @@ export default function Home() {
     setActiveChatId(null);
     setMessages([]);
   };
-
-  console.log("Page: Rendering, isAutoScrollActive:", isAutoScrollActive);
 
   return (
     <div className="flex h-screen overflow-hidden">

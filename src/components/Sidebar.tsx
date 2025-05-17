@@ -61,10 +61,10 @@ export default function Sidebar({
             <li key={chat.id} className="mb-0 relative group">
               <button
                 onClick={() => onSelectChat(chat.id)}
-                className={`cursor-pointer w-full text-sm text-left p-2 rounded-lg hover:bg-gray-200 transition-colors ${
+                className={`cursor-pointer w-full text-sm text-left p-2 rounded-lg hover:bg-gray-200 transition-colors focus:outline-none ${
                   chat.id === activeChatId
-                    ? "bg-gray-300 font-semibold"
-                    : "text-foreground"
+                    ? "bg-gray-300 font-semibold hover:bg-gray-300"
+                    : "text-foreground hover:bg-gray-200"
                 }`}
               >
                 {chat.title}

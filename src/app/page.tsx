@@ -362,7 +362,7 @@ export default function Home() {
               >
                 <button
                   onClick={handleScrollToBottomClick}
-                  className="cursor-pointer h-9 w-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-150 bg-white text-[#5d5d5d] border border-gray-300 hover:bg-gray-100 shadow-lg"
+                  className="cursor-pointer h-9 w-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary border border-gray-300 hover:bg-gray-100 shadow-lg"
                 >
                   <ArrowDownIcon className="h-5 w-5" />
                 </button>

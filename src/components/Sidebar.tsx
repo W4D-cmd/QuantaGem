@@ -41,7 +41,7 @@ export default function Sidebar({
             }}
             className="cursor-pointer p-2 rounded-lg hover:bg-gray-200 transition-colors"
           >
-            <TrashIcon className="h-6 w-6 text-[#5d5d5d]" />
+            <TrashIcon className="h-6 w-6 text-primary" />
           </button>
         </Tooltip>
 
@@ -50,7 +50,7 @@ export default function Sidebar({
             onClick={onNewChat}
             className="cursor-pointer p-2 rounded-lg hover:bg-gray-200 transition-colors"
           >
-            <PencilSquareIcon className="h-6 w-6 text-[#5d5d5d]" />
+            <PencilSquareIcon className="h-6 w-6 text-primary" />
           </button>
         </Tooltip>
       </div>
@@ -84,7 +84,7 @@ export default function Sidebar({
                     }}
                     className="opacity-0 group-hover:opacity-100 cursor-pointer"
                   >
-                    <EllipsisHorizontalIcon className="h-5 w-5 text-[#5d5d5d] transition-colors hover:text-[#121212]" />
+                    <EllipsisHorizontalIcon className="h-5 w-5 text-primary transition-colors hover:text-[#121212]" />
                   </button>
 
                   <DropdownMenu

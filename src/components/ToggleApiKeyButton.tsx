@@ -21,7 +21,7 @@ export default function ToggleApiKeyButton({
         ${
           isPaid
             ? "bg-[#171717] text-white border hover:bg-[#5d5d5d]"
-            : "bg-white text-[#5d5d5d] border border-gray-300 hover:bg-gray-100"
+            : "bg-white text-primary border border-gray-300 hover:bg-gray-100"
         }`}
     >
       {isPaid ? (

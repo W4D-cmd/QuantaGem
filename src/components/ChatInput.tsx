@@ -55,7 +55,7 @@ export default function ChatInput({
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
     const filesToUpload = Array.from(event.target.files);
-    event.target.value = ""; // Reset file input
+    event.target.value = "";
 
     setUploadingFiles((prev) => [...prev, ...filesToUpload]);
 
@@ -190,7 +190,7 @@ export default function ChatInput({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isLoading}
-                  className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-[#5d5d5d] border border-gray-300 hover:bg-gray-100"
+                  className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary border border-gray-300 hover:bg-gray-100"
                 >
                   <PaperClipIcon className="h-5 w-5" />
                 </button>
@@ -213,7 +213,7 @@ export default function ChatInput({
                     ${
                       isSearchActive
                         ? "bg-[#171717] text-white border"
-                        : "bg-white text-[#5d5d5d] border border-gray-300 hover:bg-gray-100"
+                        : "bg-white text-primary border border-gray-300 hover:bg-gray-100"
                     }
                   `}
                 >
@@ -233,7 +233,7 @@ export default function ChatInput({
               disabled={
                 isLoading ? false : !input.trim() && selectedFiles.length === 0
               }
-              className="cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:text-[#5d5d5d] transition-colors duration-150"
+              className="cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:text-primary transition-colors duration-150"
             >
               {isLoading ? (
                 <StopCircleIcon className="h-10 w-10" />

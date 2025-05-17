@@ -52,3 +52,11 @@ body {
 .prose :not(pre) > code::after {
   content: "";
 }
+
+.bg-gray-100 {
+  background-color: #f9f9f9 !important;
+}
+
+.text-primary {
+  color: #5d5d5d;
+}

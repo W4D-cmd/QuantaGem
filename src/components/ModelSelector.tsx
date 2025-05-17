@@ -44,7 +44,7 @@ export default function ModelSelector({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center h-11 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors text-[#5d5d5d] text-[18px] font-medium focus:outline-none"
+        className="inline-flex items-center h-11 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors text-primary text-[18px] font-medium focus:outline-none"
         disabled={models.length === 0}
       >
         {selected ? (
@@ -77,7 +77,7 @@ export default function ModelSelector({
                   className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                 >
                   <div className="flex flex-col">
-                    <span className="font-medium text-[#5d5d5d]">
+                    <span className="font-medium text-primary">
                       {m.displayName}
                     </span>
                     <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">

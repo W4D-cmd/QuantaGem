@@ -55,12 +55,18 @@ function ChatAreaComponent({
   }, []);
 
   useEffect(() => {
-    if (!isLoading || !autoScrollEnabled) return;
     const el = containerRef.current;
-    if (el && autoScrollEnabled) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    if (!el) return;
+
+    if (isLoading) {
+      if (!streamStarted) {
+        setAutoScrollEnabled(true);
+        el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+      } else if (autoScrollEnabled) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      }
     }
-  }, [messages, autoScrollEnabled, isLoading]);
+  }, [messages, isLoading, streamStarted, autoScrollEnabled]);
 
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-2">

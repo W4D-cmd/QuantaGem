@@ -231,7 +231,7 @@ export default function ChatInput({
               type={isLoading ? "button" : "submit"}
               onClick={isLoading ? onCancelAction : undefined}
               disabled={
-                (!input.trim() && selectedFiles.length === 0) || isLoading
+                isLoading ? false : !input.trim() && selectedFiles.length === 0
               }
               className="cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:text-[#5d5d5d] transition-colors duration-150"
             >

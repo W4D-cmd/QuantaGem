@@ -54,6 +54,7 @@ export default function Home() {
   const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
+  const prevActiveChatIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
@@ -210,22 +211,47 @@ export default function Home() {
   useEffect(() => {
     if (activeChatId === null) {
       setMessages([]);
+
+      const currentSelectedModelStillValid = models.find(
+        (m) => m.name === selectedModel?.name,
+      );
+      if (!currentSelectedModelStillValid && models.length > 0) {
+        const defaultModel =
+          models.find((m) => m.name === DEFAULT_MODEL_NAME) || models[0];
+        if (defaultModel && selectedModel?.name !== defaultModel.name) {
+          setSelectedModel(defaultModel);
+        }
+      }
+      prevActiveChatIdRef.current = null;
       return;
     }
 
     const chat = allChats.find((c) => c.id === activeChatId);
+
     if (chat?.lastModel) {
       const modelForThisChat = models.find((m) => m.name === chat.lastModel);
       if (modelForThisChat && selectedModel?.name !== modelForThisChat.name) {
         setSelectedModel(modelForThisChat);
       }
+    } else if (chat && !chat.lastModel) {
+      if (!selectedModel && models.length > 0) {
+        const defaultModel =
+          models.find((m) => m.name === DEFAULT_MODEL_NAME) || models[0];
+        if (defaultModel) {
+          setSelectedModel(defaultModel);
+        }
+      }
     }
 
-    setIsLoading(true);
-    loadChat(activeChatId).finally(() => {
-      setIsLoading(false);
-    });
-  }, [activeChatId, allChats, models, loadChat, selectedModel]);
+    if (activeChatId !== prevActiveChatIdRef.current) {
+      setIsLoading(true);
+      loadChat(activeChatId).finally(() => {
+        setIsLoading(false);
+      });
+    }
+
+    prevActiveChatIdRef.current = activeChatId;
+  }, [activeChatId, allChats, models, selectedModel, loadChat]);
 
   const handleCancel = () => {
     controller?.abort();
@@ -330,10 +356,14 @@ export default function Home() {
 
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
       let accumulatedResponse = "";
+      let isFirstChunk = true;
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        if (!streamStarted) setStreamStarted(true);
+        if (isFirstChunk) {
+          setStreamStarted(true);
+          isFirstChunk = false;
+        }
         accumulatedResponse += value;
         setMessages((prev) =>
           prev.map((msg, idx) =>

@@ -2,7 +2,10 @@
 
 import Sidebar from "@/components/Sidebar";
 import ChatArea, { ChatAreaHandle } from "@/components/ChatArea";
-import ChatInput, { UploadedFileInfo } from "@/components/ChatInput";
+import ChatInput, {
+  ChatInputHandle,
+  UploadedFileInfo,
+} from "@/components/ChatInput";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ModelSelector from "@/components/ModelSelector";
 import ToggleApiKeyButton from "@/components/ToggleApiKeyButton";
@@ -50,6 +53,38 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
+  const chatInputRef = useRef<ChatInputHandle>(null);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (isLoading) return;
+
+      const activeElement = document.activeElement as HTMLElement;
+      if (activeElement) {
+        const tagName = activeElement.tagName;
+        if (
+          tagName === "INPUT" ||
+          tagName === "TEXTAREA" ||
+          activeElement.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      if (event.key.length === 1) {
+        chatInputRef.current?.focusInput();
+      }
+    };
+
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleGlobalKeyDown);
+    };
+  }, [isLoading]);
 
   const handleAutoScrollChange = useCallback((isEnabled: boolean) => {
     setIsAutoScrollActive(isEnabled);
@@ -394,6 +429,7 @@ export default function Home() {
             </div>
 
             <ChatInput
+              ref={chatInputRef}
               onSendMessageAction={handleSendMessage}
               onCancelAction={handleCancel}
               isLoading={isLoading}

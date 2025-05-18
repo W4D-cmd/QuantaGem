@@ -9,6 +9,7 @@ import React, {
   ChangeEvent,
   forwardRef,
   useImperativeHandle,
+  ClipboardEvent,
 } from "react";
 import {
   ArrowUpCircleIcon,
@@ -52,19 +53,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       },
     }));
 
-    useEffect(() => {
-      const ta = textareaRef.current;
-      if (!ta) return;
-      ta.style.height = "auto";
-      const newHeight = Math.min(ta.scrollHeight, 320);
-      ta.style.height = `${newHeight}px`;
-      ta.style.overflowY = ta.scrollHeight > 320 ? "auto" : "hidden";
-    }, [input]);
-
-    const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-      if (!event.target.files) return;
-      const filesToUpload = Array.from(event.target.files);
-      event.target.value = "";
+    const processAndUploadFiles = async (filesToUpload: File[]) => {
+      if (filesToUpload.length === 0) return;
 
       setUploadingFiles((prev) => [...prev, ...filesToUpload]);
 
@@ -99,6 +89,44 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       setUploadingFiles((prev) =>
         prev.filter((f) => !filesToUpload.includes(f)),
       );
+    };
+
+    useEffect(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      ta.style.height = "auto";
+      const newHeight = Math.min(ta.scrollHeight, 320);
+      ta.style.height = `${newHeight}px`;
+      ta.style.overflowY = ta.scrollHeight > 320 ? "auto" : "hidden";
+    }, [input]);
+
+    const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+      if (!event.target.files) return;
+      const files = Array.from(event.target.files);
+      event.target.value = "";
+
+      await processAndUploadFiles(files);
+    };
+
+    const handlePaste = async (event: ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      const pastedFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (file) {
+            pastedFiles.push(file);
+          }
+        }
+      }
+
+      if (pastedFiles.length > 0) {
+        event.preventDefault();
+        await processAndUploadFiles(pastedFiles);
+      }
     };
 
     const removeSelectedFile = (objectNameToRemove: string) => {
@@ -177,6 +205,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
+                onPaste={handlePaste}
                 placeholder="Send a message..."
                 rows={1}
                 className="w-full resize-none border-none p-0 bg-background text-foreground focus:outline-none"

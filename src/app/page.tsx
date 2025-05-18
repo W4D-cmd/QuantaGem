@@ -210,7 +210,9 @@ export default function Home() {
 
   useEffect(() => {
     if (activeChatId === null) {
-      setMessages([]);
+      if (!isLoading) {
+        setMessages([]);
+      }
 
       const currentSelectedModelStillValid = models.find(
         (m) => m.name === selectedModel?.name,

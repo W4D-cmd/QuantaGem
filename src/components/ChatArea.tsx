@@ -46,10 +46,12 @@ function ChatAreaComponent(
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const justManuallyDisabledRef = useRef(false);
   const lastScrollTopRef = useRef(0);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useImperativeHandle(ref, () => ({
     scrollToBottomAndEnableAutoscroll: () => {
       setAutoScrollEnabled(true);
+      justManuallyDisabledRef.current = false;
       if (onAutoScrollChange) {
         onAutoScrollChange(true);
       }
@@ -70,95 +72,142 @@ function ChatAreaComponent(
 
     lastScrollTopRef.current = el.scrollTop;
 
-    const handleScroll = (event: WheelEvent | TouchEvent) => {
-      const currentScrollTop = el.scrollTop;
-      const isScrollingUp = currentScrollTop < lastScrollTopRef.current;
-      const atBottom = el.scrollHeight - currentScrollTop - el.clientHeight < 1;
+    const handleUserInitiatedScroll = (event: WheelEvent | TouchEvent) => {
+      const currentEl = containerRef.current;
+      if (!currentEl) return;
 
-      let effectivelyScrollingUp = isScrollingUp;
+      const currentScrollTop = currentEl.scrollTop;
+      const atBottomForUserScroll =
+        currentEl.scrollHeight - currentScrollTop - currentEl.clientHeight < 1;
+
+      let effectivelyScrollingUp: boolean;
       if (event.type === "wheel") {
         effectivelyScrollingUp = (event as WheelEvent).deltaY < 0;
+      } else {
+        effectivelyScrollingUp = currentScrollTop < lastScrollTopRef.current;
       }
 
-      if (effectivelyScrollingUp || !atBottom) {
-        if (autoScrollEnabled) {
-          setAutoScrollEnabled(false);
-          justManuallyDisabledRef.current = true;
-          if (onAutoScrollChange) {
-            onAutoScrollChange(false);
-          }
-          setTimeout(() => {
-            justManuallyDisabledRef.current = false;
-          }, 150);
+      if (
+        autoScrollEnabled &&
+        (effectivelyScrollingUp || !atBottomForUserScroll)
+      ) {
+        currentEl.scrollTo({ top: currentEl.scrollTop, behavior: "auto" });
+        setAutoScrollEnabled(false);
+        justManuallyDisabledRef.current = true;
+        if (onAutoScrollChange) {
+          onAutoScrollChange(false);
         }
       }
       lastScrollTopRef.current = currentScrollTop;
     };
 
-    el.addEventListener("wheel", handleScroll as EventListener, {
-      passive: true,
-    });
-    el.addEventListener("touchstart", handleScroll as EventListener, {
-      passive: true,
-    });
+    const DEBOUNCE_DELAY = 150;
 
-    const enableIfNearBottom = () => {
+    const evaluateScrollPositionAndToggleAutoscroll = () => {
+      const currentEl = containerRef.current;
+      if (!currentEl) return;
+
+      const generalAtBottomThreshold = 20;
+      const isGenerallyAtBottom =
+        currentEl.scrollHeight - currentEl.scrollTop - currentEl.clientHeight <
+        generalAtBottomThreshold;
+
+      const manualOverrideResetThreshold = 5;
+      const isManuallyScrolledBackToBottom =
+        currentEl.scrollHeight - currentEl.scrollTop - currentEl.clientHeight <
+        manualOverrideResetThreshold;
+
       if (justManuallyDisabledRef.current) {
+        if (isManuallyScrolledBackToBottom) {
+          justManuallyDisabledRef.current = false;
+          if (!autoScrollEnabled) {
+            setAutoScrollEnabled(true);
+            if (onAutoScrollChange) {
+              onAutoScrollChange(true);
+            }
+          }
+        }
         return;
       }
 
-      const el = containerRef.current;
-      if (!el) return;
-
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 20;
-
-      if (atBottom) {
-        if (!autoScrollEnabled) {
+      if (isLoading) {
+        if (isGenerallyAtBottom && !autoScrollEnabled) {
           setAutoScrollEnabled(true);
           if (onAutoScrollChange) {
             onAutoScrollChange(true);
           }
         }
       } else {
-        if (autoScrollEnabled) {
-          setAutoScrollEnabled(false);
-          if (onAutoScrollChange) {
-            onAutoScrollChange(false);
+        if (isGenerallyAtBottom) {
+          if (!autoScrollEnabled) {
+            setAutoScrollEnabled(true);
+            if (onAutoScrollChange) {
+              onAutoScrollChange(true);
+            }
+          }
+        } else {
+          if (autoScrollEnabled) {
+            setAutoScrollEnabled(false);
+            if (onAutoScrollChange) {
+              onAutoScrollChange(false);
+            }
           }
         }
       }
     };
 
-    el.addEventListener("scroll", enableIfNearBottom, { passive: true });
+    const debouncedScrollHandler = () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      scrollTimeoutRef.current = setTimeout(
+        evaluateScrollPositionAndToggleAutoscroll,
+        DEBOUNCE_DELAY,
+      );
+    };
+
+    el.addEventListener("wheel", handleUserInitiatedScroll as EventListener, {
+      passive: true,
+    });
+    el.addEventListener(
+      "touchstart",
+      handleUserInitiatedScroll as EventListener,
+      {
+        passive: true,
+      },
+    );
+    el.addEventListener("scroll", debouncedScrollHandler, { passive: true });
 
     return () => {
-      el.removeEventListener("wheel", handleScroll as EventListener);
-      el.removeEventListener("touchstart", handleScroll as EventListener);
-      el.removeEventListener("scroll", enableIfNearBottom);
+      el.removeEventListener(
+        "wheel",
+        handleUserInitiatedScroll as EventListener,
+      );
+      el.removeEventListener(
+        "touchstart",
+        handleUserInitiatedScroll as EventListener,
+      );
+      el.removeEventListener("scroll", debouncedScrollHandler);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
     };
-  }, [onAutoScrollChange, autoScrollEnabled]);
+  }, [onAutoScrollChange, autoScrollEnabled, isLoading]);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    if (isLoading) {
-      if (!streamStarted) {
-        const shouldEnable = autoScrollEnabled;
-        setAutoScrollEnabled(true);
-        if (onAutoScrollChange && !shouldEnable) onAutoScrollChange(true);
-        el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
-      } else if (autoScrollEnabled) {
-        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-      }
+    if (justManuallyDisabledRef.current) {
+      return;
     }
-  }, [
-    messages,
-    isLoading,
-    streamStarted,
-    autoScrollEnabled,
-    onAutoScrollChange,
-  ]);
+
+    if (isLoading && !streamStarted) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+    } else if (isLoading && streamStarted && autoScrollEnabled) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
+  }, [messages, isLoading, streamStarted, autoScrollEnabled]);
 
   return (
     <div
@@ -223,12 +272,10 @@ function ChatAreaComponent(
                   );
                 }
               }
-
               return null;
             })}
           </div>
         ))}
-
         {isLoading && !streamStarted && (
           <div className="p-3 rounded-lg max-w-xl bg-transparent self-start mr-auto">
             <div className="w-6 h-6 border-3 border-gray-300 border-t-[#5d5d5d] rounded-full animate-spin" />

@@ -11,6 +11,8 @@ import Tooltip from "@/components/Tooltip";
 import Toast from "@/components/Toast";
 import { ArrowDownIcon } from "@heroicons/react/24/solid";
 
+const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash-preview-04-17";
+
 export interface MessagePart {
   type: "text" | "file";
   text?: string;
@@ -80,10 +82,19 @@ export default function Home() {
       .then((res) => res.json())
       .then((list: Model[]) => {
         setModels(list);
-        setSelectedModel(
-          (current) =>
-            list.find((m) => m.name === current?.name) || list[0] || null,
-        );
+        if (list.length === 0) {
+          setSelectedModel(null);
+          return;
+        }
+        setSelectedModel((current) => {
+          if (current) {
+            const stillExists = list.find((m) => m.name === current.name);
+            if (stillExists) return stillExists;
+          }
+          const defaultModel = list.find((m) => m.name === DEFAULT_MODEL_NAME);
+          if (defaultModel) return defaultModel;
+          return list[0] || null;
+        });
       })
       .catch((err) => setError(err.message));
   }, [keySelection]);
@@ -166,9 +177,20 @@ export default function Home() {
       setMessages([]);
       return;
     }
+
+    const chat = allChats.find((c) => c.id === activeChatId);
+    if (chat?.lastModel) {
+      const modelForThisChat = models.find((m) => m.name === chat.lastModel);
+      if (modelForThisChat && selectedModel?.name !== modelForThisChat.name) {
+        setSelectedModel(modelForThisChat);
+      }
+    }
+
     setIsLoading(true);
-    loadChat(activeChatId).finally(() => setIsLoading(false));
-  }, [activeChatId, loadChat]);
+    loadChat(activeChatId).finally(() => {
+      setIsLoading(false);
+    });
+  }, [activeChatId, allChats, models, loadChat, selectedModel]);
 
   const handleCancel = () => {
     controller?.abort();
@@ -180,7 +202,12 @@ export default function Home() {
     uploadedFiles: UploadedFileInfo[],
   ) => {
     if (!inputText.trim() && uploadedFiles.length === 0) return;
-    if (!selectedModel) return;
+    if (!selectedModel) {
+      setError(
+        "No model selected or available. Please check model list or API key.",
+      );
+      return;
+    }
 
     let sessionId = activeChatId;
     let isNew = false;
@@ -191,7 +218,7 @@ export default function Home() {
         body: JSON.stringify({ title: `Chat ${allChats.length + 1}` }),
       });
       const { id, title } = await res.json();
-      const modelName = selectedModel!.name ?? "";
+      const modelName = selectedModel.name ?? "";
       setAllChats((prev) => [...prev, { id, title, lastModel: modelName }]);
       sessionId = id;
       isNew = true;
@@ -246,7 +273,7 @@ export default function Home() {
           history: historyForAPI,
           messageParts: newUserMessageParts,
           chatSessionId: sessionId,
-          model: selectedModel!.name,
+          model: selectedModel.name,
           keySelection,
         }),
         signal: ctrl.signal,
@@ -327,7 +354,7 @@ export default function Home() {
         <div className="flex-none sticky top-0 z-10 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
           <ModelSelector
             models={models}
-            selected={selectedModel!}
+            selected={selectedModel}
             onChangeAction={handleModelChange}
           />
 

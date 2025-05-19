@@ -1,5 +1,7 @@
 "use client";
 
+import "katex/dist/katex.min.css";
+
 import React, {
   useRef,
   useState,
@@ -11,6 +13,8 @@ import React, {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { MessagePart } from "@/app/page";
 
 export interface Message {
@@ -230,8 +234,11 @@ function ChatAreaComponent(
                 return (
                   <div key={j} className="prose max-w-none prose-customtext">
                     <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[[rehypeHighlight, { detect: true }]]}
+                      remarkPlugins={[remarkMath, remarkGfm]}
+                      rehypePlugins={[
+                        rehypeKatex,
+                        [rehypeHighlight, { detect: true }],
+                      ]}
                     >
                       {part.text}
                     </ReactMarkdown>

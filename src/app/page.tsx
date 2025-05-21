@@ -14,7 +14,7 @@ import Tooltip from "@/components/Tooltip";
 import Toast from "@/components/Toast";
 import { ArrowDownIcon } from "@heroicons/react/24/solid";
 
-const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash-preview-04-17";
+const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash-preview-05-20";
 
 export interface MessagePart {
   type: "text" | "file";

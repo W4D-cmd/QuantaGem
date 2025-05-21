@@ -29,7 +29,7 @@ export default function ToggleApiKeyButton({
       ) : (
         <OutlineDollar className="h-5 w-5" />
       )}
-      <span>Paid</span>
+      <span>{isPaid ? "Paid" : "Free"}</span>
     </button>
   );
 }

@@ -174,12 +174,20 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    fetch("/api/chats")
-      .then((res) => res.json())
-      .then((list: ChatListItem[]) => setAllChats(list))
-      .catch((err) => setError(err.message));
+  const fetchAllChats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/chats");
+      if (!res.ok) throw new Error("Failed to fetch chats.");
+      const list: ChatListItem[] = await res.json();
+      setAllChats(list);
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err));
+    }
   }, []);
+
+  useEffect(() => {
+    fetchAllChats();
+  }, [fetchAllChats]);
 
   const handleNewChat = useCallback(() => {
     setActiveChatId(null);
@@ -288,9 +296,8 @@ export default function Home() {
           body: JSON.stringify({ title: `Chat ${allChats.length + 1}` }),
         });
         if (!res.ok) throw new Error("Failed to create new chat session.");
-        const { id, title } = await res.json();
-        const modelName = selectedModel.name ?? "";
-        setAllChats((prev) => [{ id, title, lastModel: modelName }, ...prev]);
+        const { id } = await res.json();
+        await fetchAllChats();
         sessionId = id;
         isNew = true;
       } catch (err) {

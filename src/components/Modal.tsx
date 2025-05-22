@@ -67,7 +67,7 @@ const Modal: React.FC<ModalProps> = ({
     >
       <div
         ref={modalRef}
-        className={`bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden w-full ${sizeClasses[size]}`}
+        className={`focus:outline-none bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden w-full ${sizeClasses[size]}`}
         onClick={(e) => e.stopPropagation()}
         tabIndex={-1}
         role="document"

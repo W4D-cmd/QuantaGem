@@ -285,10 +285,39 @@ export async function POST(request: Request) {
       { role: "user", parts: newMessageGeminiParts },
     ];
 
-    const streamingResult = await genAI.models.generateContentStream({
+    let systemPromptText: string | null = null;
+    try {
+      const settingsResult = await pool.query(
+        "SELECT system_prompt FROM user_settings WHERE id = 1",
+      );
+      if (
+        settingsResult.rows.length > 0 &&
+        settingsResult.rows[0].system_prompt
+      ) {
+        systemPromptText = settingsResult.rows[0].system_prompt;
+      }
+    } catch (dbError) {
+      console.warn(
+        "Failed to fetch system prompt, proceeding without it:",
+        dbError,
+      );
+    }
+
+    const streamParams: {
+      model: string;
+      contents: Content[];
+      config?: { systemInstruction: string };
+    } = {
       model,
       contents: contentsForApi,
-    });
+    };
+
+    if (systemPromptText && systemPromptText.trim() !== "") {
+      streamParams.config = { systemInstruction: systemPromptText };
+    }
+
+    const streamingResult =
+      await genAI.models.generateContentStream(streamParams);
 
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({

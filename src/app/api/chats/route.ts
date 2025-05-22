@@ -6,6 +6,7 @@ export async function GET() {
     SELECT id
          , title
          , last_model   AS "lastModel"
+         , system_prompt AS "systemPrompt"
     FROM chat_sessions
     ORDER BY updated_at DESC
   `);
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
   const { rows } = await pool.query(
     `INSERT INTO chat_sessions (title, last_model)
        VALUES ($1, $2)
-         RETURNING id, title, last_model AS "lastModel"`,
+         RETURNING id, title, last_model AS "lastModel", system_prompt AS "systemPrompt"`,
     [title, ""],
   );
   return NextResponse.json(rows[0]);

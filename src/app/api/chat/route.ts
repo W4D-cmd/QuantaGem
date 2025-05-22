@@ -287,14 +287,26 @@ export async function POST(request: Request) {
 
     let systemPromptText: string | null = null;
     try {
-      const settingsResult = await pool.query(
-        "SELECT system_prompt FROM user_settings WHERE id = 1",
+      const chatSettingsResult = await pool.query(
+        "SELECT system_prompt FROM chat_sessions WHERE id = $1",
+        [chatSessionId],
       );
+
       if (
-        settingsResult.rows.length > 0 &&
-        settingsResult.rows[0].system_prompt
+        chatSettingsResult.rows.length > 0 &&
+        chatSettingsResult.rows[0].system_prompt?.trim() !== ""
       ) {
-        systemPromptText = settingsResult.rows[0].system_prompt;
+        systemPromptText = chatSettingsResult.rows[0].system_prompt;
+      } else {
+        const globalSettingsResult = await pool.query(
+          "SELECT system_prompt FROM user_settings WHERE id = 1",
+        );
+        if (
+          globalSettingsResult.rows.length > 0 &&
+          globalSettingsResult.rows[0].system_prompt?.trim() !== ""
+        ) {
+          systemPromptText = globalSettingsResult.rows[0].system_prompt;
+        }
       }
     } catch (dbError) {
       console.warn(

@@ -37,6 +37,7 @@ export interface ChatListItem {
   id: number;
   title: string;
   lastModel: string;
+  systemPrompt: string;
 }
 
 function extractErrorMessage(err: unknown): string {
@@ -56,6 +57,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [editingChatId, setEditingChatId] = useState<number | null>(null);
+  const [editingPromptInitialValue, setEditingPromptInitialValue] = useState<
+    string | null
+  >(null);
   const [isThreeDotMenuOpen, setIsThreeDotMenuOpen] = useState(false);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
@@ -171,6 +176,7 @@ export default function Home() {
     if (activeChatId === chatId) {
       setActiveChatId(null);
       setMessages([]);
+      setEditingPromptInitialValue(null);
     }
   };
 
@@ -192,18 +198,20 @@ export default function Home() {
   const handleNewChat = useCallback(() => {
     setActiveChatId(null);
     setMessages([]);
+    setEditingPromptInitialValue(null);
   }, []);
 
   const loadChat = useCallback(async (chatId: number) => {
     setIsLoading(true);
     try {
       const res = await fetch(`/api/chats/${chatId}`);
-      const data: Message[] = await res.json();
-      setMessages(data);
+      const data: { messages: Message[]; systemPrompt: string } =
+        await res.json();
+      setMessages(data.messages);
+      setEditingPromptInitialValue(data.systemPrompt);
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
       setError(message);
-      return;
     } finally {
       setIsLoading(false);
     }
@@ -214,18 +222,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (activeChatId === null) return;
-    const chat = allChats.find((c) => c.id === activeChatId);
-    if (chat?.lastModel) {
-      const mi = models.find((m) => m.name === chat.lastModel);
-      if (mi) setSelectedModel(mi);
-    }
-  }, [activeChatId, allChats, models]);
-
-  useEffect(() => {
     if (activeChatId === null) {
       if (!isLoading) {
         setMessages([]);
+        setEditingPromptInitialValue(null);
       }
 
       const currentSelectedModelStillValid = models.find(
@@ -423,16 +423,34 @@ export default function Home() {
     setAllChats([]);
     setActiveChatId(null);
     setMessages([]);
+    setEditingPromptInitialValue(null);
   };
 
-  const openSettingsModal = () => {
+  const openGlobalSettingsModal = () => {
+    setEditingChatId(null);
     setIsSettingsModalOpen(true);
     setIsThreeDotMenuOpen(false);
   };
 
+  const openChatSettingsModal = (chatId: number, initialPrompt: string) => {
+    setEditingChatId(chatId);
+    setEditingPromptInitialValue(initialPrompt);
+    setIsSettingsModalOpen(true);
+  };
+
   const closeSettingsModal = () => {
     setIsSettingsModalOpen(false);
+    setEditingChatId(null);
+    setEditingPromptInitialValue(null);
   };
+
+  const handleSettingsSaved = useCallback(async () => {
+    await fetchAllChats();
+    if (activeChatId !== null) {
+      await loadChat(activeChatId);
+    }
+    closeSettingsModal();
+  }, [activeChatId, fetchAllChats, loadChat]);
 
   const toggleThreeDotMenu = () => {
     setIsThreeDotMenuOpen((prev) => !prev);
@@ -443,7 +461,7 @@ export default function Home() {
       id: "settings",
       label: "Settings",
       icon: <Cog6ToothIcon className="h-4 w-4" />,
-      onClick: openSettingsModal,
+      onClick: openGlobalSettingsModal,
     },
   ];
 
@@ -458,6 +476,7 @@ export default function Home() {
         onRenameChat={handleRenameChat}
         onDeleteChat={handleDeleteChat}
         onDeleteAllChats={handleDeleteAllChats}
+        onOpenChatSettings={openChatSettingsModal}
       />
       <main className="flex-1 flex flex-col bg-background text-foreground relative">
         <div className="flex-none sticky top-0 z-10 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
@@ -468,7 +487,6 @@ export default function Home() {
           />
 
           <div className="flex items-center">
-            {/* Group for right-side controls */}
             <Tooltip text="Switch between free and paid API key">
               <ToggleApiKeyButton
                 selectedKey={keySelection}
@@ -479,7 +497,6 @@ export default function Home() {
             </Tooltip>
 
             <div className="relative ms-2">
-              {/* Container for the button and dropdown */}
               <Tooltip text="More options">
                 <button
                   ref={threeDotMenuButtonRef}
@@ -511,10 +528,8 @@ export default function Home() {
           onAutoScrollChange={handleAutoScrollChange}
         />
 
-        {/* pinned input */}
         <div className="flex-none p-4 bg-background">
           <div className="mx-auto max-w-[52rem]">
-            {/* Floating Scroll to Bottom Button */}
             <div className="relative h-0">
               <div
                 className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300 ease-in-out ${isAutoScrollActive ? "opacity-0 pointer-events-none" : "opacity-100"} `}
@@ -541,6 +556,9 @@ export default function Home() {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={closeSettingsModal}
+        chatId={editingChatId}
+        initialSystemPromptValue={editingPromptInitialValue}
+        onSettingsSaved={handleSettingsSaved}
       />
     </div>
   );

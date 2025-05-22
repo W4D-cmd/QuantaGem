@@ -3,6 +3,8 @@
   "extends": [
     "config:recommended"
   ],
+  "automerge": false,
+  "platformAutomerge": false,
   "packageRules": [
     {
       "groupName": "Next.js and React stack",

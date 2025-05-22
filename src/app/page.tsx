@@ -12,7 +12,10 @@ import ToggleApiKeyButton from "@/components/ToggleApiKeyButton";
 import { Model } from "@google/genai";
 import Tooltip from "@/components/Tooltip";
 import Toast from "@/components/Toast";
-import { ArrowDownIcon } from "@heroicons/react/24/solid";
+import DropdownMenu, { DropdownItem } from "@/components/DropdownMenu";
+import SettingsModal from "@/components/SettingsModal";
+import { ArrowDownIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { EllipsisVerticalIcon } from "@heroicons/react/20/solid";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash-preview-05-20";
 
@@ -52,6 +55,9 @@ export default function Home() {
   const [keySelection, setKeySelection] = useState<"free" | "paid">("free");
   const [error, setError] = useState<string | null>(null);
   const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isThreeDotMenuOpen, setIsThreeDotMenuOpen] = useState(false);
+  const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const prevActiveChatIdRef = useRef<number | null>(null);
@@ -253,7 +259,7 @@ export default function Home() {
     }
 
     prevActiveChatIdRef.current = activeChatId;
-  }, [activeChatId, allChats, models, selectedModel, loadChat]);
+  }, [activeChatId, allChats, models, selectedModel, loadChat, isLoading]);
 
   const handleCancel = () => {
     controller?.abort();
@@ -275,16 +281,23 @@ export default function Home() {
     let sessionId = activeChatId;
     let isNew = false;
     if (!sessionId) {
-      const res = await fetch("/api/chats", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: `Chat ${allChats.length + 1}` }),
-      });
-      const { id, title } = await res.json();
-      const modelName = selectedModel.name ?? "";
-      setAllChats((prev) => [...prev, { id, title, lastModel: modelName }]);
-      sessionId = id;
-      isNew = true;
+      try {
+        const res = await fetch("/api/chats", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: `Chat ${allChats.length + 1}` }),
+        });
+        if (!res.ok) throw new Error("Failed to create new chat session.");
+        const { id, title } = await res.json();
+        const modelName = selectedModel.name ?? "";
+        setAllChats((prev) => [{ id, title, lastModel: modelName }, ...prev]);
+        sessionId = id;
+        isNew = true;
+      } catch (err) {
+        setError(extractErrorMessage(err));
+        setIsLoading(false);
+        return;
+      }
     }
 
     const newUserMessageParts: MessagePart[] = [];
@@ -405,6 +418,28 @@ export default function Home() {
     setMessages([]);
   };
 
+  const openSettingsModal = () => {
+    setIsSettingsModalOpen(true);
+    setIsThreeDotMenuOpen(false);
+  };
+
+  const closeSettingsModal = () => {
+    setIsSettingsModalOpen(false);
+  };
+
+  const toggleThreeDotMenu = () => {
+    setIsThreeDotMenuOpen((prev) => !prev);
+  };
+
+  const threeDotMenuItems: DropdownItem[] = [
+    {
+      id: "settings",
+      label: "Settings",
+      icon: <Cog6ToothIcon className="h-4 w-4" />,
+      onClick: openSettingsModal,
+    },
+  ];
+
   return (
     <div className="flex h-screen overflow-hidden">
       {error && <Toast message={error} onClose={() => setError(null)} />}
@@ -425,14 +460,40 @@ export default function Home() {
             onChangeAction={handleModelChange}
           />
 
-          <Tooltip text="Switch between free and paid API key">
-            <ToggleApiKeyButton
-              selectedKey={keySelection}
-              onToggleAction={() =>
-                setKeySelection((prev) => (prev === "free" ? "paid" : "free"))
-              }
-            />
-          </Tooltip>
+          <div className="flex items-center">
+            {/* Group for right-side controls */}
+            <Tooltip text="Switch between free and paid API key">
+              <ToggleApiKeyButton
+                selectedKey={keySelection}
+                onToggleAction={() =>
+                  setKeySelection((prev) => (prev === "free" ? "paid" : "free"))
+                }
+              />
+            </Tooltip>
+
+            <div className="relative ms-2">
+              {/* Container for the button and dropdown */}
+              <Tooltip text="More options">
+                <button
+                  ref={threeDotMenuButtonRef}
+                  onClick={toggleThreeDotMenu}
+                  className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary hover:bg-gray-100"
+                  aria-label="More options"
+                >
+                  <EllipsisVerticalIcon className="h-5 w-5" />
+                </button>
+              </Tooltip>
+
+              <DropdownMenu
+                anchorRef={threeDotMenuButtonRef}
+                open={isThreeDotMenuOpen}
+                onCloseAction={() => setIsThreeDotMenuOpen(false)}
+                items={threeDotMenuItems}
+                position="right"
+                extraWidthPx={10}
+              />
+            </div>
+          </div>
         </div>
 
         <ChatArea
@@ -469,6 +530,11 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={closeSettingsModal}
+      />
     </div>
   );
 }

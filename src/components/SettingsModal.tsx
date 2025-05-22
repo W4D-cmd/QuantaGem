@@ -7,11 +7,21 @@ import Toast from "./Toast";
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  chatId: number | null;
+  initialSystemPromptValue: string | null;
+  onSettingsSaved: () => void;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  chatId,
+  initialSystemPromptValue,
+  onSettingsSaved,
+}) => {
   const [systemPrompt, setSystemPrompt] = useState<string>("");
-  const [initialSystemPrompt, setInitialSystemPrompt] = useState<string>("");
+  const [currentInitialSystemPrompt, setCurrentInitialSystemPrompt] =
+    useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [showToast, setShowToast] = useState<boolean>(false);
@@ -20,30 +30,65 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     if (isOpen) {
       setIsLoading(true);
       setError(null);
-      fetch("/api/settings")
-        .then(async (res) => {
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({
-              error: `Failed to fetch settings: ${res.statusText}`,
-            }));
-            throw new Error(errData.error || "Failed to fetch settings");
-          }
-          return res.json();
-        })
-        .then((data) => {
-          const prompt = data.system_prompt || "";
-          setSystemPrompt(prompt);
-          setInitialSystemPrompt(prompt);
-        })
-        .catch((err) => {
-          setError(err.message);
-          setShowToast(true);
-        })
-        .finally(() => {
+      if (chatId !== null) {
+        if (initialSystemPromptValue !== null) {
+          setSystemPrompt(initialSystemPromptValue);
+          setCurrentInitialSystemPrompt(initialSystemPromptValue);
           setIsLoading(false);
-        });
+        } else {
+          fetch(`/api/chats/${chatId}`)
+            .then(async (res) => {
+              if (!res.ok) {
+                const errData = await res.json().catch(() => ({
+                  error: `Failed to fetch chat settings: ${res.statusText}`,
+                }));
+                throw new Error(
+                  errData.error || "Failed to fetch chat settings",
+                );
+              }
+              return res.json();
+            })
+            .then((data) => {
+              const prompt = data.systemPrompt || "";
+              setSystemPrompt(prompt);
+              setCurrentInitialSystemPrompt(prompt);
+            })
+            .catch((err) => {
+              setError(err.message);
+              setShowToast(true);
+            })
+            .finally(() => {
+              setIsLoading(false);
+            });
+        }
+      } else {
+        fetch("/api/settings")
+          .then(async (res) => {
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({
+                error: `Failed to fetch global settings: ${res.statusText}`,
+              }));
+              throw new Error(
+                errData.error || "Failed to fetch global settings",
+              );
+            }
+            return res.json();
+          })
+          .then((data) => {
+            const prompt = data.system_prompt || "";
+            setSystemPrompt(prompt);
+            setCurrentInitialSystemPrompt(prompt);
+          })
+          .catch((err) => {
+            setError(err.message);
+            setShowToast(true);
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, chatId, initialSystemPromptValue]);
 
   const handleInputChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setSystemPrompt(event.target.value);
@@ -53,21 +98,33 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/settings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ systemPrompt }),
-      });
+      let response;
+      if (chatId !== null) {
+        response = await fetch(`/api/chats/${chatId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ systemPrompt }),
+        });
+      } else {
+        response = await fetch("/api/settings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ systemPrompt }),
+        });
+      }
+
       if (!response.ok) {
         const errData = await response.json().catch(() => ({
           error: `Failed to save settings: ${response.statusText}`,
         }));
         throw new Error(errData.error || "Failed to save settings");
       }
-      setInitialSystemPrompt(systemPrompt);
-      onClose();
+      setCurrentInitialSystemPrompt(systemPrompt);
+      onSettingsSaved();
     } catch (err: unknown) {
       let errorMessage = "An unexpected error occurred.";
       if (err instanceof Error) {
@@ -83,11 +140,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleCancel = () => {
-    setSystemPrompt(initialSystemPrompt);
+    setSystemPrompt(currentInitialSystemPrompt);
     onClose();
   };
 
-  const hasChanges = systemPrompt !== initialSystemPrompt;
+  const hasChanges = systemPrompt !== currentInitialSystemPrompt;
+  const modalTitle = chatId !== null ? "Chat Settings" : "Global Settings";
+  const promptDescription =
+    chatId !== null
+      ? "Define the behavior and persona for the AI in this specific chat. If not set, the global system prompt will be used."
+      : "Define the default behavior and persona for the AI in all new chats.";
 
   return (
     <>
@@ -100,7 +162,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           }}
         />
       )}
-      <Modal isOpen={isOpen} onClose={handleCancel} title="Settings" size="lg">
+      <Modal
+        isOpen={isOpen}
+        onClose={handleCancel}
+        title={modalTitle}
+        size="lg"
+      >
         <div className="space-y-6">
           <div>
             <label
@@ -110,10 +177,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               System Prompt
             </label>
             <p className="text-xs text-primary mb-4 mt-1">
-              Define the behavior and persona for the AI. This prompt will be
-              sent as a system instruction with every request.
+              {promptDescription}
             </p>
-            {isLoading && !systemPrompt && !initialSystemPrompt ? (
+            {isLoading && !systemPrompt && !currentInitialSystemPrompt ? (
               <div className="w-full h-32 bg-gray-100 rounded-lg animate-pulse"></div>
             ) : (
               <textarea

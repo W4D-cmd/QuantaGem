@@ -3,7 +3,8 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
   title TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  last_model TEXT
+  last_model TEXT,
+  system_prompt TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS messages (

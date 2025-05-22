@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { ChatListItem } from "@/app/page";
 import {
+  Cog6ToothIcon,
   PencilIcon,
   PencilSquareIcon,
   TrashIcon,
@@ -17,6 +18,7 @@ interface SidebarProps {
   onRenameChat: (chatId: number, newTitle: string) => void;
   onDeleteChat: (chatId: number) => void;
   onDeleteAllChats: () => void;
+  onOpenChatSettings: (chatId: number, initialPrompt: string) => void;
 }
 
 export default function Sidebar({
@@ -27,6 +29,7 @@ export default function Sidebar({
   onRenameChat,
   onDeleteChat,
   onDeleteAllChats,
+  onOpenChatSettings,
 }: SidebarProps) {
   const [openMenuChatId, setOpenMenuChatId] = useState<number | null>(null);
   const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -93,6 +96,13 @@ export default function Sidebar({
                     onCloseAction={() => setOpenMenuChatId(null)}
                     position="left"
                     items={[
+                      {
+                        id: "settings",
+                        icon: <Cog6ToothIcon className="h-4 w-4" />,
+                        label: "Settings",
+                        onClick: () =>
+                          onOpenChatSettings(chat.id, chat.systemPrompt),
+                      },
                       {
                         id: "rename",
                         icon: <PencilIcon className="h-4 w-4" />,

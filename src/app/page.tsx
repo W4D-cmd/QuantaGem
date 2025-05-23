@@ -62,6 +62,7 @@ export default function Home() {
     string | null
   >(null);
   const [isThreeDotMenuOpen, setIsThreeDotMenuOpen] = useState(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -277,6 +278,7 @@ export default function Home() {
   const handleSendMessage = async (
     inputText: string,
     uploadedFiles: UploadedFileInfo[],
+    sendWithSearch: boolean,
   ) => {
     if (!inputText.trim() && uploadedFiles.length === 0) return;
     if (!selectedModel) {
@@ -358,6 +360,7 @@ export default function Home() {
           chatSessionId: sessionId,
           model: selectedModel.name,
           keySelection,
+          isSearchActive: sendWithSearch,
         }),
         signal: ctrl.signal,
       });
@@ -548,6 +551,8 @@ export default function Home() {
               onSendMessageAction={handleSendMessage}
               onCancelAction={handleCancel}
               isLoading={isLoading}
+              isSearchActive={isSearchActive}
+              onToggleSearch={setIsSearchActive}
             />
           </div>
         </div>

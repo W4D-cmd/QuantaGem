@@ -29,9 +29,15 @@ export interface UploadedFileInfo {
 }
 
 interface ChatInputProps {
-  onSendMessageAction: (inputText: string, files: UploadedFileInfo[]) => void;
+  onSendMessageAction: (
+    inputText: string,
+    files: UploadedFileInfo[],
+    isSearchActive: boolean,
+  ) => void;
   onCancelAction: () => void;
   isLoading: boolean;
+  isSearchActive: boolean;
+  onToggleSearch: (isActive: boolean) => void;
 }
 
 export interface ChatInputHandle {
@@ -39,9 +45,17 @@ export interface ChatInputHandle {
 }
 
 const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
-  ({ onSendMessageAction, onCancelAction, isLoading }, ref) => {
+  (
+    {
+      onSendMessageAction,
+      onCancelAction,
+      isLoading,
+      isSearchActive,
+      onToggleSearch,
+    },
+    ref,
+  ) => {
     const [input, setInput] = useState("");
-    const [isSearchActive, setIsSearchActive] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedFiles, setSelectedFiles] = useState<UploadedFileInfo[]>([]);
@@ -137,7 +151,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const submit = () => {
       if ((!input.trim() && selectedFiles.length === 0) || isLoading) return;
-      onSendMessageAction(input, selectedFiles);
+      onSendMessageAction(input, selectedFiles, isSearchActive);
       setInput("");
       setSelectedFiles([]);
     };
@@ -244,10 +258,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 <Tooltip text="Search the web">
                   <button
                     type="button"
-                    disabled
-                    onClick={() => setIsSearchActive((v) => !v)}
+                    onClick={() => onToggleSearch(!isSearchActive)}
                     className={`
-                    cursor-not-allowed h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium transition-colors duration-150
+                    cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium transition-colors duration-150
                     ${
                       isSearchActive
                         ? "bg-[#171717] text-white border"

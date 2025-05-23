@@ -133,6 +133,23 @@ export default function Home() {
     setIsAutoScrollActive(isEnabled);
   }, []);
 
+  const fetchAllChats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/chats");
+      if (!res.ok) throw new Error("Failed to fetch chats.");
+      const list: ChatListItem[] = await res.json();
+      setAllChats(list);
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (userEmail) {
+      fetchAllChats();
+    }
+  }, [fetchAllChats, userEmail]);
+
   const handleScrollToBottomClick = () => {
     chatAreaRef.current?.scrollToBottomAndEnableAutoscroll();
   };
@@ -169,11 +186,13 @@ export default function Home() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ keySelection: newSelection }),
-        }).catch((err) => setError(extractErrorMessage(err)));
+        })
+          .then(() => fetchAllChats())
+          .catch((err) => setError(extractErrorMessage(err)));
       }
       return newSelection;
     });
-  }, [activeChatId]);
+  }, [activeChatId, fetchAllChats]);
 
   useEffect(() => {
     fetch(`/api/models?keySelection=${keySelection}`)
@@ -210,6 +229,7 @@ export default function Home() {
           errorData.error || `Failed to rename chat: ${res.statusText}`,
         );
       }
+      await fetchAllChats();
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
       setError(message);
@@ -243,23 +263,6 @@ export default function Home() {
       setKeySelection("free");
     }
   };
-
-  const fetchAllChats = useCallback(async () => {
-    try {
-      const res = await fetch("/api/chats");
-      if (!res.ok) throw new Error("Failed to fetch chats.");
-      const list: ChatListItem[] = await res.json();
-      setAllChats(list);
-    } catch (err: unknown) {
-      setError(extractErrorMessage(err));
-    }
-  }, []);
-
-  useEffect(() => {
-    if (userEmail) {
-      fetchAllChats();
-    }
-  }, [fetchAllChats, userEmail]);
 
   const handleNewChat = useCallback(() => {
     setActiveChatId(null);
@@ -390,7 +393,6 @@ export default function Home() {
           );
         }
         const { id } = await res.json();
-        await fetchAllChats();
         sessionId = id;
         isNew = true;
       } catch (err) {
@@ -540,6 +542,7 @@ export default function Home() {
       setIsLoading(false);
       setController(null);
       if (isNew) setActiveChatId(sessionId);
+      await fetchAllChats();
     }
   };
 

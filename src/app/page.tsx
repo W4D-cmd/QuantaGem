@@ -303,7 +303,6 @@ export default function Home() {
       if (!isLoading) {
         setMessages([]);
         setEditingPromptInitialValue(null);
-        setKeySelection("free");
       }
 
       const currentSelectedModelStillValid = models.find(
@@ -378,7 +377,10 @@ export default function Home() {
         const res = await fetch("/api/chats", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: `Chat ${allChats.length + 1}` }),
+          body: JSON.stringify({
+            title: `Chat ${allChats.length + 1}`,
+            keySelection,
+          }),
         });
         if (!res.ok) {
           const errorData = await res.json();

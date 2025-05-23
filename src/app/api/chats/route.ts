@@ -44,12 +44,13 @@ export async function POST(request: NextRequest) {
   }
   const userId = user.id.toString();
 
-  const { title } = await request.json();
+  const { title, keySelection: initialKeySelection } = await request.json();
+  const actualKeySelection = initialKeySelection || "free";
   const { rows } = await pool.query(
     `INSERT INTO chat_sessions (user_id, title, last_model, key_selection)
        VALUES ($1, $2, $3, $4)
          RETURNING id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection"`,
-    [userId, title, "", "free"],
+    [userId, title, "", actualKeySelection],
   );
   return NextResponse.json(rows[0]);
 }

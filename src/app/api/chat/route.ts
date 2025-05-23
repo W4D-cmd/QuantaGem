@@ -10,6 +10,7 @@ interface ChatRequest {
   chatSessionId: string;
   model: string;
   keySelection: "free" | "paid";
+  isSearchActive?: boolean;
 }
 
 const SUPPORTED_GEMINI_MIME_TYPES = [
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
     chatSessionId,
     model,
     keySelection,
+    isSearchActive,
   } = (await request.json()) as ChatRequest;
 
   const apiKey =
@@ -315,17 +317,30 @@ export async function POST(request: Request) {
       );
     }
 
+    const generationConfig: {
+      systemInstruction?: string;
+      tools?: Array<{ googleSearch: Record<string, never> }>;
+    } = {};
+
+    if (systemPromptText && systemPromptText.trim() !== "") {
+      generationConfig.systemInstruction = systemPromptText;
+    }
+
+    if (isSearchActive) {
+      generationConfig.tools = [{ googleSearch: {} }];
+    }
+
     const streamParams: {
       model: string;
       contents: Content[];
-      config?: { systemInstruction: string };
+      config?: typeof generationConfig;
     } = {
       model,
       contents: contentsForApi,
     };
 
-    if (systemPromptText && systemPromptText.trim() !== "") {
-      streamParams.config = { systemInstruction: systemPromptText };
+    if (Object.keys(generationConfig).length > 0) {
+      streamParams.config = generationConfig;
     }
 
     const streamingResult =

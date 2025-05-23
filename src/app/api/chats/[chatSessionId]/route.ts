@@ -23,7 +23,7 @@ export async function GET(
   const client = await pool.connect();
   try {
     const chatSessionResult = await client.query(
-      `SELECT title, last_model AS "lastModel", system_prompt AS "systemPrompt"
+      `SELECT title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection"
          FROM chat_sessions
          WHERE id = $1 AND user_id = $2`,
       [chatSessionId, userId],
@@ -81,11 +81,13 @@ export async function PATCH(
   const userId = user.id.toString();
 
   const { chatSessionId } = await context.params;
-  const { title, lastModel, systemPrompt } = (await request.json()) as {
-    title?: string;
-    lastModel?: string;
-    systemPrompt?: string;
-  };
+  const { title, lastModel, systemPrompt, keySelection } =
+    (await request.json()) as {
+      title?: string;
+      lastModel?: string;
+      systemPrompt?: string;
+      keySelection?: "free" | "paid";
+    };
 
   const sets: string[] = [];
   const vals: (string | number)[] = [];
@@ -102,6 +104,10 @@ export async function PATCH(
   if (systemPrompt !== undefined) {
     sets.push(`system_prompt = $${idx++}`);
     vals.push(systemPrompt);
+  }
+  if (keySelection !== undefined) {
+    sets.push(`key_selection = $${idx++}`);
+    vals.push(keySelection);
   }
 
   if (!sets.length) {
@@ -125,7 +131,7 @@ export async function PATCH(
       );
     }
     const { rows } = await pool.query(
-      `SELECT id, title, last_model AS "lastModel", system_prompt AS "systemPrompt" FROM chat_sessions WHERE id = $1 AND user_id = $2`,
+      `SELECT id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection" FROM chat_sessions WHERE id = $1 AND user_id = $2`,
       [chatSessionId, userId],
     );
     return NextResponse.json(rows[0]);

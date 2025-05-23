@@ -423,8 +423,8 @@ export async function POST(request: NextRequest) {
           ],
         );
         await pool.query(
-          `UPDATE chat_sessions SET last_model = $2, updated_at = now() WHERE id = $1 AND user_id = $3`,
-          [chatSessionId, model, userId],
+          `UPDATE chat_sessions SET last_model = $2, key_selection = $3, updated_at = now() WHERE id = $1 AND user_id = $4`,
+          [chatSessionId, model, keySelection, userId],
         );
         controller.close();
       },

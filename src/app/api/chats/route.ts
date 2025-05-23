@@ -18,14 +18,15 @@ export async function GET(request: NextRequest) {
 
   const { rows } = await pool.query(
     `
-    SELECT id
-         , title
-         , last_model   AS "lastModel"
-         , system_prompt AS "systemPrompt"
-    FROM chat_sessions
-    WHERE user_id = $1
-    ORDER BY updated_at DESC
-  `,
+        SELECT id
+             , title
+             , last_model   AS "lastModel"
+             , system_prompt AS "systemPrompt"
+             , key_selection AS "keySelection"
+        FROM chat_sessions
+        WHERE user_id = $1
+        ORDER BY updated_at DESC
+      `,
     [userId],
   );
   return NextResponse.json(rows);
@@ -45,10 +46,10 @@ export async function POST(request: NextRequest) {
 
   const { title } = await request.json();
   const { rows } = await pool.query(
-    `INSERT INTO chat_sessions (user_id, title, last_model)
-       VALUES ($1, $2, $3)
-         RETURNING id, title, last_model AS "lastModel", system_prompt AS "systemPrompt"`,
-    [userId, title, ""],
+    `INSERT INTO chat_sessions (user_id, title, last_model, key_selection)
+       VALUES ($1, $2, $3, $4)
+         RETURNING id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection"`,
+    [userId, title, "", "free"],
   );
   return NextResponse.json(rows[0]);
 }

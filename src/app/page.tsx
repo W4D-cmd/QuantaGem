@@ -44,6 +44,7 @@ export interface ChatListItem {
   title: string;
   lastModel: string;
   systemPrompt: string;
+  keySelection: "free" | "paid";
 }
 
 function extractErrorMessage(err: unknown): string {
@@ -154,6 +155,26 @@ export default function Home() {
     }
   };
 
+  const handleKeySelectionToggle = useCallback(() => {
+    setKeySelection((prev) => {
+      const newSelection = prev === "free" ? "paid" : "free";
+
+      if (activeChatId !== null) {
+        setAllChats((prevChats) =>
+          prevChats.map((c) =>
+            c.id === activeChatId ? { ...c, keySelection: newSelection } : c,
+          ),
+        );
+        fetch(`/api/chats/${activeChatId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keySelection: newSelection }),
+        }).catch((err) => setError(extractErrorMessage(err)));
+      }
+      return newSelection;
+    });
+  }, [activeChatId]);
+
   useEffect(() => {
     fetch(`/api/models?keySelection=${keySelection}`)
       .then((res) => res.json())
@@ -219,6 +240,7 @@ export default function Home() {
       setActiveChatId(null);
       setMessages([]);
       setEditingPromptInitialValue(null);
+      setKeySelection("free");
     }
   };
 
@@ -243,6 +265,7 @@ export default function Home() {
     setActiveChatId(null);
     setMessages([]);
     setEditingPromptInitialValue(null);
+    setKeySelection("free");
   }, []);
 
   const loadChat = useCallback(async (chatId: number) => {
@@ -255,10 +278,14 @@ export default function Home() {
           errorData.error || `Failed to load chat: ${res.statusText}`,
         );
       }
-      const data: { messages: Message[]; systemPrompt: string } =
-        await res.json();
+      const data: {
+        messages: Message[];
+        systemPrompt: string;
+        keySelection: "free" | "paid";
+      } = await res.json();
       setMessages(data.messages);
       setEditingPromptInitialValue(data.systemPrompt);
+      setKeySelection(data.keySelection);
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
       setError(message);
@@ -276,6 +303,7 @@ export default function Home() {
       if (!isLoading) {
         setMessages([]);
         setEditingPromptInitialValue(null);
+        setKeySelection("free");
       }
 
       const currentSelectedModelStillValid = models.find(
@@ -307,6 +335,12 @@ export default function Home() {
           setSelectedModel(defaultModel);
         }
       }
+    }
+
+    if (chat?.keySelection) {
+      setKeySelection(chat.keySelection);
+    } else {
+      setKeySelection("free");
     }
 
     if (activeChatId !== prevActiveChatIdRef.current) {
@@ -526,6 +560,7 @@ export default function Home() {
     setActiveChatId(null);
     setMessages([]);
     setEditingPromptInitialValue(null);
+    setKeySelection("free");
   };
 
   const openGlobalSettingsModal = () => {
@@ -612,9 +647,7 @@ export default function Home() {
             <Tooltip text="Switch between free and paid API key">
               <ToggleApiKeyButton
                 selectedKey={keySelection}
-                onToggleAction={() =>
-                  setKeySelection((prev) => (prev === "free" ? "paid" : "free"))
-                }
+                onToggleAction={handleKeySelectionToggle}
               />
             </Tooltip>
 

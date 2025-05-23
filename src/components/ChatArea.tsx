@@ -20,6 +20,7 @@ import { MessagePart } from "@/app/page";
 export interface Message {
   role: "user" | "model";
   parts: MessagePart[];
+  sources?: Array<{ title: string; uri: string }>;
 }
 
 interface ChatAreaProps {
@@ -281,6 +282,25 @@ function ChatAreaComponent(
               }
               return null;
             })}
+            {msg.role === "model" && msg.sources && msg.sources.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-600">
+                <p className="font-semibold mb-2">Sources:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  {msg.sources.map((source, k) => (
+                    <li key={k}>
+                      <a
+                        href={source.uri}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 underline break-all"
+                      >
+                        {source.title || source.uri}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         ))}
         {isLoading && !streamStarted && (

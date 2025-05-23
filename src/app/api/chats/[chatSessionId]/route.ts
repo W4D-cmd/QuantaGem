@@ -12,8 +12,8 @@ export async function GET(
   try {
     const chatSessionResult = await client.query(
       `SELECT title, last_model AS "lastModel", system_prompt AS "systemPrompt"
-       FROM chat_sessions
-       WHERE id = $1`,
+         FROM chat_sessions
+         WHERE id = $1`,
       [chatSessionId],
     );
 
@@ -27,10 +27,10 @@ export async function GET(
     const chatSessionData = chatSessionResult.rows[0];
 
     const messagesResult = await client.query(
-      `SELECT role, parts
-       FROM messages
-       WHERE chat_session_id = $1
-       ORDER BY position`,
+      `SELECT role, parts, sources
+         FROM messages
+         WHERE chat_session_id = $1
+         ORDER BY position`,
       [chatSessionId],
     );
     return NextResponse.json({

@@ -1,4 +1,4 @@
-import { Content, GoogleGenAI, Part } from "@google/genai";
+import { Content, GoogleGenAI, GroundingMetadata, Part } from "@google/genai";
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
@@ -199,12 +199,13 @@ export async function POST(request: Request) {
 
   try {
     await pool.query(
-      `INSERT INTO messages (chat_session_id, role, content, parts, position) SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1`,
+      `INSERT INTO messages (chat_session_id, role, content, parts, position, sources) SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5 FROM messages WHERE chat_session_id = $1`,
       [
         chatSessionId,
         "user",
         combinedUserTextForDB,
         JSON.stringify(newMessageAppParts),
+        JSON.stringify([]),
       ],
     );
 
@@ -350,19 +351,62 @@ export async function POST(request: Request) {
     const readableStream = new ReadableStream({
       async start(controller) {
         let modelOutput = "";
+        const sourcesToStore: Array<{ title: string; uri: string }> = [];
+
         for await (const chunk of streamingResult) {
           if (chunk.text) {
             modelOutput += chunk.text;
-            controller.enqueue(encoder.encode(chunk.text));
+            const jsonTextChunk = { type: "text", value: chunk.text };
+            controller.enqueue(
+              encoder.encode(JSON.stringify(jsonTextChunk) + "\n"),
+            );
+          }
+
+          if (chunk.candidates && chunk.candidates.length > 0) {
+            const candidate = chunk.candidates[0];
+            if (candidate.groundingMetadata) {
+              const groundingMetadata: GroundingMetadata =
+                candidate.groundingMetadata;
+
+              if (groundingMetadata.groundingChunks) {
+                for (const gc of groundingMetadata.groundingChunks) {
+                  if (gc.web && gc.web.title && gc.web.uri) {
+                    const webInfo = gc.web;
+
+                    const isDuplicate = sourcesToStore.some(
+                      (s) => s.uri === webInfo.uri,
+                    );
+                    if (!isDuplicate) {
+                      const source = {
+                        title: webInfo.title!,
+                        uri: webInfo.uri!,
+                      };
+                      sourcesToStore.push(source);
+                      const jsonGroundingChunk = {
+                        type: "grounding",
+                        sources: [source],
+                      };
+                      controller.enqueue(
+                        encoder.encode(
+                          JSON.stringify(jsonGroundingChunk) + "\n",
+                        ),
+                      );
+                    }
+                  }
+                }
+              }
+            }
           }
         }
+
         await pool.query(
-          `INSERT INTO messages (chat_session_id, role, content, parts, position) SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1`,
+          `INSERT INTO messages (chat_session_id, role, content, parts, position, sources) SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5 FROM messages WHERE chat_session_id = $1`,
           [
             chatSessionId,
             "model",
             modelOutput,
             JSON.stringify([{ type: "text", text: modelOutput }]),
+            JSON.stringify(sourcesToStore),
           ],
         );
         await pool.query(
@@ -374,7 +418,7 @@ export async function POST(request: Request) {
       cancel() {},
     });
     return new Response(readableStream, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
+      headers: { "Content-Type": "application/jsonl; charset=utf-8" },
     });
   } catch (error) {
     console.error("Error in Gemini API call or DB operation:", error);

@@ -31,6 +31,7 @@ export interface MessagePart {
 export interface Message {
   role: "user" | "model";
   parts: MessagePart[];
+  sources?: Array<{ title: string; uri: string }>;
 }
 
 export interface ChatListItem {
@@ -341,6 +342,7 @@ export default function Home() {
     const placeholderMessage: Message = {
       role: "model",
       parts: [{ type: "text", text: "" }],
+      sources: [],
     };
     setMessages((prev) => {
       modelMessageIndex = prev.length;
@@ -380,23 +382,60 @@ export default function Home() {
       }
 
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-      let accumulatedResponse = "";
       let isFirstChunk = true;
+      let textAccumulator = "";
+      const currentSources: Array<{ title: string; uri: string }> = [];
+
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
+
         if (isFirstChunk) {
           setStreamStarted(true);
           isFirstChunk = false;
         }
-        accumulatedResponse += value;
-        setMessages((prev) =>
-          prev.map((msg, idx) =>
-            idx === modelMessageIndex
-              ? { ...msg, parts: [{ type: "text", text: accumulatedResponse }] }
-              : msg,
-          ),
-        );
+
+        const lines = value.split("\n").filter((line) => line.trim() !== "");
+
+        setMessages((prev) => {
+          const updatedMessages = [...prev];
+          const messageToUpdate = updatedMessages[modelMessageIndex];
+
+          for (const line of lines) {
+            try {
+              const parsedChunk = JSON.parse(line);
+              if (parsedChunk.type === "text") {
+                textAccumulator += parsedChunk.value;
+              } else if (parsedChunk.type === "grounding") {
+                if (parsedChunk.sources && Array.isArray(parsedChunk.sources)) {
+                  parsedChunk.sources.forEach(
+                    (s: { title: string; uri: string }) => {
+                      const exists = currentSources.some(
+                        (existing) => existing.uri === s.uri,
+                      );
+                      if (!exists) {
+                        currentSources.push(s);
+                      }
+                    },
+                  );
+                }
+              }
+            } catch (jsonError) {
+              console.error(
+                "Failed to parse JSONL chunk:",
+                jsonError,
+                "Raw line:",
+                line,
+              );
+              textAccumulator += line;
+            }
+          }
+
+          messageToUpdate.parts = [{ type: "text", text: textAccumulator }];
+          messageToUpdate.sources = [...currentSources];
+
+          return updatedMessages;
+        });
       }
     } catch (error: unknown) {
       setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndex));

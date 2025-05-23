@@ -1,8 +1,9 @@
 import { Content, GoogleGenAI, GroundingMetadata, Part } from "@google/genai";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
+import { getUserFromSession } from "@/lib/auth";
 
 interface ChatRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
@@ -71,7 +72,18 @@ function getFileExtension(fileName?: string): string {
   return (fileName.split(".").pop() || "").toLowerCase();
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const user = await getUserFromSession(request.cookies);
+  if (!user) {
+    const response = NextResponse.json(
+      { error: "Unauthorized: User not authenticated" },
+      { status: 401 },
+    );
+    response.cookies.delete("session");
+    return response;
+  }
+  const userId = user.id.toString();
+
   const {
     history: clientHistoryWithAppParts,
     messageParts: newMessageAppParts,
@@ -291,8 +303,8 @@ export async function POST(request: Request) {
     let systemPromptText: string | null = null;
     try {
       const chatSettingsResult = await pool.query(
-        "SELECT system_prompt FROM chat_sessions WHERE id = $1",
-        [chatSessionId],
+        "SELECT system_prompt FROM chat_sessions WHERE id = $1 AND user_id = $2",
+        [chatSessionId, userId],
       );
 
       if (
@@ -302,7 +314,8 @@ export async function POST(request: Request) {
         systemPromptText = chatSettingsResult.rows[0].system_prompt;
       } else {
         const globalSettingsResult = await pool.query(
-          "SELECT system_prompt FROM user_settings WHERE id = 1",
+          "SELECT system_prompt FROM user_settings WHERE user_id = $1",
+          [userId],
         );
         if (
           globalSettingsResult.rows.length > 0 &&
@@ -410,8 +423,8 @@ export async function POST(request: Request) {
           ],
         );
         await pool.query(
-          `UPDATE chat_sessions SET last_model = $2, updated_at = now() WHERE id = $1`,
-          [chatSessionId, model],
+          `UPDATE chat_sessions SET last_model = $2, updated_at = now() WHERE id = $1 AND user_id = $3`,
+          [chatSessionId, model, userId],
         );
         controller.close();
       },

@@ -19,6 +19,7 @@ interface SidebarProps {
   onDeleteChat: (chatId: number) => void;
   onDeleteAllChats: () => void;
   onOpenChatSettings: (chatId: number, initialPrompt: string) => void;
+  userEmail: string | null;
 }
 
 export default function Sidebar({
@@ -30,32 +31,46 @@ export default function Sidebar({
   onDeleteChat,
   onDeleteAllChats,
   onOpenChatSettings,
+  userEmail,
 }: SidebarProps) {
   const [openMenuChatId, setOpenMenuChatId] = useState<number | null>(null);
   const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   return (
     <div className="w-70 h-full bg-gray-100 p-4 pt-2 overflow-y-auto flex flex-col">
-      <div className="flex justify-end mb-4 space-x-2">
-        <Tooltip text={"Delete all chats"}>
-          <button
-            onClick={() => {
-              if (confirm("Delete all chats?")) onDeleteAllChats();
-            }}
-            className="cursor-pointer p-2 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            <TrashIcon className="h-6 w-6 text-primary" />
-          </button>
-        </Tooltip>
+      <div className="flex-none mb-4">
+        {userEmail && (
+          <div className="mb-4 text-center text-sm text-gray-700 p-2 bg-gray-200 rounded-lg">
+            Logged in as: <br />
+            <span className="font-semibold">{userEmail}</span>
+          </div>
+        )}
+        <div className="flex justify-end space-x-2">
+          <Tooltip text={"Delete all chats"}>
+            <button
+              onClick={() => {
+                if (
+                  confirm(
+                    "Are you sure you want to delete ALL your chats? This action cannot be undone.",
+                  )
+                )
+                  onDeleteAllChats();
+              }}
+              className="cursor-pointer p-2 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <TrashIcon className="h-6 w-6 text-primary" />
+            </button>
+          </Tooltip>
 
-        <Tooltip text={"New chat"}>
-          <button
-            onClick={onNewChat}
-            className="cursor-pointer p-2 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            <PencilSquareIcon className="h-6 w-6 text-primary" />
-          </button>
-        </Tooltip>
+          <Tooltip text={"New chat"}>
+            <button
+              onClick={onNewChat}
+              className="cursor-pointer p-2 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <PencilSquareIcon className="h-6 w-6 text-primary" />
+            </button>
+          </Tooltip>
+        </div>
       </div>
 
       <div className="flex-grow overflow-y-auto">
@@ -117,7 +132,11 @@ export default function Sidebar({
                         icon: <TrashIcon className="h-4 w-4 text-red-500" />,
                         label: "Delete",
                         onClick: () => {
-                          if (confirm("Delete this chat?"))
+                          if (
+                            confirm(
+                              "Are you sure you want to delete this chat?",
+                            )
+                          )
                             onDeleteChat(chat.id);
                         },
                         className: "text-red-500 hover:bg-red-100",

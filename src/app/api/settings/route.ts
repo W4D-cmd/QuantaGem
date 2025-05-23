@@ -1,10 +1,23 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import { getUserFromSession } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const user = await getUserFromSession(request.cookies);
+  if (!user) {
+    const response = NextResponse.json(
+      { error: "Unauthorized: User ID missing" },
+      { status: 401 },
+    );
+    response.cookies.delete("session");
+    return response;
+  }
+  const userId = user.id.toString();
+
   try {
     const { rows } = await pool.query(
-      "SELECT system_prompt FROM user_settings WHERE id = 1",
+      "SELECT system_prompt FROM user_settings WHERE user_id = $1",
+      [userId],
     );
 
     if (rows.length === 0) {
@@ -16,7 +29,7 @@ export async function GET() {
       { status: 200 },
     );
   } catch (error) {
-    console.error("Error fetching user settings:", error);
+    console.error(`Error fetching user settings for user ${userId}:`, error);
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";
     return NextResponse.json(
@@ -26,7 +39,18 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const user = await getUserFromSession(request.cookies);
+  if (!user) {
+    const response = NextResponse.json(
+      { error: "Unauthorized: User ID missing" },
+      { status: 401 },
+    );
+    response.cookies.delete("session");
+    return response;
+  }
+  const userId = user.id.toString();
+
   try {
     const { systemPrompt } = (await request.json()) as {
       systemPrompt?: string;
@@ -40,20 +64,20 @@ export async function POST(request: Request) {
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO user_settings (id, system_prompt, updated_at)
-       VALUES (1, $1, NOW())
-       ON CONFLICT (id) DO UPDATE
+      `INSERT INTO user_settings (user_id, system_prompt, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (user_id) DO UPDATE
        SET system_prompt = EXCLUDED.system_prompt,
            updated_at = NOW()
        RETURNING system_prompt, updated_at`,
-      [systemPrompt ?? ""],
+      [userId, systemPrompt ?? ""],
     );
 
     if (rows.length === 0) {
       return NextResponse.json(
         {
           error:
-            "Failed to update settings, settings row not found or created.",
+            "Failed to update settings, settings row not found or created for user.",
         },
         { status: 500 },
       );
@@ -68,7 +92,7 @@ export async function POST(request: Request) {
       { status: 200 },
     );
   } catch (error) {
-    console.error("Error updating user settings:", error);
+    console.error(`Error updating user settings for user ${userId}:`, error);
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";
     return NextResponse.json(

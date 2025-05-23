@@ -14,8 +14,13 @@ import Tooltip from "@/components/Tooltip";
 import Toast from "@/components/Toast";
 import DropdownMenu, { DropdownItem } from "@/components/DropdownMenu";
 import SettingsModal from "@/components/SettingsModal";
-import { ArrowDownIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowDownIcon,
+  Cog6ToothIcon,
+  ArrowRightStartOnRectangleIcon,
+} from "@heroicons/react/24/outline";
 import { EllipsisVerticalIcon } from "@heroicons/react/20/solid";
+import { useRouter } from "next/navigation";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash-preview-05-20";
 
@@ -46,6 +51,7 @@ function extractErrorMessage(err: unknown): string {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamStarted, setStreamStarted] = useState(false);
@@ -64,10 +70,32 @@ export default function Home() {
   >(null);
   const [isThreeDotMenuOpen, setIsThreeDotMenuOpen] = useState(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const prevActiveChatIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch("/api/user");
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          throw new Error("Failed to fetch user information.");
+        }
+        const data = await res.json();
+        setUserEmail(data.email);
+      } catch (err: unknown) {
+        setError(extractErrorMessage(err));
+        router.replace("/login");
+      }
+    };
+    fetchUser();
+  }, [router]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
@@ -122,7 +150,7 @@ export default function Home() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lastModel: modelName }),
-      }).catch((err) => setError(err.message));
+      }).catch((err) => setError(extractErrorMessage(err)));
     }
   };
 
@@ -145,16 +173,22 @@ export default function Home() {
           return list[0] || null;
         });
       })
-      .catch((err) => setError(err.message));
+      .catch((err) => setError(extractErrorMessage(err)));
   }, [keySelection]);
 
   const handleRenameChat = async (chatId: number, newTitle: string) => {
     try {
-      await fetch(`/api/chats/${chatId}`, {
+      const res = await fetch(`/api/chats/${chatId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: newTitle }),
       });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(
+          errorData.error || `Failed to rename chat: ${res.statusText}`,
+        );
+      }
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
       setError(message);
@@ -167,7 +201,13 @@ export default function Home() {
 
   const handleDeleteChat = async (chatId: number) => {
     try {
-      await fetch(`/api/chats/${chatId}`, { method: "DELETE" });
+      const res = await fetch(`/api/chats/${chatId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(
+          errorData.error || `Failed to delete chat: ${res.statusText}`,
+        );
+      }
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
       setError(message);
@@ -194,8 +234,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    fetchAllChats();
-  }, [fetchAllChats]);
+    if (userEmail) {
+      fetchAllChats();
+    }
+  }, [fetchAllChats, userEmail]);
 
   const handleNewChat = useCallback(() => {
     setActiveChatId(null);
@@ -207,6 +249,12 @@ export default function Home() {
     setIsLoading(true);
     try {
       const res = await fetch(`/api/chats/${chatId}`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(
+          errorData.error || `Failed to load chat: ${res.statusText}`,
+        );
+      }
       const data: { messages: Message[]; systemPrompt: string } =
         await res.json();
       setMessages(data.messages);
@@ -298,7 +346,13 @@ export default function Home() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: `Chat ${allChats.length + 1}` }),
         });
-        if (!res.ok) throw new Error("Failed to create new chat session.");
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(
+            errorData.error ||
+              `Failed to create new chat session: ${res.statusText}`,
+          );
+        }
         const { id } = await res.json();
         await fetchAllChats();
         sessionId = id;
@@ -455,7 +509,13 @@ export default function Home() {
 
   const handleDeleteAllChats = async () => {
     try {
-      await fetch("/api/chats", { method: "DELETE" });
+      const res = await fetch("/api/chats", { method: "DELETE" });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(
+          errorData.error || `Failed to delete all chats: ${res.statusText}`,
+        );
+      }
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
       setError(message);
@@ -498,12 +558,31 @@ export default function Home() {
     setIsThreeDotMenuOpen((prev) => !prev);
   };
 
+  const handleLogout = async () => {
+    try {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (!res.ok) {
+        throw new Error("Logout failed.");
+      }
+      router.push("/login");
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err));
+    }
+  };
+
   const threeDotMenuItems: DropdownItem[] = [
     {
       id: "settings",
       label: "Settings",
       icon: <Cog6ToothIcon className="h-4 w-4" />,
       onClick: openGlobalSettingsModal,
+    },
+    {
+      id: "logout",
+      label: "Logout",
+      icon: <ArrowRightStartOnRectangleIcon className="h-4 w-4 text-red-500" />,
+      onClick: handleLogout,
+      className: "text-red-500 hover:bg-red-100",
     },
   ];
 
@@ -519,6 +598,7 @@ export default function Home() {
         onDeleteChat={handleDeleteChat}
         onDeleteAllChats={handleDeleteAllChats}
         onOpenChatSettings={openChatSettingsModal}
+        userEmail={userEmail}
       />
       <main className="flex-1 flex flex-col bg-background text-foreground relative">
         <div className="flex-none sticky top-0 z-10 px-4 py-2 border-b border-gray-100 flex items-center justify-between">

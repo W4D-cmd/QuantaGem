@@ -11,6 +11,7 @@
   "dependencies": {
     "@google/genai": "^1.0.0",
     "@heroicons/react": "^2.2.0",
+    "bcryptjs": "^3.0.2",
     "highlight.js": "^11.11.1",
     "minio": "^8.0.5",
     "next": "15.3.2",
@@ -22,7 +23,8 @@
     "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0"
+    "remark-math": "^6.0.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

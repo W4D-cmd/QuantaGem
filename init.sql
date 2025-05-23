@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS messages (
   content TEXT NOT NULL,
   parts JSONB NOT NULL DEFAULT '[]',
   position INTEGER NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sources JSONB NOT NULL DEFAULT '[]'
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_chat_session_position ON messages (chat_session_id, position);

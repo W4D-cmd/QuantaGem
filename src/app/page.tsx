@@ -78,10 +78,7 @@ export default function Home() {
   const prevActiveChatIdRef = useRef<number | null>(null);
 
   const getAuthHeaders = useCallback(() => {
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-    };
-    return headers;
+    return {};
   }, []);
 
   useEffect(() => {
@@ -177,7 +174,10 @@ export default function Home() {
       );
       fetch(`/api/chats/${activeChatId}`, {
         method: "PATCH",
-        headers: getAuthHeaders(),
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify({ lastModel: modelName }),
       }).catch((err) => setError(extractErrorMessage(err)));
     }
@@ -195,7 +195,10 @@ export default function Home() {
         );
         fetch(`/api/chats/${activeChatId}`, {
           method: "PATCH",
-          headers: getAuthHeaders(),
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
           body: JSON.stringify({ keySelection: newSelection }),
         })
           .then(() => fetchAllChats())
@@ -231,7 +234,10 @@ export default function Home() {
     try {
       const res = await fetch(`/api/chats/${chatId}`, {
         method: "PATCH",
-        headers: getAuthHeaders(),
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify({ title: newTitle }),
       });
       if (res.status === 401) {
@@ -410,7 +416,10 @@ export default function Home() {
       try {
         const res = await fetch("/api/chats", {
           method: "POST",
-          headers: getAuthHeaders(),
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
           body: JSON.stringify({
             title: `Chat ${allChats.length + 1}`,
             keySelection,
@@ -482,7 +491,10 @@ export default function Home() {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify({
           history: historyForAPI,
           messageParts: newUserMessageParts,

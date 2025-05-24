@@ -5,8 +5,17 @@ import {
   ensureBucketExists,
 } from "@/lib/minio";
 import { randomUUID } from "crypto";
+import { getUserFromToken } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
+  const user = await getUserFromToken(request);
+  if (!user) {
+    return NextResponse.json(
+      { error: "Unauthorized: User not authenticated" },
+      { status: 401 },
+    );
+  }
+
   try {
     await ensureBucketExists();
 

@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { getUserFromSession } from "@/lib/auth";
+import { getUserFromToken } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
-  const user = await getUserFromSession(request.cookies);
+  const user = await getUserFromToken(request);
   if (!user) {
-    const response = NextResponse.json(
-      { error: "Unauthorized: User ID missing" },
+    return NextResponse.json(
+      { error: "Unauthorized: User not authenticated" },
       { status: 401 },
     );
-    response.cookies.delete("session");
-    return response;
   }
   const userId = user.id.toString();
 
@@ -40,14 +38,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getUserFromSession(request.cookies);
+  const user = await getUserFromToken(request);
   if (!user) {
-    const response = NextResponse.json(
-      { error: "Unauthorized: User ID missing" },
+    return NextResponse.json(
+      { error: "Unauthorized: User not authenticated" },
       { status: 401 },
     );
-    response.cookies.delete("session");
-    return response;
   }
   const userId = user.id.toString();
 
@@ -65,11 +61,11 @@ export async function POST(request: NextRequest) {
 
     const { rows } = await pool.query(
       `INSERT INTO user_settings (user_id, system_prompt, updated_at)
-       VALUES ($1, $2, NOW())
-       ON CONFLICT (user_id) DO UPDATE
-       SET system_prompt = EXCLUDED.system_prompt,
-           updated_at = NOW()
-       RETURNING system_prompt, updated_at`,
+         VALUES ($1, $2, NOW())
+           ON CONFLICT (user_id) DO UPDATE
+                                      SET system_prompt = EXCLUDED.system_prompt,
+                                      updated_at = NOW()
+                                      RETURNING system_prompt, updated_at`,
       [userId, systemPrompt ?? ""],
     );
 

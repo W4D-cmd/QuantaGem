@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAuthToken } from "@/lib/auth";
 
 const publicPaths = [
   "/login",
@@ -7,7 +8,6 @@ const publicPaths = [
   "/api/auth/signup",
   "/api/auth/logout",
   "/api/ping",
-  "/api/user",
 ];
 
 export async function middleware(request: NextRequest) {
@@ -17,15 +17,48 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const sessionId = request.cookies.get("session")?.value;
+  const sessionCookie = request.cookies.get("__session");
+  const authTokenFromHeader = request.headers.get("Authorization");
 
-  if (!sessionId) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  let tokenToVerify: string | undefined;
+
+  if (authTokenFromHeader && authTokenFromHeader.startsWith("Bearer ")) {
+    tokenToVerify = authTokenFromHeader.substring(7);
+  } else if (sessionCookie) {
+    tokenToVerify = sessionCookie.value;
   }
 
-  return NextResponse.next();
+  if (!tokenToVerify) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirectedFrom", request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  try {
+    const payload = await verifyAuthToken(tokenToVerify);
+
+    if (!payload) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("redirectedFrom", request.nextUrl.pathname);
+      const res = NextResponse.redirect(loginUrl);
+      res.cookies.delete("__session");
+      return res;
+    }
+
+    return NextResponse.next();
+  } catch (error) {
+    console.error(
+      "Middleware authentication error during token verification:",
+      error,
+    );
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("error", "internal_error");
+    const res = NextResponse.redirect(loginUrl);
+    res.cookies.delete("__session");
+    return res;
+  }
 }
 
 export const config = {
-  matcher: ["/((?!_next/|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|favicon.ico).*)"],
 };

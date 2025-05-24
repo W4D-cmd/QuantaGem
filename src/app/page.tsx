@@ -77,10 +77,17 @@ export default function Home() {
   const chatInputRef = useRef<ChatInputHandle>(null);
   const prevActiveChatIdRef = useRef<number | null>(null);
 
+  const getAuthHeaders = useCallback(() => {
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    return headers;
+  }, []);
+
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("/api/user");
+        const res = await fetch("/api/user", { headers: getAuthHeaders() });
         if (res.status === 401) {
           router.replace("/login");
           return;
@@ -96,7 +103,7 @@ export default function Home() {
       }
     };
     fetchUser();
-  }, [router]);
+  }, [router, getAuthHeaders]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
@@ -135,14 +142,18 @@ export default function Home() {
 
   const fetchAllChats = useCallback(async () => {
     try {
-      const res = await fetch("/api/chats");
+      const res = await fetch("/api/chats", { headers: getAuthHeaders() });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
       if (!res.ok) throw new Error("Failed to fetch chats.");
       const list: ChatListItem[] = await res.json();
       setAllChats(list);
     } catch (err: unknown) {
       setError(extractErrorMessage(err));
     }
-  }, []);
+  }, [getAuthHeaders, router]);
 
   useEffect(() => {
     if (userEmail) {
@@ -166,7 +177,7 @@ export default function Home() {
       );
       fetch(`/api/chats/${activeChatId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ lastModel: modelName }),
       }).catch((err) => setError(extractErrorMessage(err)));
     }
@@ -184,7 +195,7 @@ export default function Home() {
         );
         fetch(`/api/chats/${activeChatId}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ keySelection: newSelection }),
         })
           .then(() => fetchAllChats())
@@ -192,7 +203,7 @@ export default function Home() {
       }
       return newSelection;
     });
-  }, [activeChatId, fetchAllChats]);
+  }, [activeChatId, fetchAllChats, getAuthHeaders]);
 
   useEffect(() => {
     fetch(`/api/models?keySelection=${keySelection}`)
@@ -220,9 +231,13 @@ export default function Home() {
     try {
       const res = await fetch(`/api/chats/${chatId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ title: newTitle }),
       });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(
@@ -242,7 +257,14 @@ export default function Home() {
 
   const handleDeleteChat = async (chatId: number) => {
     try {
-      const res = await fetch(`/api/chats/${chatId}`, { method: "DELETE" });
+      const res = await fetch(`/api/chats/${chatId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(
@@ -271,31 +293,40 @@ export default function Home() {
     setKeySelection("free");
   }, []);
 
-  const loadChat = useCallback(async (chatId: number) => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/chats/${chatId}`);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(
-          errorData.error || `Failed to load chat: ${res.statusText}`,
-        );
+  const loadChat = useCallback(
+    async (chatId: number) => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`/api/chats/${chatId}`, {
+          headers: getAuthHeaders(),
+        });
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(
+            errorData.error || `Failed to load chat: ${res.statusText}`,
+          );
+        }
+        const data: {
+          messages: Message[];
+          systemPrompt: string;
+          keySelection: "free" | "paid";
+        } = await res.json();
+        setMessages(data.messages);
+        setEditingPromptInitialValue(data.systemPrompt);
+        setKeySelection(data.keySelection);
+      } catch (err: unknown) {
+        const message = extractErrorMessage(err);
+        setError(message);
+      } finally {
+        setIsLoading(false);
       }
-      const data: {
-        messages: Message[];
-        systemPrompt: string;
-        keySelection: "free" | "paid";
-      } = await res.json();
-      setMessages(data.messages);
-      setEditingPromptInitialValue(data.systemPrompt);
-      setKeySelection(data.keySelection);
-    } catch (err: unknown) {
-      const message = extractErrorMessage(err);
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    [getAuthHeaders, router],
+  );
 
   const handleSelectChat = useCallback((chatId: number) => {
     setActiveChatId(chatId);
@@ -379,12 +410,16 @@ export default function Home() {
       try {
         const res = await fetch("/api/chats", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             title: `Chat ${allChats.length + 1}`,
             keySelection,
           }),
         });
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
         if (!res.ok) {
           const errorData = await res.json();
           throw new Error(
@@ -447,7 +482,7 @@ export default function Home() {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           history: historyForAPI,
           messageParts: newUserMessageParts,
@@ -458,6 +493,11 @@ export default function Home() {
         }),
         signal: ctrl.signal,
       });
+
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
 
       if (!res.ok || !res.body) {
         let errorData = {
@@ -548,7 +588,14 @@ export default function Home() {
 
   const handleDeleteAllChats = async () => {
     try {
-      const res = await fetch("/api/chats", { method: "DELETE" });
+      const res = await fetch("/api/chats", {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(
@@ -710,6 +757,7 @@ export default function Home() {
               isLoading={isLoading}
               isSearchActive={isSearchActive}
               onToggleSearch={setIsSearchActive}
+              getAuthHeaders={getAuthHeaders}
             />
           </div>
         </div>
@@ -721,6 +769,7 @@ export default function Home() {
         chatId={editingChatId}
         initialSystemPromptValue={editingPromptInitialValue}
         onSettingsSaved={handleSettingsSaved}
+        getAuthHeaders={getAuthHeaders}
       />
     </div>
   );

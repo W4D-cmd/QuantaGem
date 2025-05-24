@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { NextRequest } from "next/server";
 
 export interface User {
@@ -6,38 +6,93 @@ export interface User {
   email: string;
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+interface AuthPayload extends JWTPayload {
+  userId: number;
+  email: string;
+}
 
-export async function getUserFromSession(
-  cookies: NextRequest["cookies"],
-): Promise<User | null> {
-  const sessionId = cookies.get("session")?.value;
+const JWT_SECRET_VALUE = process.env.JWT_SECRET;
 
-  if (!sessionId) {
-    return null;
-  }
+if (!JWT_SECRET_VALUE) {
+  throw new Error("JWT_SECRET is not defined in environment variables.");
+}
 
+const JWT_SECRET_KEY = new TextEncoder().encode(JWT_SECRET_VALUE);
+
+export async function generateAuthToken(
+  userId: number,
+  email: string,
+): Promise<string> {
+  const payload: AuthPayload = { userId, email };
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("7d")
+    .sign(JWT_SECRET_KEY);
+}
+
+export async function verifyAuthToken(
+  token: string,
+): Promise<AuthPayload | null> {
   try {
-    const sessionResult = await pool.query(
-      `SELECT s.user_id, u.email
-             FROM sessions s
-                      JOIN users u ON s.user_id = u.id
-             WHERE s.id = $1 AND s.expires_at > NOW()`,
-      [sessionId],
-    );
+    const { payload } = await jwtVerify(token, JWT_SECRET_KEY, {
+      algorithms: ["HS256"],
+    });
 
-    if (sessionResult.rows.length > 0) {
-      return {
-        id: sessionResult.rows[0].user_id,
-        email: sessionResult.rows[0].email,
-      };
-    } else {
-      return null;
+    if (
+      typeof payload === "object" &&
+      payload !== null &&
+      "userId" in payload &&
+      "email" in payload
+    ) {
+      return payload as AuthPayload;
     }
+    return null;
   } catch (error) {
-    console.error("Error retrieving session or user:", error);
+    console.log("Token verification failed:", error);
     return null;
   }
+}
+
+export async function getUserIdFromRequest(
+  request: NextRequest,
+): Promise<number | null> {
+  const authHeader = request.headers.get("Authorization");
+  let token: string | undefined;
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.substring(7);
+  } else {
+    token = request.cookies.get("__session")?.value;
+  }
+
+  if (!token) {
+    return null;
+  }
+
+  const payload = await verifyAuthToken(token);
+  return payload ? payload.userId : null;
+}
+
+export async function getUserFromToken(
+  request: NextRequest,
+): Promise<User | null> {
+  const authHeader = request.headers.get("Authorization");
+  let token: string | undefined;
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.substring(7);
+  } else {
+    token = request.cookies.get("__session")?.value;
+  }
+
+  if (!token) {
+    return null;
+  }
+
+  const payload = await verifyAuthToken(token);
+  if (payload) {
+    return { id: payload.userId, email: payload.email };
+  }
+  return null;
 }

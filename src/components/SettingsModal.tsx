@@ -10,6 +10,7 @@ interface SettingsModalProps {
   chatId: number | null;
   initialSystemPromptValue: string | null;
   onSettingsSaved: () => void;
+  getAuthHeaders: () => HeadersInit;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -18,6 +19,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   chatId,
   initialSystemPromptValue,
   onSettingsSaved,
+  getAuthHeaders,
 }) => {
   const [systemPrompt, setSystemPrompt] = useState<string>("");
   const [currentInitialSystemPrompt, setCurrentInitialSystemPrompt] =
@@ -36,7 +38,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           setCurrentInitialSystemPrompt(initialSystemPromptValue);
           setIsLoading(false);
         } else {
-          fetch(`/api/chats/${chatId}`)
+          fetch(`/api/chats/${chatId}`, { headers: getAuthHeaders() })
             .then(async (res) => {
               if (!res.ok) {
                 const errData = await res.json().catch(() => ({
@@ -62,7 +64,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             });
         }
       } else {
-        fetch("/api/settings")
+        fetch("/api/settings", { headers: getAuthHeaders() })
           .then(async (res) => {
             if (!res.ok) {
               const errData = await res.json().catch(() => ({
@@ -88,7 +90,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           });
       }
     }
-  }, [isOpen, chatId, initialSystemPromptValue]);
+  }, [isOpen, chatId, initialSystemPromptValue, getAuthHeaders]);
 
   const handleInputChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setSystemPrompt(event.target.value);
@@ -102,17 +104,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       if (chatId !== null) {
         response = await fetch(`/api/chats/${chatId}`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ systemPrompt }),
         });
       } else {
         response = await fetch("/api/settings", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ systemPrompt }),
         });
       }

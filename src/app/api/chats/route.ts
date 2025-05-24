@@ -2,17 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
-import { getUserFromSession } from "@/lib/auth";
+import { getUserFromToken } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
-  const user = await getUserFromSession(request.cookies);
+  const user = await getUserFromToken(request);
   if (!user) {
-    const response = NextResponse.json(
-      { error: "Unauthorized: User ID missing" },
+    return NextResponse.json(
+      { error: "Unauthorized: User not authenticated" },
       { status: 401 },
     );
-    response.cookies.delete("session");
-    return response;
   }
   const userId = user.id.toString();
 
@@ -33,14 +31,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getUserFromSession(request.cookies);
+  const user = await getUserFromToken(request);
   if (!user) {
-    const response = NextResponse.json(
-      { error: "Unauthorized: User ID missing" },
+    return NextResponse.json(
+      { error: "Unauthorized: User not authenticated" },
       { status: 401 },
     );
-    response.cookies.delete("session");
-    return response;
   }
   const userId = user.id.toString();
 
@@ -56,14 +52,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const user = await getUserFromSession(request.cookies);
+  const user = await getUserFromToken(request);
   if (!user) {
-    const response = NextResponse.json(
-      { error: "Unauthorized: User ID missing" },
+    return NextResponse.json(
+      { error: "Unauthorized: User not authenticated" },
       { status: 401 },
     );
-    response.cookies.delete("session");
-    return response;
   }
   const userId = user.id.toString();
 

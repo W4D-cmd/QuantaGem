@@ -104,13 +104,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       if (chatId !== null) {
         response = await fetch(`/api/chats/${chatId}`, {
           method: "PATCH",
-          headers: getAuthHeaders(),
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
           body: JSON.stringify({ systemPrompt }),
         });
       } else {
         response = await fetch("/api/settings", {
           method: "POST",
-          headers: getAuthHeaders(),
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
           body: JSON.stringify({ systemPrompt }),
         });
       }

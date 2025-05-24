@@ -239,9 +239,6 @@ export async function POST(request: NextRequest) {
                 !SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType) &&
                 SOURCE_CODE_EXTENSIONS.includes(`.${extension}`)
               ) {
-                console.warn(
-                  `Overriding MIME type for historical source code file ${appPart.fileName || appPart.objectName} from ${effectiveMimeType} to text/plain for Gemini.`,
-                );
                 effectiveMimeType = "text/plain";
               }
 

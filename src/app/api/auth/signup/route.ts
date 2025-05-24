@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import bcrypt from "bcryptjs";
-import { v4 as uuidv4 } from "uuid";
+import { generateAuthToken } from "@/lib/auth";
 
-const SESSION_EXPIRATION_SECONDS = 7 * 24 * 60 * 60;
 const BCRYPT_SALT_ROUNDS = 12;
 
 export async function POST(request: Request) {
@@ -59,25 +58,17 @@ export async function POST(request: Request) {
         [newUser.id, ""],
       );
 
-      const sessionId = uuidv4();
-      const expiresAt = new Date(
-        Date.now() + SESSION_EXPIRATION_SECONDS * 1000,
-      );
-
-      await client.query(
-        "INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)",
-        [sessionId, newUser.id, expiresAt],
-      );
+      const token = await generateAuthToken(newUser.id, newUser.email);
 
       const response = NextResponse.json({
         message: "Account created and logged in successfully",
         user: { id: newUser.id, email: newUser.email },
       });
 
-      response.cookies.set("session", sessionId, {
+      response.cookies.set("__session", token, {
         httpOnly: true,
         secure: process.env.APP_USES_HTTPS === "true",
-        maxAge: SESSION_EXPIRATION_SECONDS,
+        maxAge: 7 * 24 * 60 * 60,
         path: "/",
         sameSite: "lax",
       });

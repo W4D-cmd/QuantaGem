@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
+import { getUserFromToken } from "@/lib/auth";
 
 export async function GET(
   request: NextRequest,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context: any,
 ) {
+  const user = await getUserFromToken(request);
+  if (!user) {
+    return NextResponse.json(
+      { error: "Unauthorized: User not authenticated" },
+      { status: 401 },
+    );
+  }
+
   const params = context.params as { objectKey: string[] };
 
   if (!params || !params.objectKey) {

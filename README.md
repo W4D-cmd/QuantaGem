@@ -40,6 +40,13 @@ FREE_GOOGLE_API_KEY="your_free_google_api_key"
 PAID_GOOGLE_API_KEY="your_paid_google_api_key"
 ```
 
+You must also set `JWT_SECRET` to a random, cryptographically strong string.
+This secret is vital for securing user sessions and should be at least 32 characters (256 bits) long.
+You can generate a suitable value using `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` and add it to your `.env.local` file.
+```env
+JWT_SECRET="your_jwt_secret"
+```
+
 ## Running the Application
 
 Inside the cloned repository execute the following command to start up the docker environment including the database and the Next.js app:

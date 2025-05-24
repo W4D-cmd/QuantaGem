@@ -38,6 +38,7 @@ interface ChatInputProps {
   isLoading: boolean;
   isSearchActive: boolean;
   onToggleSearch: (isActive: boolean) => void;
+  getAuthHeaders: () => HeadersInit;
 }
 
 export interface ChatInputHandle {
@@ -52,6 +53,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       isLoading,
       isSearchActive,
       onToggleSearch,
+      getAuthHeaders,
     },
     ref,
   ) => {
@@ -79,6 +81,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           const response = await fetch("/api/files/upload", {
             method: "POST",
             body: formData,
+            headers: getAuthHeaders(),
           });
           if (!response.ok) {
             const errorData = await response.json();

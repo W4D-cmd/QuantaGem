@@ -13,6 +13,7 @@
     "@heroicons/react": "^2.2.0",
     "bcryptjs": "^3.0.2",
     "highlight.js": "^11.11.1",
+    "jose": "^6.0.11",
     "minio": "^8.0.5",
     "next": "15.3.2",
     "pg": "^8.16.0",

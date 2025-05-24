@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
-import { getUserFromSession } from "@/lib/auth";
+import { getUserFromToken } from "@/lib/auth";
 
 interface ChatRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
@@ -73,14 +73,12 @@ function getFileExtension(fileName?: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getUserFromSession(request.cookies);
+  const user = await getUserFromToken(request);
   if (!user) {
-    const response = NextResponse.json(
+    return NextResponse.json(
       { error: "Unauthorized: User not authenticated" },
       { status: 401 },
     );
-    response.cookies.delete("session");
-    return response;
   }
   const userId = user.id.toString();
 

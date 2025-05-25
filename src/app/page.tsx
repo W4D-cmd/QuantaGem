@@ -77,8 +77,9 @@ export default function Home() {
   const chatInputRef = useRef<ChatInputHandle>(null);
   const prevActiveChatIdRef = useRef<number | null>(null);
 
-  const getAuthHeaders = useCallback(() => {
-    return {};
+  const getAuthHeaders = useCallback((): HeadersInit => {
+    const token = localStorage.getItem("__session");
+    return token ? { Authorization: `Bearer ${token}` } : {};
   }, []);
 
   useEffect(() => {
@@ -209,8 +210,26 @@ export default function Home() {
   }, [activeChatId, fetchAllChats, getAuthHeaders]);
 
   useEffect(() => {
-    fetch(`/api/models?keySelection=${keySelection}`)
-      .then((res) => res.json())
+    if (!userEmail) return;
+
+    fetch(`/api/models?keySelection=${keySelection}`, {
+      headers: getAuthHeaders(),
+    })
+      .then(async (res) => {
+        if (res.status === 401) {
+          router.replace("/login");
+          throw new Error("Unauthorized to fetch models.");
+        }
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({
+            error: `Failed to fetch models: HTTP ${res.status}`,
+          }));
+          throw new Error(
+            errorData.error || `Failed to fetch models: HTTP ${res.status}`,
+          );
+        }
+        return res.json();
+      })
       .then((list: Model[]) => {
         setModels(list);
         if (list.length === 0) {
@@ -227,8 +246,15 @@ export default function Home() {
           return list[0] || null;
         });
       })
-      .catch((err) => setError(extractErrorMessage(err)));
-  }, [keySelection]);
+      .catch((err) => {
+        setError(extractErrorMessage(err));
+        if (err.message.includes("Unauthorized")) {
+        } else {
+          setModels([]);
+          setSelectedModel(null);
+        }
+      });
+  }, [keySelection, getAuthHeaders, router, userEmail]);
 
   const handleRenameChat = async (chatId: number, newTitle: string) => {
     try {
@@ -663,6 +689,7 @@ export default function Home() {
       if (!res.ok) {
         throw new Error("Logout failed.");
       }
+      localStorage.removeItem("__session");
       router.push("/login");
     } catch (err: unknown) {
       setError(extractErrorMessage(err));

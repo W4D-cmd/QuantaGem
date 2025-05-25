@@ -31,6 +31,9 @@ export default function LoginPage() {
         throw new Error(errorData.error || "Login failed");
       }
 
+      const data = await response.json();
+      localStorage.setItem("__session", data.token);
+
       router.push("/");
     } catch (err: unknown) {
       let errorMessage = "An unexpected error occurred.";

@@ -44,14 +44,7 @@ export async function POST(request: Request) {
       const response = NextResponse.json({
         message: "Login successful",
         user: { id: user.id, email: user.email },
-      });
-
-      response.cookies.set("__session", token, {
-        httpOnly: true,
-        secure: process.env.APP_USES_HTTPS === "true",
-        maxAge: 7 * 24 * 60 * 60,
-        path: "/",
-        sameSite: "lax",
+        token: token,
       });
 
       return response;

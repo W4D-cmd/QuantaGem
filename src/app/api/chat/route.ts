@@ -407,20 +407,31 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        await pool.query(
-          `INSERT INTO messages (chat_session_id, role, content, parts, position, sources) SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5 FROM messages WHERE chat_session_id = $1`,
-          [
-            chatSessionId,
-            "model",
-            modelOutput,
-            JSON.stringify([{ type: "text", text: modelOutput }]),
-            JSON.stringify(sourcesToStore),
-          ],
-        );
-        await pool.query(
-          `UPDATE chat_sessions SET last_model = $2, key_selection = $3, updated_at = now() WHERE id = $1 AND user_id = $4`,
-          [chatSessionId, model, keySelection, userId],
-        );
+        if (modelOutput.trim() === "") {
+          console.warn("Gemini model returned an empty message.");
+          const emptyMessageError = {
+            type: "error",
+            value: "Model returned an empty message. Please try again.",
+          };
+          controller.enqueue(
+            encoder.encode(JSON.stringify(emptyMessageError) + "\n"),
+          );
+        } else {
+          await pool.query(
+            `INSERT INTO messages (chat_session_id, role, content, parts, position, sources) SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5 FROM messages WHERE chat_session_id = $1`,
+            [
+              chatSessionId,
+              "model",
+              modelOutput,
+              JSON.stringify([{ type: "text", text: modelOutput }]),
+              JSON.stringify(sourcesToStore),
+            ],
+          );
+          await pool.query(
+            `UPDATE chat_sessions SET last_model = $2, key_selection = $3, updated_at = now() WHERE id = $1 AND user_id = $4`,
+            [chatSessionId, model, keySelection, userId],
+          );
+        }
         controller.close();
       },
       cancel() {},

@@ -555,6 +555,7 @@ export default function Home() {
       let isFirstChunk = true;
       let textAccumulator = "";
       const currentSources: Array<{ title: string; uri: string }> = [];
+      let modelReturnedEmptyMessage = false;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -589,6 +590,9 @@ export default function Home() {
                     },
                   );
                 }
+              } else if (parsedChunk.type === "error" && parsedChunk.value) {
+                modelReturnedEmptyMessage = true;
+                setError(parsedChunk.value);
               }
             } catch (jsonError) {
               console.error(
@@ -606,6 +610,12 @@ export default function Home() {
 
           return updatedMessages;
         });
+      }
+
+      if (modelReturnedEmptyMessage) {
+        setMessages((prev) =>
+          prev.filter((_, idx) => idx !== modelMessageIndex),
+        );
       }
     } catch (error: unknown) {
       setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndex));

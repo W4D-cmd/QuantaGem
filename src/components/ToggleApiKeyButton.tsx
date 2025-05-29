@@ -1,7 +1,7 @@
 "use client";
-import { CurrencyDollarIcon as OutlineDollar } from "@heroicons/react/24/outline";
-import { CurrencyDollarIcon as SolidDollar } from "@heroicons/react/24/solid";
 import React from "react";
+import { CurrencyDollarIcon as OutlineCurrencyDollarIcon } from "@heroicons/react/24/outline";
+import { CurrencyDollarIcon as SolidCurrencyDollarIcon } from "@heroicons/react/24/solid";
 
 interface Props {
   selectedKey: "free" | "paid";
@@ -25,9 +25,9 @@ export default function ToggleApiKeyButton({
         }`}
     >
       {isPaid ? (
-        <SolidDollar className="h-5 w-5" />
+        <SolidCurrencyDollarIcon className="size-5" />
       ) : (
-        <OutlineDollar className="h-5 w-5" />
+        <OutlineCurrencyDollarIcon className="size-5" />
       )}
       <span>{isPaid ? "Paid" : "Free"}</span>
     </button>

@@ -11,15 +11,11 @@ import React, {
   useImperativeHandle,
   ClipboardEvent,
 } from "react";
-import {
-  ArrowUpCircleIcon,
-  StopCircleIcon,
-  PaperClipIcon,
-  XCircleIcon,
-} from "@heroicons/react/24/solid";
-import { GlobeAltIcon as GlobeOutlineIcon } from "@heroicons/react/24/outline";
-import { GlobeAltIcon as GlobeSolidIcon } from "@heroicons/react/24/solid";
 import Tooltip from "@/components/Tooltip";
+import { PaperClipIcon, XCircleIcon } from "@heroicons/react/24/outline";
+import { ArrowUpCircleIcon, StopCircleIcon } from "@heroicons/react/24/solid";
+import { GlobeAltIcon as OutlineGlobeAltIcon } from "@heroicons/react/24/outline";
+import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -184,7 +180,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   <span>{file.fileName}</span>
                   {!isLoading && (
                     <XCircleIcon
-                      className="h-4 w-4 text-gray-500 hover:text-red-500 cursor-pointer"
+                      className="size-4 text-gray-500 hover:text-red-500 cursor-pointer"
                       onClick={() => removeSelectedFile(file.objectName)}
                     />
                   )}
@@ -247,7 +243,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     disabled={isLoading}
                     className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary border border-gray-300 hover:bg-gray-100"
                   >
-                    <PaperClipIcon className="h-5 w-5" />
+                    <PaperClipIcon className="size-5" />
                   </button>
                 </Tooltip>
                 <input
@@ -272,9 +268,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   `}
                   >
                     {isSearchActive ? (
-                      <GlobeSolidIcon className="h-5 w-5" />
+                      <SolidGlobeAltIcon className="size-5 text-white" />
                     ) : (
-                      <GlobeOutlineIcon className="h-5 w-5" />
+                      <OutlineGlobeAltIcon className="size-5 text-primary" />
                     )}
                     <span>Search</span>
                   </button>
@@ -292,9 +288,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 className="cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:text-[#5d5d5d] transition-colors duration-150"
               >
                 {isLoading ? (
-                  <StopCircleIcon className="h-10 w-10" />
+                  <StopCircleIcon className="size-10" />
                 ) : (
-                  <ArrowUpCircleIcon className="h-10 w-10" />
+                  <ArrowUpCircleIcon className="size-10" />
                 )}
               </button>
             </div>

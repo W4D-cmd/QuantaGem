@@ -6,7 +6,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: "var(--font-roboto)",
-        mono: "var(--font-mono)",
+        mono: "var(--font-roboto-mono)",
       },
       typography: ({ theme }) => ({
         DEFAULT: {

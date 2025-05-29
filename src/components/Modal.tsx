@@ -2,7 +2,7 @@
 
 import React, { useEffect, ReactNode, useRef } from "react";
 import { createPortal } from "react-dom";
-import { XMarkIcon } from "@heroicons/react/24/solid";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 
 interface ModalProps {
   isOpen: boolean;
@@ -83,7 +83,7 @@ const Modal: React.FC<ModalProps> = ({
                 className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary hover:bg-gray-100 focus:outline-none"
                 aria-label="Close modal"
               >
-                <XMarkIcon className="h-5 w-5" />
+                <XMarkIcon className="size-5" />
               </button>
             )}
           </div>
@@ -94,7 +94,7 @@ const Modal: React.FC<ModalProps> = ({
             className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary hover:bg-gray-100 focus:outline-none"
             aria-label="Close modal"
           >
-            <XMarkIcon className="h-5 w-5" />
+            <XMarkIcon className="size-5" />
           </button>
         )}
         <div className="p-6 flex-grow overflow-y-auto">{children}</div>

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { CheckCircleIcon, ChevronDownIcon } from "@heroicons/react/20/solid";
+import { Model } from "@google/genai";
+import Tooltip from "@/components/Tooltip";
 import {
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
-import { Model } from "@google/genai";
-import Tooltip from "@/components/Tooltip";
+import { CheckCircleIcon } from "@heroicons/react/24/solid";
 
 export interface Props {
   models: Model[];
@@ -52,7 +53,7 @@ export default function ModelSelector({
         ) : (
           <div className="w-4 h-4 border-3 border-gray-300 border-t-[#5d5d5d] rounded-full animate-spin" />
         )}
-        <ChevronDownIcon className="h-5 w-5 ml-2 text-gray-400" />
+        <ChevronDownIcon className="size-5 ml-2 text-gray-400" />
       </button>
 
       {open && (
@@ -81,14 +82,14 @@ export default function ModelSelector({
                       {m.displayName}
                     </span>
                     <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
-                      <ArrowDownTrayIcon className="h-3 w-3" />
+                      <ArrowDownTrayIcon className="size-3" />
                       {m.inputTokenLimit}
-                      <ArrowUpTrayIcon className="h-3 w-3" />
+                      <ArrowUpTrayIcon className="size-3" />
                       {m.outputTokenLimit}
                     </div>
                   </div>
                   {m.name === selected?.name && (
-                    <CheckCircleIcon className="h-4 w-4" />
+                    <CheckCircleIcon className="size-4" />
                   )}
                 </button>
               </Tooltip>

@@ -782,6 +782,7 @@ export default function Home() {
           isLoading={isLoading}
           streamStarted={streamStarted}
           onAutoScrollChange={handleAutoScrollChange}
+          getAuthHeaders={getAuthHeaders}
         />
 
         <div className="flex-none p-4 bg-background">

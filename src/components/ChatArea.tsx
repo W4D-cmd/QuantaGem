@@ -3,12 +3,12 @@
 import "katex/dist/katex.min.css";
 
 import React, {
+  forwardRef,
+  memo,
+  useEffect,
+  useImperativeHandle,
   useRef,
   useState,
-  useEffect,
-  memo,
-  forwardRef,
-  useImperativeHandle,
 } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -16,6 +16,8 @@ import rehypeHighlight from "rehype-highlight";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { MessagePart } from "@/app/page";
+
+type GetAuthHeaders = () => HeadersInit;
 
 export interface Message {
   role: "user" | "model";
@@ -28,11 +30,85 @@ interface ChatAreaProps {
   isLoading: boolean;
   streamStarted: boolean;
   onAutoScrollChange?: (isAutoScrollEnabled: boolean) => void;
+  getAuthHeaders: GetAuthHeaders;
 }
 
 export interface ChatAreaHandle {
   scrollToBottomAndEnableAutoscroll: () => void;
 }
+
+const ProtectedImage = memo(
+  ({
+    objectName,
+    fileName,
+    mimeType,
+    getAuthHeaders,
+  }: {
+    objectName: string;
+    fileName: string;
+    mimeType: string;
+    getAuthHeaders: () => HeadersInit;
+  }) => {
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+      let objectUrl: string | null = null;
+      const fetchImage = async () => {
+        try {
+          const res = await fetch(`/api/files/${objectName}`, {
+            headers: getAuthHeaders(),
+          });
+
+          if (!res.ok) {
+            console.error(
+              `Failed to fetch image ${fileName}: ${res.statusText}`,
+            );
+            setImageUrl("/image.png");
+            return;
+          }
+
+          const blob = await res.blob();
+          objectUrl = URL.createObjectURL(blob);
+          setImageUrl(objectUrl);
+        } catch (error) {
+          console.error(`Error loading image ${fileName}:`, error);
+          setImageUrl("/image.png");
+        }
+      };
+
+      fetchImage();
+
+      return () => {
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+        }
+      };
+    }, [objectName, fileName, mimeType, getAuthHeaders]);
+
+    if (!imageUrl) {
+      return (
+        <div
+          className="max-w-full h-auto rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center"
+          style={{ maxHeight: "400px", minHeight: "100px" }}
+        >
+          Loading Image...
+        </div>
+      );
+    }
+
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={imageUrl}
+        alt={fileName}
+        className="max-w-full h-auto rounded-lg border border-gray-200"
+        style={{ maxHeight: "400px" }}
+      />
+    );
+  },
+);
+
+ProtectedImage.displayName = "ProtectedImage";
 
 export default memo(
   forwardRef<ChatAreaHandle, ChatAreaProps>(ChatAreaComponent),
@@ -40,11 +116,18 @@ export default memo(
     prev.messages === next.messages &&
     prev.isLoading === next.isLoading &&
     prev.streamStarted === next.streamStarted &&
-    prev.onAutoScrollChange === next.onAutoScrollChange,
+    prev.onAutoScrollChange === next.onAutoScrollChange &&
+    prev.getAuthHeaders === next.getAuthHeaders,
 );
 
 function ChatAreaComponent(
-  { messages, isLoading, streamStarted, onAutoScrollChange }: ChatAreaProps,
+  {
+    messages,
+    isLoading,
+    streamStarted,
+    onAutoScrollChange,
+    getAuthHeaders,
+  }: ChatAreaProps,
   ref: React.Ref<ChatAreaHandle>,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -251,19 +334,19 @@ function ChatAreaComponent(
                 part.mimeType &&
                 part.fileName
               ) {
-                const fileUrl = `/api/files/${part.objectName}`;
                 if (part.mimeType.startsWith("image/")) {
                   return (
                     <div key={j} className="my-2">
-                      <img
-                        src={fileUrl}
-                        alt={part.fileName}
-                        className="max-w-full h-auto rounded-lg border border-gray-200"
-                        style={{ maxHeight: "400px" }}
+                      <ProtectedImage
+                        objectName={part.objectName}
+                        fileName={part.fileName}
+                        mimeType={part.mimeType}
+                        getAuthHeaders={getAuthHeaders}
                       />
                     </div>
                   );
                 } else {
+                  const fileUrl = `/api/files/${part.objectName}`;
                   return (
                     <div key={j} className="my-2">
                       <a

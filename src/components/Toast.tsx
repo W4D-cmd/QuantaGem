@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, FC, useCallback } from "react";
-import { XMarkIcon } from "@heroicons/react/24/solid";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 
 interface ToastProps {
   message: string;
@@ -63,7 +63,7 @@ const Toast: FC<ToastProps> = ({ message, onClose }) => {
           }}
           className="cursor-pointer p-2 rounded-lg hover:bg-red-600/30 transition-colors"
         >
-          <XMarkIcon className="h-6 w-6 text-primary" />
+          <XMarkIcon className="size-5 text-primary" />
         </button>
       </div>
       <div className="h-1 overflow-hidden">

@@ -1,14 +1,14 @@
 import { useRef, useState } from "react";
 import { ChatListItem } from "@/app/page";
+import DropdownMenu from "@/components/DropdownMenu";
+import Tooltip from "@/components/Tooltip";
 import {
   Cog6ToothIcon,
+  EllipsisHorizontalIcon,
   PencilIcon,
   PencilSquareIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import DropdownMenu from "@/components/DropdownMenu";
-import { EllipsisHorizontalIcon } from "@heroicons/react/20/solid";
-import Tooltip from "@/components/Tooltip";
 
 interface SidebarProps {
   chats: ChatListItem[];
@@ -39,12 +39,6 @@ export default function Sidebar({
   return (
     <div className="w-70 h-full bg-gray-100 p-4 pt-2 overflow-y-auto flex flex-col">
       <div className="flex-none mb-4">
-        {userEmail && (
-          <div className="mb-4 text-center text-sm text-gray-700 p-2 bg-gray-200 rounded-lg">
-            Logged in as: <br />
-            <span className="font-semibold">{userEmail}</span>
-          </div>
-        )}
         <div className="flex justify-end space-x-2">
           <Tooltip text={"Delete all chats"}>
             <button
@@ -58,7 +52,7 @@ export default function Sidebar({
               }}
               className="cursor-pointer p-2 rounded-lg hover:bg-gray-200 transition-colors"
             >
-              <TrashIcon className="h-6 w-6 text-primary" />
+              <TrashIcon className="size-6 text-primary" />
             </button>
           </Tooltip>
 
@@ -67,7 +61,7 @@ export default function Sidebar({
               onClick={onNewChat}
               className="cursor-pointer p-2 rounded-lg hover:bg-gray-200 transition-colors"
             >
-              <PencilSquareIcon className="h-6 w-6 text-primary" />
+              <PencilSquareIcon className="size-6 text-primary" />
             </button>
           </Tooltip>
         </div>
@@ -102,7 +96,7 @@ export default function Sidebar({
                     }}
                     className="opacity-0 group-hover:opacity-100 cursor-pointer"
                   >
-                    <EllipsisHorizontalIcon className="h-5 w-5 text-primary transition-colors hover:text-[#121212]" />
+                    <EllipsisHorizontalIcon className="size-5 text-primary transition-colors hover:text-[#121212]" />
                   </button>
 
                   <DropdownMenu
@@ -113,14 +107,14 @@ export default function Sidebar({
                     items={[
                       {
                         id: "settings",
-                        icon: <Cog6ToothIcon className="h-4 w-4" />,
+                        icon: <Cog6ToothIcon className="size-4" />,
                         label: "Settings",
                         onClick: () =>
                           onOpenChatSettings(chat.id, chat.systemPrompt),
                       },
                       {
                         id: "rename",
-                        icon: <PencilIcon className="h-4 w-4" />,
+                        icon: <PencilIcon className="size-4" />,
                         label: "Rename",
                         onClick: () => {
                           const newTitle = prompt("New title", chat.title);
@@ -129,7 +123,7 @@ export default function Sidebar({
                       },
                       {
                         id: "delete",
-                        icon: <TrashIcon className="h-4 w-4 text-red-500" />,
+                        icon: <TrashIcon className="size-4 text-red-500" />,
                         label: "Delete",
                         onClick: () => {
                           if (
@@ -149,6 +143,13 @@ export default function Sidebar({
           ))}
         </ul>
       </div>
+
+      {userEmail && (
+        <div className="mb-0 text-center text-sm text-gray-700 p-2 bg-gray-200 rounded-lg">
+          Logged in as: <br />
+          <span className="font-semibold">{userEmail}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -14,13 +14,13 @@ import Tooltip from "@/components/Tooltip";
 import Toast from "@/components/Toast";
 import DropdownMenu, { DropdownItem } from "@/components/DropdownMenu";
 import SettingsModal from "@/components/SettingsModal";
+import { useRouter } from "next/navigation";
 import {
   ArrowDownIcon,
-  Cog6ToothIcon,
   ArrowRightStartOnRectangleIcon,
+  Cog6ToothIcon,
+  EllipsisHorizontalIcon,
 } from "@heroicons/react/24/outline";
-import { EllipsisVerticalIcon } from "@heroicons/react/20/solid";
-import { useRouter } from "next/navigation";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash-preview-05-20";
 
@@ -710,13 +710,13 @@ export default function Home() {
     {
       id: "settings",
       label: "Settings",
-      icon: <Cog6ToothIcon className="h-4 w-4" />,
+      icon: <Cog6ToothIcon className="size-4" />,
       onClick: openGlobalSettingsModal,
     },
     {
       id: "logout",
       label: "Logout",
-      icon: <ArrowRightStartOnRectangleIcon className="h-4 w-4 text-red-500" />,
+      icon: <ArrowRightStartOnRectangleIcon className="size-4 text-red-500" />,
       onClick: handleLogout,
       className: "text-red-500 hover:bg-red-100",
     },
@@ -760,7 +760,7 @@ export default function Home() {
                   className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary hover:bg-gray-100"
                   aria-label="More options"
                 >
-                  <EllipsisVerticalIcon className="h-5 w-5" />
+                  <EllipsisHorizontalIcon className="size-5" />
                 </button>
               </Tooltip>
 
@@ -795,7 +795,7 @@ export default function Home() {
                   onClick={handleScrollToBottomClick}
                   className="cursor-pointer h-9 w-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary border border-gray-300 hover:bg-gray-100 shadow-lg"
                 >
-                  <ArrowDownIcon className="h-5 w-5" />
+                  <ArrowDownIcon />
                 </button>
               </div>
             </div>

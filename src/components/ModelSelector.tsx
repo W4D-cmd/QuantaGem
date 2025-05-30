@@ -45,20 +45,20 @@ export default function ModelSelector({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center h-11 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors text-primary text-[18px] font-medium focus:outline-none"
+        className="inline-flex items-center h-11 px-3 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 transition-colors text-neutral-600 text-[18px] font-medium focus:outline-none"
         disabled={models.length === 0}
       >
         {selected ? (
           selected.displayName
         ) : (
-          <div className="w-4 h-4 border-3 border-gray-300 border-t-[#5d5d5d] rounded-full animate-spin" />
+          <div className="w-4 h-4 border-3 border-neutral-300 border-t-neutral-500 rounded-full animate-spin" />
         )}
-        <ChevronDownIcon className="size-5 ml-2 text-gray-400" />
+        <ChevronDownIcon className="size-5 ml-2 text-neutral-400" />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-2 min-w-md bg-white border border-gray-200 rounded-2xl shadow-lg z-50 overflow-hidden">
-          <div className="px-4 py-2 flex items-center justify-between text-gray-500">
+        <div className="absolute left-0 top-full mt-2 min-w-md bg-white border border-neutral-200 rounded-2xl shadow-lg z-50 overflow-hidden">
+          <div className="px-4 py-2 flex items-center justify-between text-neutral-500">
             <span>Model</span>
           </div>
           <div
@@ -75,13 +75,13 @@ export default function ModelSelector({
                     onChangeAction(m);
                     setOpen(false);
                   }}
-                  className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between px-4 py-2 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
                 >
                   <div className="flex flex-col">
-                    <span className="font-medium text-primary">
+                    <span className="font-medium text-neutral-600">
                       {m.displayName}
                     </span>
-                    <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
+                    <div className="text-xs text-neutral-500 flex items-center gap-2 mt-1">
                       <ArrowDownTrayIcon className="size-3" />
                       {m.inputTokenLimit}
                       <ArrowUpTrayIcon className="size-3" />

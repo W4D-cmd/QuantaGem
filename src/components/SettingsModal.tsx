@@ -180,17 +180,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               System Prompt
             </label>
-            <p className="text-xs text-primary mb-4 mt-1">
+            <p className="text-xs text-neutral-500 mb-4 mt-1">
               {promptDescription}
             </p>
             {isLoading && !systemPrompt && !currentInitialSystemPrompt ? (
-              <div className="w-full h-32 bg-gray-100 rounded-lg animate-pulse"></div>
+              <div className="w-full h-32 bg-neutral-100 rounded-lg animate-pulse"></div>
             ) : (
               <textarea
                 id="system-prompt"
                 name="system-prompt"
                 rows={8}
-                className="w-full resize-none p-3 border border-gray-300 rounded-xl shadow-sm
+                className="w-full resize-none p-3 border border-neutral-300 rounded-xl shadow-sm
                            text-sm transition-shadow duration-200 ease-in-out
                            focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                 value={systemPrompt}
@@ -207,7 +207,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={handleCancel}
               disabled={isLoading}
               className="cursor-pointer h-9 px-4 rounded-full text-sm font-medium transition-colors duration-150
-                         bg-white text-primary border border-gray-300 hover:bg-gray-100
+                         bg-background border border-neutral-300 hover:bg-neutral-100 text-neutral-500
                          focus:outline-none disabled:opacity-50"
             >
               Cancel
@@ -217,8 +217,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={handleSave}
               disabled={isLoading || !hasChanges}
               className="cursor-pointer disabled:cursor-not-allowed h-9 px-4 rounded-full text-sm font-medium transition-colors duration-150
-                         bg-black text-white border border-transparent shadow-sm hover:bg-[#5d5d5d]
-                         focus:outline-none disabled:opacity-50 disabled:bg-[#5d5d5d]"
+                         bg-black text-white border border-transparent shadow-sm hover:bg-neutral-600
+                         focus:outline-none disabled:opacity-50"
             >
               {isLoading ? "Saving..." : "Save"}
             </button>

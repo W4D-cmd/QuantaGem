@@ -37,7 +37,7 @@ export default function Sidebar({
   const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   return (
-    <div className="w-70 h-full bg-gray-100 p-4 pt-2 overflow-y-auto flex flex-col">
+    <div className="w-70 h-full bg-neutral-100 p-4 pt-2 overflow-y-auto flex flex-col">
       <div className="flex-none mb-4">
         <div className="flex justify-end space-x-2">
           <Tooltip text={"Delete all chats"}>
@@ -50,18 +50,18 @@ export default function Sidebar({
                 )
                   onDeleteAllChats();
               }}
-              className="cursor-pointer p-2 rounded-lg hover:bg-gray-200 transition-colors"
+              className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 transition-colors"
             >
-              <TrashIcon className="size-6 text-primary" />
+              <TrashIcon className="size-6 text-neutral-500" />
             </button>
           </Tooltip>
 
           <Tooltip text={"New chat"}>
             <button
               onClick={onNewChat}
-              className="cursor-pointer p-2 rounded-lg hover:bg-gray-200 transition-colors"
+              className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 transition-colors"
             >
-              <PencilSquareIcon className="size-6 text-primary" />
+              <PencilSquareIcon className="size-6 text-neutral-500" />
             </button>
           </Tooltip>
         </div>
@@ -73,10 +73,10 @@ export default function Sidebar({
             <li key={chat.id} className="mb-0 relative group">
               <button
                 onClick={() => onSelectChat(chat.id)}
-                className={`cursor-pointer w-full text-sm text-left p-2 rounded-lg hover:bg-gray-200 transition-colors focus:outline-none ${
+                className={`cursor-pointer w-full text-sm text-left p-2 rounded-lg hover:bg-neutral-200 transition-colors focus:outline-none ${
                   chat.id === activeChatId
-                    ? "bg-gray-300 font-semibold hover:bg-gray-300"
-                    : "text-foreground hover:bg-gray-200"
+                    ? "bg-neutral-300 font-semibold hover:bg-neutral-300"
+                    : "text-neutral-900 hover:bg-neutral-200"
                 }`}
               >
                 {chat.title}
@@ -94,9 +94,9 @@ export default function Sidebar({
                         openMenuChatId === chat.id ? null : chat.id,
                       );
                     }}
-                    className="opacity-0 group-hover:opacity-100 cursor-pointer"
+                    className="opacity-0 group-hover:opacity-100 cursor-pointer text-neutral-500 duration-150"
                   >
-                    <EllipsisHorizontalIcon className="size-5 text-primary transition-colors hover:text-[#121212]" />
+                    <EllipsisHorizontalIcon className="size-5" />
                   </button>
 
                   <DropdownMenu
@@ -145,7 +145,7 @@ export default function Sidebar({
       </div>
 
       {userEmail && (
-        <div className="mb-0 text-center text-sm text-gray-700 p-2 bg-gray-200 rounded-lg">
+        <div className="mb-0 text-center text-sm text-neutral-700 p-2 bg-neutral-200 rounded-lg">
           Logged in as: <br />
           <span className="font-semibold">{userEmail}</span>
         </div>

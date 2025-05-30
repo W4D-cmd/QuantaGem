@@ -63,7 +63,7 @@ const Toast: FC<ToastProps> = ({ message, onClose }) => {
           }}
           className="cursor-pointer p-2 rounded-lg hover:bg-red-600/30 transition-colors"
         >
-          <XMarkIcon className="size-5 text-primary" />
+          <XMarkIcon className="size-5" />
         </button>
       </div>
       <div className="h-1 overflow-hidden">

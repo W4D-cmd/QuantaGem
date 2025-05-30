@@ -88,7 +88,7 @@ const ProtectedImage = memo(
     if (!imageUrl) {
       return (
         <div
-          className="max-w-full h-auto rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center"
+          className="max-w-full h-auto rounded-lg border border-neutral-200 bg-neutral-100 flex items-center justify-center"
           style={{ maxHeight: "400px", minHeight: "100px" }}
         >
           Loading Image...
@@ -101,7 +101,7 @@ const ProtectedImage = memo(
       <img
         src={imageUrl}
         alt={fileName}
-        className="max-w-full h-auto rounded-lg border border-gray-200"
+        className="max-w-full h-auto rounded-lg border border-neutral-200"
         style={{ maxHeight: "400px" }}
       />
     );
@@ -309,14 +309,14 @@ function ChatAreaComponent(
             key={i}
             className={`p-4 rounded-3xl break-words overflow-hidden ${
               msg.role === "user"
-                ? "max-w-xl bg-[#e9e9e980] text-white self-end ml-auto"
-                : "w-full text-foreground self-start"
+                ? "max-w-xl bg-neutral-200 self-end ml-auto"
+                : "w-full self-start"
             }`}
           >
             {msg.parts.map((part, j) => {
               if (part.type === "text" && part.text) {
                 return (
-                  <div key={j} className="prose max-w-none prose-customtext">
+                  <div key={j} className="prose max-w-none">
                     <ReactMarkdown
                       remarkPlugins={[remarkMath, remarkGfm]}
                       rehypePlugins={[
@@ -366,7 +366,7 @@ function ChatAreaComponent(
               return null;
             })}
             {msg.role === "model" && msg.sources && msg.sources.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-600">
+              <div className="mt-4 pt-3 border-t border-neutral-200 text-xs text-neutral-600">
                 <p className="font-semibold mb-2">Sources:</p>
                 <ul className="list-disc list-inside space-y-1">
                   {msg.sources.map((source, k) => (
@@ -388,7 +388,7 @@ function ChatAreaComponent(
         ))}
         {isLoading && !streamStarted && (
           <div className="p-3 rounded-lg max-w-xl bg-transparent self-start mr-auto">
-            <div className="w-6 h-6 border-3 border-gray-300 border-t-[#5d5d5d] rounded-full animate-spin" />
+            <div className="w-6 h-6 border-3 border-neutral-300 border-t-neutral-500 rounded-full animate-spin" />
           </div>
         )}
       </div>

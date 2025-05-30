@@ -171,16 +171,16 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       <form onSubmit={onSubmit} className="p-4 pt-0 flex justify-center">
         <div className="w-full max-w-[52rem]">
           {selectedFiles.length > 0 && (
-            <div className="mb-2 p-2 border border-gray-200 rounded-xl flex flex-wrap gap-2">
+            <div className="mb-2 p-2 border border-neutral-200 rounded-xl flex flex-wrap gap-2">
               {selectedFiles.map((file) => (
                 <div
                   key={file.objectName}
-                  className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm flex items-center gap-2"
+                  className="bg-neutral-100 text-neutral-700 px-3 py-1 rounded-full text-sm flex items-center gap-2"
                 >
                   <span>{file.fileName}</span>
                   {!isLoading && (
                     <XCircleIcon
-                      className="size-4 text-gray-500 hover:text-red-500 cursor-pointer"
+                      className="size-4 text-neutral-500 hover:text-red-500 cursor-pointer"
                       onClick={() => removeSelectedFile(file.objectName)}
                     />
                   )}
@@ -189,7 +189,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             </div>
           )}
           {uploadingFiles.length > 0 && (
-            <div className="mb-2 p-2 text-sm text-gray-500">
+            <div className="mb-2 p-2 text-sm text-neutral-500">
               Uploading {uploadingFiles.length} file(s)...
               {uploadingFiles.map((f) => (
                 <div key={f.name} className="text-xs">
@@ -204,7 +204,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             relative
             flex flex-col
             rounded-3xl
-            border border-gray-300
+            border border-neutral-300
             overflow-hidden
             shadow-lg
             transition-shadow duration-200
@@ -221,7 +221,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 onPaste={handlePaste}
                 placeholder="Send a message..."
                 rows={1}
-                className="w-full resize-none border-none p-0 bg-background text-foreground focus:outline-none"
+                className="w-full resize-none border-none p-0 bg-background focus:outline-none"
                 style={{
                   maxHeight: "320px",
                   overflowY:
@@ -234,14 +234,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               />
             </div>
 
-            <div className="border-t border-gray-200 p-2 ps-3 flex justify-between items-center">
+            <div className="border-t border-neutral-200 p-2 ps-3 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Tooltip text="Attach files">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isLoading}
-                    className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary border border-gray-300 hover:bg-gray-100"
+                    className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-background border text-neutral-500 border-neutral-300 hover:bg-neutral-100"
                   >
                     <PaperClipIcon className="size-5" />
                   </button>
@@ -262,15 +262,15 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium transition-colors duration-150
                     ${
                       isSearchActive
-                        ? "bg-[#171717] text-white border"
-                        : "bg-white text-primary border border-gray-300 hover:bg-gray-100"
+                        ? "bg-black text-white border hover:bg-neutral-600"
+                        : "bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500"
                     }
                   `}
                   >
                     {isSearchActive ? (
                       <SolidGlobeAltIcon className="size-5 text-white" />
                     ) : (
-                      <OutlineGlobeAltIcon className="size-5 text-primary" />
+                      <OutlineGlobeAltIcon className="size-5 text-neutral-500" />
                     )}
                     <span>Search</span>
                   </button>
@@ -285,13 +285,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     ? false
                     : !input.trim() && selectedFiles.length === 0
                 }
-                className="cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:text-[#5d5d5d] transition-colors duration-150"
+                className="size-10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:text-neutral-600 transition-colors duration-150"
               >
-                {isLoading ? (
-                  <StopCircleIcon className="size-10" />
-                ) : (
-                  <ArrowUpCircleIcon className="size-10" />
-                )}
+                {isLoading ? <StopCircleIcon /> : <ArrowUpCircleIcon />}
               </button>
             </div>
           </div>

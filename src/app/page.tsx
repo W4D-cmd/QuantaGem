@@ -19,7 +19,7 @@ import {
   ArrowDownIcon,
   ArrowRightStartOnRectangleIcon,
   Cog6ToothIcon,
-  EllipsisHorizontalIcon,
+  EllipsisVerticalIcon,
 } from "@heroicons/react/24/outline";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash-preview-05-20";
@@ -736,7 +736,7 @@ export default function Home() {
         onOpenChatSettings={openChatSettingsModal}
         userEmail={userEmail}
       />
-      <main className="flex-1 flex flex-col bg-background text-foreground relative">
+      <main className="flex-1 flex flex-col relative">
         <div className="flex-none sticky top-0 z-10 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
           <ModelSelector
             models={models}
@@ -757,10 +757,10 @@ export default function Home() {
                 <button
                   ref={threeDotMenuButtonRef}
                   onClick={toggleThreeDotMenu}
-                  className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary hover:bg-gray-100"
+                  className="cursor-pointer size-9 flex items-center justify-center rounded-full transition-colors duration-150 text-neutral-500 hover:bg-neutral-100"
                   aria-label="More options"
                 >
-                  <EllipsisHorizontalIcon className="size-5" />
+                  <EllipsisVerticalIcon className="size-5" />
                 </button>
               </Tooltip>
 
@@ -785,7 +785,7 @@ export default function Home() {
           getAuthHeaders={getAuthHeaders}
         />
 
-        <div className="flex-none p-4 bg-background">
+        <div className="flex-none p-4">
           <div className="mx-auto max-w-[52rem]">
             <div className="relative h-0">
               <div
@@ -793,9 +793,9 @@ export default function Home() {
               >
                 <button
                   onClick={handleScrollToBottomClick}
-                  className="cursor-pointer h-9 w-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary border border-gray-300 hover:bg-gray-100 shadow-lg"
+                  className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-150 text-neutral-500 border border-neutral-200 bg-background hover:bg-neutral-100 shadow-lg"
                 >
-                  <ArrowDownIcon />
+                  <ArrowDownIcon className="size-5" />
                 </button>
               </div>
             </div>

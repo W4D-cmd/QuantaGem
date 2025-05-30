@@ -29,20 +29,7 @@ const config: Config = {
             },
           },
         },
-
-        customtext: {
-          css: {
-            "--tw-prose-body": "#0d0d0d",
-          },
-        },
       }),
-      colors: {
-        gray: {
-          100: "#f9f9f9",
-          200: "#ececec",
-          300: "#e3e3e3",
-        },
-      },
     },
   },
 

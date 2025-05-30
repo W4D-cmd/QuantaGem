@@ -73,14 +73,14 @@ const Modal: React.FC<ModalProps> = ({
         role="document"
       >
         {title && (
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h2 id="modal-title" className="text-lg font-semibold text-primary">
+          <div className="flex items-center justify-between p-4 border-b border-neutral-200">
+            <h2 id="modal-title" className="text-lg font-semibold">
               {title}
             </h2>
             {!hideCloseButton && (
               <button
                 onClick={onClose}
-                className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary hover:bg-gray-100 focus:outline-none"
+                className="cursor-pointer size-9 flex items-center justify-center px-2 rounded-full transition-colors duration-150 text-neutral-500 hover:bg-neutral-100 focus:outline-none"
                 aria-label="Close modal"
               >
                 <XMarkIcon className="size-5" />
@@ -91,7 +91,7 @@ const Modal: React.FC<ModalProps> = ({
         {!title && !hideCloseButton && (
           <button
             onClick={onClose}
-            className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium transition-colors duration-150 bg-white text-primary hover:bg-gray-100 focus:outline-none"
+            className="cursor-pointer size-9 flex items-center justify-center px-2 rounded-full transition-colors duration-150 text-neutral-500 hover:bg-neutral-100 focus:outline-none"
             aria-label="Close modal"
           >
             <XMarkIcon className="size-5" />

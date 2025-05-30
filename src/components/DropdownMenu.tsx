@@ -98,7 +98,7 @@ export default function DropdownMenu({
         zIndex: 9999,
         ...(menuWidth != null ? { width: `${menuWidth}px` } : {}),
       }}
-      className="bg-white border border-gray-200 rounded-2xl shadow-lg overflow-hidden"
+      className="bg-background border border-neutral-200 rounded-2xl shadow-lg overflow-hidden"
     >
       <div className="max-h-60 overflow-y-auto p-2 space-y-1">
         {items.map((item) => (
@@ -108,7 +108,7 @@ export default function DropdownMenu({
               onCloseAction();
               item.onClick();
             }}
-            className={`cursor-pointer w-full flex items-center px-4 py-2 text-sm text-left hover:bg-gray-100 rounded-lg transition-colors ${item.className || ""}`}
+            className={`cursor-pointer w-full flex items-center px-4 py-2 text-sm text-left hover:bg-neutral-100 rounded-lg transition-colors ${item.className || ""}`}
           >
             {item.icon && <span className="mr-2">{item.icon}</span>}
             {item.label}

@@ -2,10 +2,7 @@
 
 import Sidebar from "@/components/Sidebar";
 import ChatArea, { ChatAreaHandle } from "@/components/ChatArea";
-import ChatInput, {
-  ChatInputHandle,
-  UploadedFileInfo,
-} from "@/components/ChatInput";
+import ChatInput, { ChatInputHandle, UploadedFileInfo } from "@/components/ChatInput";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ModelSelector from "@/components/ModelSelector";
 import ToggleApiKeyButton from "@/components/ToggleApiKeyButton";
@@ -21,6 +18,7 @@ import {
   Cog6ToothIcon,
   EllipsisVerticalIcon,
 } from "@heroicons/react/24/outline";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash-preview-05-20";
 
@@ -66,9 +64,7 @@ export default function Home() {
   const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [editingChatId, setEditingChatId] = useState<number | null>(null);
-  const [editingPromptInitialValue, setEditingPromptInitialValue] = useState<
-    string | null
-  >(null);
+  const [editingPromptInitialValue, setEditingPromptInitialValue] = useState<string | null>(null);
   const [isThreeDotMenuOpen, setIsThreeDotMenuOpen] = useState(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -110,11 +106,7 @@ export default function Home() {
       const activeElement = document.activeElement as HTMLElement;
       if (activeElement) {
         const tagName = activeElement.tagName;
-        if (
-          tagName === "INPUT" ||
-          tagName === "TEXTAREA" ||
-          activeElement.isContentEditable
-        ) {
+        if (tagName === "INPUT" || tagName === "TEXTAREA" || activeElement.isContentEditable) {
           return;
         }
       }
@@ -168,11 +160,7 @@ export default function Home() {
 
     if (activeChatId !== null && messages.length > 0) {
       const modelName = model.name ?? "";
-      setAllChats((prev) =>
-        prev.map((c) =>
-          c.id === activeChatId ? { ...c, lastModel: modelName } : c,
-        ),
-      );
+      setAllChats((prev) => prev.map((c) => (c.id === activeChatId ? { ...c, lastModel: modelName } : c)));
       fetch(`/api/chats/${activeChatId}`, {
         method: "PATCH",
         headers: {
@@ -190,9 +178,7 @@ export default function Home() {
 
       if (activeChatId !== null) {
         setAllChats((prevChats) =>
-          prevChats.map((c) =>
-            c.id === activeChatId ? { ...c, keySelection: newSelection } : c,
-          ),
+          prevChats.map((c) => (c.id === activeChatId ? { ...c, keySelection: newSelection } : c)),
         );
         fetch(`/api/chats/${activeChatId}`, {
           method: "PATCH",
@@ -224,9 +210,7 @@ export default function Home() {
           const errorData = await res.json().catch(() => ({
             error: `Failed to fetch models: HTTP ${res.status}`,
           }));
-          throw new Error(
-            errorData.error || `Failed to fetch models: HTTP ${res.status}`,
-          );
+          throw new Error(errorData.error || `Failed to fetch models: HTTP ${res.status}`);
         }
         return res.json();
       })
@@ -272,9 +256,7 @@ export default function Home() {
       }
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(
-          errorData.error || `Failed to rename chat: ${res.statusText}`,
-        );
+        throw new Error(errorData.error || `Failed to rename chat: ${res.statusText}`);
       }
       await fetchAllChats();
     } catch (err: unknown) {
@@ -282,9 +264,7 @@ export default function Home() {
       setError(message);
       return;
     }
-    setAllChats((prev) =>
-      prev.map((c) => (c.id === chatId ? { ...c, title: newTitle } : c)),
-    );
+    setAllChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, title: newTitle } : c)));
   };
 
   const handleDeleteChat = async (chatId: number) => {
@@ -299,9 +279,7 @@ export default function Home() {
       }
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(
-          errorData.error || `Failed to delete chat: ${res.statusText}`,
-        );
+        throw new Error(errorData.error || `Failed to delete chat: ${res.statusText}`);
       }
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
@@ -338,9 +316,7 @@ export default function Home() {
         }
         if (!res.ok) {
           const errorData = await res.json();
-          throw new Error(
-            errorData.error || `Failed to load chat: ${res.statusText}`,
-          );
+          throw new Error(errorData.error || `Failed to load chat: ${res.statusText}`);
         }
         const data: {
           messages: Message[];
@@ -371,12 +347,9 @@ export default function Home() {
         setEditingPromptInitialValue(null);
       }
 
-      const currentSelectedModelStillValid = models.find(
-        (m) => m.name === selectedModel?.name,
-      );
+      const currentSelectedModelStillValid = models.find((m) => m.name === selectedModel?.name);
       if (!currentSelectedModelStillValid && models.length > 0) {
-        const defaultModel =
-          models.find((m) => m.name === DEFAULT_MODEL_NAME) || models[0];
+        const defaultModel = models.find((m) => m.name === DEFAULT_MODEL_NAME) || models[0];
         if (defaultModel && selectedModel?.name !== defaultModel.name) {
           setSelectedModel(defaultModel);
         }
@@ -394,8 +367,7 @@ export default function Home() {
       }
     } else if (chat && !chat.lastModel) {
       if (!selectedModel && models.length > 0) {
-        const defaultModel =
-          models.find((m) => m.name === DEFAULT_MODEL_NAME) || models[0];
+        const defaultModel = models.find((m) => m.name === DEFAULT_MODEL_NAME) || models[0];
         if (defaultModel) {
           setSelectedModel(defaultModel);
         }
@@ -423,16 +395,10 @@ export default function Home() {
     setIsLoading(false);
   };
 
-  const handleSendMessage = async (
-    inputText: string,
-    uploadedFiles: UploadedFileInfo[],
-    sendWithSearch: boolean,
-  ) => {
+  const handleSendMessage = async (inputText: string, uploadedFiles: UploadedFileInfo[], sendWithSearch: boolean) => {
     if (!inputText.trim() && uploadedFiles.length === 0) return;
     if (!selectedModel) {
-      setError(
-        "No model selected or available. Please check model list or API key.",
-      );
+      setError("No model selected or available. Please check model list or API key.");
       return;
     }
 
@@ -457,10 +423,7 @@ export default function Home() {
         }
         if (!res.ok) {
           const errorData = await res.json();
-          throw new Error(
-            errorData.error ||
-              `Failed to create new chat session: ${res.statusText}`,
-          );
+          throw new Error(errorData.error || `Failed to create new chat session: ${res.statusText}`);
         }
         const { id } = await res.json();
         sessionId = id;
@@ -546,9 +509,7 @@ export default function Home() {
             errorData = await res.json();
           } catch {}
         }
-        throw new Error(
-          errorData.error || `API request failed with status ${res.status}`,
-        );
+        throw new Error(errorData.error || `API request failed with status ${res.status}`);
       }
 
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -579,28 +540,19 @@ export default function Home() {
                 textAccumulator += parsedChunk.value;
               } else if (parsedChunk.type === "grounding") {
                 if (parsedChunk.sources && Array.isArray(parsedChunk.sources)) {
-                  parsedChunk.sources.forEach(
-                    (s: { title: string; uri: string }) => {
-                      const exists = currentSources.some(
-                        (existing) => existing.uri === s.uri,
-                      );
-                      if (!exists) {
-                        currentSources.push(s);
-                      }
-                    },
-                  );
+                  parsedChunk.sources.forEach((s: { title: string; uri: string }) => {
+                    const exists = currentSources.some((existing) => existing.uri === s.uri);
+                    if (!exists) {
+                      currentSources.push(s);
+                    }
+                  });
                 }
               } else if (parsedChunk.type === "error" && parsedChunk.value) {
                 modelReturnedEmptyMessage = true;
                 setError(parsedChunk.value);
               }
             } catch (jsonError) {
-              console.error(
-                "Failed to parse JSONL chunk:",
-                jsonError,
-                "Raw line:",
-                line,
-              );
+              console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
               textAccumulator += line;
             }
           }
@@ -613,9 +565,7 @@ export default function Home() {
       }
 
       if (modelReturnedEmptyMessage) {
-        setMessages((prev) =>
-          prev.filter((_, idx) => idx !== modelMessageIndex),
-        );
+        setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndex));
       }
     } catch (error: unknown) {
       setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndex));
@@ -646,9 +596,7 @@ export default function Home() {
       }
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(
-          errorData.error || `Failed to delete all chats: ${res.statusText}`,
-        );
+        throw new Error(errorData.error || `Failed to delete all chats: ${res.statusText}`);
       }
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
@@ -716,9 +664,9 @@ export default function Home() {
     {
       id: "logout",
       label: "Logout",
-      icon: <ArrowRightStartOnRectangleIcon className="size-4 text-red-500" />,
+      icon: <ArrowRightStartOnRectangleIcon className="size-4 text-red-500 dark:text-red-400" />,
       onClick: handleLogout,
-      className: "text-red-500 hover:bg-red-100",
+      className: "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
     },
   ];
 
@@ -737,27 +685,28 @@ export default function Home() {
         userEmail={userEmail}
       />
       <main className="flex-1 flex flex-col relative">
-        <div className="flex-none sticky top-0 z-10 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-          <ModelSelector
-            models={models}
-            selected={selectedModel}
-            onChangeAction={handleModelChange}
-          />
+        <div
+          className="flex-none sticky top-0 z-10 px-4 py-2 border-b border-neutral-100 dark:border-neutral-950 transition-colors duration-300
+            ease-in-out flex items-center justify-between"
+        >
+          <ModelSelector models={models} selected={selectedModel} onChangeAction={handleModelChange} />
 
           <div className="flex items-center">
             <Tooltip text="Switch between free and paid API key">
-              <ToggleApiKeyButton
-                selectedKey={keySelection}
-                onToggleAction={handleKeySelectionToggle}
-              />
+              <ToggleApiKeyButton selectedKey={keySelection} onToggleAction={handleKeySelectionToggle} />
             </Tooltip>
+
+            <div className="relative ms-2">
+              <ThemeToggleButton />
+            </div>
 
             <div className="relative ms-2">
               <Tooltip text="More options">
                 <button
                   ref={threeDotMenuButtonRef}
                   onClick={toggleThreeDotMenu}
-                  className="cursor-pointer size-9 flex items-center justify-center rounded-full transition-colors duration-150 text-neutral-500 hover:bg-neutral-100"
+                  className="cursor-pointer size-9 flex items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100
+                    dark:hover:bg-neutral-900 transition-colors duration-300 ease-in-out"
                   aria-label="More options"
                 >
                   <EllipsisVerticalIcon className="size-5" />
@@ -789,11 +738,14 @@ export default function Home() {
           <div className="mx-auto max-w-[52rem]">
             <div className="relative h-0">
               <div
-                className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300 ease-in-out ${isAutoScrollActive ? "opacity-0 pointer-events-none" : "opacity-100"} `}
+                className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300 ease-in-out
+                  ${isAutoScrollActive ? "opacity-0 pointer-events-none" : "opacity-100"} `}
               >
                 <button
                   onClick={handleScrollToBottomClick}
-                  className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-150 text-neutral-500 border border-neutral-200 bg-background hover:bg-neutral-100 shadow-lg"
+                  className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-300
+                    ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-900
+                    dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 shadow-lg"
                 >
                   <ArrowDownIcon className="size-5" />
                 </button>

@@ -5,45 +5,29 @@ import { getUserFromToken } from "@/lib/auth";
 export async function GET(request: NextRequest) {
   const user = await getUserFromToken(request);
   if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized: User not authenticated" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
   try {
-    const { rows } = await pool.query(
-      "SELECT system_prompt FROM user_settings WHERE user_id = $1",
-      [userId],
-    );
+    const { rows } = await pool.query("SELECT system_prompt FROM user_settings WHERE user_id = $1", [userId]);
 
     if (rows.length === 0) {
       return NextResponse.json({ system_prompt: "" }, { status: 200 });
     }
 
-    return NextResponse.json(
-      { system_prompt: rows[0].system_prompt || "" },
-      { status: 200 },
-    );
+    return NextResponse.json({ system_prompt: rows[0].system_prompt || "" }, { status: 200 });
   } catch (error) {
     console.error(`Error fetching user settings for user ${userId}:`, error);
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    return NextResponse.json(
-      { error: "Failed to fetch settings", details: errorMessage },
-      { status: 500 },
-    );
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return NextResponse.json({ error: "Failed to fetch settings", details: errorMessage }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromToken(request);
   if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized: User not authenticated" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
@@ -53,10 +37,7 @@ export async function POST(request: NextRequest) {
     };
 
     if (typeof systemPrompt === "undefined") {
-      return NextResponse.json(
-        { error: "systemPrompt is required" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "systemPrompt is required" }, { status: 400 });
     }
 
     const { rows } = await pool.query(
@@ -72,8 +53,7 @@ export async function POST(request: NextRequest) {
     if (rows.length === 0) {
       return NextResponse.json(
         {
-          error:
-            "Failed to update settings, settings row not found or created for user.",
+          error: "Failed to update settings, settings row not found or created for user.",
         },
         { status: 500 },
       );
@@ -89,11 +69,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error(`Error updating user settings for user ${userId}:`, error);
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    return NextResponse.json(
-      { error: "Failed to update settings", details: errorMessage },
-      { status: 500 },
-    );
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return NextResponse.json({ error: "Failed to update settings", details: errorMessage }, { status: 500 });
   }
 }

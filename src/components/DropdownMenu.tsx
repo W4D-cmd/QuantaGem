@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  ReactNode,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 export interface DropdownItem {
@@ -50,9 +44,7 @@ export default function DropdownMenu({
 
     const top = rect.bottom + window.scrollY;
     const left =
-      position === "right"
-        ? rect.right + window.scrollX - (contentW + extraWidthPx)
-        : rect.left + window.scrollX;
+      position === "right" ? rect.right + window.scrollX - (contentW + extraWidthPx) : rect.left + window.scrollX;
 
     setCoords({ top, left });
 
@@ -98,7 +90,8 @@ export default function DropdownMenu({
         zIndex: 9999,
         ...(menuWidth != null ? { width: `${menuWidth}px` } : {}),
       }}
-      className="bg-background border border-neutral-200 rounded-2xl shadow-lg overflow-hidden"
+      className="border bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-lg overflow-hidden
+        transition-colors duration-300 ease-in-out"
     >
       <div className="max-h-60 overflow-y-auto p-2 space-y-1">
         {items.map((item) => (
@@ -108,7 +101,8 @@ export default function DropdownMenu({
               onCloseAction();
               item.onClick();
             }}
-            className={`cursor-pointer w-full flex items-center px-4 py-2 text-sm text-left hover:bg-neutral-100 rounded-lg transition-colors ${item.className || ""}`}
+            className={`cursor-pointer w-full flex items-center px-4 py-2 text-sm text-left hover:bg-neutral-100 dark:hover:bg-neutral-800
+            rounded-lg transition-colors duration-300 ease-in-out ${item.className || ""}`}
           >
             {item.icon && <span className="mr-2">{item.icon}</span>}
             {item.label}

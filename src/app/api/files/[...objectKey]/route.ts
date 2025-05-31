@@ -9,46 +9,27 @@ export async function GET(
 ) {
   const user = await getUserFromToken(request);
   if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized: User not authenticated" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
 
   const params = context.params as { objectKey: string[] };
 
   if (!params || !params.objectKey) {
     console.error("Invalid params in GET /api/files:", params);
-    return NextResponse.json(
-      { error: "Internal server error: Invalid route parameters" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error: Invalid route parameters" }, { status: 500 });
   }
   const objectPathParams = params.objectKey;
 
   if (!Array.isArray(objectPathParams)) {
     console.error("objectKey is not an array:", objectPathParams);
-    return NextResponse.json(
-      { error: "Internal server error: Invalid objectKey format" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error: Invalid objectKey format" }, { status: 500 });
   }
 
   const objectPath = objectPathParams.join("/");
 
-  if (
-    !objectPath &&
-    objectPathParams.length > 0 &&
-    objectPathParams[0] !== ""
-  ) {
-  } else if (
-    !objectPath &&
-    (objectPathParams.length === 0 || objectPathParams[0] === "")
-  ) {
-    return NextResponse.json(
-      { error: "File path is missing" },
-      { status: 400 },
-    );
+  if (!objectPath && objectPathParams.length > 0 && objectPathParams[0] !== "") {
+  } else if (!objectPath && (objectPathParams.length === 0 || objectPathParams[0] === "")) {
+    return NextResponse.json({ error: "File path is missing" }, { status: 400 });
   }
 
   try {
@@ -67,10 +48,7 @@ export async function GET(
     });
 
     const headers = new Headers();
-    headers.set(
-      "Content-Type",
-      stat.metaData?.["content-type"] || "application/octet-stream",
-    );
+    headers.set("Content-Type", stat.metaData?.["content-type"] || "application/octet-stream");
     headers.set("Content-Length", stat.size.toString());
 
     return new NextResponse(webReadableStream, {
@@ -83,8 +61,7 @@ export async function GET(
       typeof error === "object" &&
       error !== null &&
       "code" in error &&
-      ((error as { code: string }).code === "NoSuchKey" ||
-        (error as { code: string }).code === "NotFound")
+      ((error as { code: string }).code === "NoSuchKey" || (error as { code: string }).code === "NotFound")
     ) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
@@ -96,9 +73,6 @@ export async function GET(
     ) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
-    return NextResponse.json(
-      { error: "Failed to retrieve file" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to retrieve file" }, { status: 500 });
   }
 }

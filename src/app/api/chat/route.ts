@@ -75,10 +75,7 @@ function getFileExtension(fileName?: string): string {
 export async function POST(request: NextRequest) {
   const user = await getUserFromToken(request);
   if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized: User not authenticated" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
@@ -91,22 +88,13 @@ export async function POST(request: NextRequest) {
     isSearchActive,
   } = (await request.json()) as ChatRequest;
 
-  const apiKey =
-    keySelection === "paid"
-      ? process.env.PAID_GOOGLE_API_KEY
-      : process.env.FREE_GOOGLE_API_KEY;
+  const apiKey = keySelection === "paid" ? process.env.PAID_GOOGLE_API_KEY : process.env.FREE_GOOGLE_API_KEY;
 
   if (!apiKey) {
-    return NextResponse.json(
-      { error: `${keySelection.toUpperCase()}_GOOGLE_API_KEY not configured` },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: `${keySelection.toUpperCase()}_GOOGLE_API_KEY not configured` }, { status: 500 });
   }
   if (!chatSessionId) {
-    return NextResponse.json(
-      { error: "chatSessionId missing" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "chatSessionId missing" }, { status: 400 });
   }
   if (!model) {
     return NextResponse.json({ error: "model missing" }, { status: 400 });
@@ -120,13 +108,8 @@ export async function POST(request: NextRequest) {
   for (const appPart of newMessageAppParts) {
     if (appPart.type === "text" && appPart.text) {
       newMessageGeminiParts.push({ text: appPart.text });
-      combinedUserTextForDB +=
-        (combinedUserTextForDB ? " " : "") + appPart.text;
-    } else if (
-      appPart.type === "file" &&
-      appPart.objectName &&
-      appPart.mimeType
-    ) {
+      combinedUserTextForDB += (combinedUserTextForDB ? " " : "") + appPart.text;
+    } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
       let effectiveMimeType = appPart.mimeType.toLowerCase();
       const extension = getFileExtension(appPart.fileName);
 
@@ -151,10 +134,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const fileStream = await minioClient.getObject(
-          MINIO_BUCKET_NAME,
-          appPart.objectName,
-        );
+        const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
         const chunks: Buffer[] = [];
         for await (const chunk of fileStream) {
           chunks.push(chunk as Buffer);
@@ -167,8 +147,7 @@ export async function POST(request: NextRequest) {
           },
         });
         if (appPart.fileName) {
-          combinedUserTextForDB +=
-            (combinedUserTextForDB ? " " : "") + `[file: ${appPart.fileName}]`;
+          combinedUserTextForDB += (combinedUserTextForDB ? " " : "") + `[file: ${appPart.fileName}]`;
         }
       } catch (fileError) {
         console.error(
@@ -186,9 +165,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (newMessageGeminiParts.length === 0) {
-    const hasActualTextContent = newMessageAppParts.some(
-      (p) => p.type === "text" && p.text && p.text.trim() !== "",
-    );
+    const hasActualTextContent = newMessageAppParts.some((p) => p.type === "text" && p.text && p.text.trim() !== "");
     if (!hasActualTextContent && newMessageAppParts.length > 0) {
       return NextResponse.json(
         {
@@ -200,8 +177,7 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json(
       {
-        error:
-          "No valid content to send to Gemini (message empty or all files unsupported/unprocessed).",
+        error: "No valid content to send to Gemini (message empty or all files unsupported/unprocessed).",
       },
       { status: 400 },
     );
@@ -210,13 +186,7 @@ export async function POST(request: NextRequest) {
   try {
     await pool.query(
       `INSERT INTO messages (chat_session_id, role, content, parts, position, sources) SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5 FROM messages WHERE chat_session_id = $1`,
-      [
-        chatSessionId,
-        "user",
-        combinedUserTextForDB,
-        JSON.stringify(newMessageAppParts),
-        JSON.stringify([]),
-      ],
+      [chatSessionId, "user", combinedUserTextForDB, JSON.stringify(newMessageAppParts), JSON.stringify([])],
     );
 
     const historyGeminiContents: Content[] = [];
@@ -226,11 +196,7 @@ export async function POST(request: NextRequest) {
         for (const appPart of prevMsg.parts) {
           if (appPart.type === "text" && appPart.text) {
             prevMsgGeminiParts.push({ text: appPart.text });
-          } else if (
-            appPart.type === "file" &&
-            appPart.objectName &&
-            appPart.mimeType
-          ) {
+          } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
             if (prevMsg.role === "user") {
               let effectiveMimeType = appPart.mimeType.toLowerCase();
               const extension = getFileExtension(appPart.fileName);
@@ -249,10 +215,7 @@ export async function POST(request: NextRequest) {
                 continue;
               }
               try {
-                const fileStream = await minioClient.getObject(
-                  MINIO_BUCKET_NAME,
-                  appPart.objectName,
-                );
+                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
                 const chunks: Buffer[] = [];
                 for await (const chunk of fileStream) {
                   chunks.push(chunk as Buffer);
@@ -265,10 +228,7 @@ export async function POST(request: NextRequest) {
                   },
                 });
               } catch (fileError) {
-                console.error(
-                  `Failed to retrieve historical file ${appPart.objectName} from MinIO:`,
-                  fileError,
-                );
+                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
                 return NextResponse.json(
                   {
                     error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}`,
@@ -290,10 +250,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const contentsForApi: Content[] = [
-      ...historyGeminiContents,
-      { role: "user", parts: newMessageGeminiParts },
-    ];
+    const contentsForApi: Content[] = [...historyGeminiContents, { role: "user", parts: newMessageGeminiParts }];
 
     let systemPromptText: string | null = null;
     try {
@@ -302,28 +259,18 @@ export async function POST(request: NextRequest) {
         [chatSessionId, userId],
       );
 
-      if (
-        chatSettingsResult.rows.length > 0 &&
-        chatSettingsResult.rows[0].system_prompt?.trim() !== ""
-      ) {
+      if (chatSettingsResult.rows.length > 0 && chatSettingsResult.rows[0].system_prompt?.trim() !== "") {
         systemPromptText = chatSettingsResult.rows[0].system_prompt;
       } else {
-        const globalSettingsResult = await pool.query(
-          "SELECT system_prompt FROM user_settings WHERE user_id = $1",
-          [userId],
-        );
-        if (
-          globalSettingsResult.rows.length > 0 &&
-          globalSettingsResult.rows[0].system_prompt?.trim() !== ""
-        ) {
+        const globalSettingsResult = await pool.query("SELECT system_prompt FROM user_settings WHERE user_id = $1", [
+          userId,
+        ]);
+        if (globalSettingsResult.rows.length > 0 && globalSettingsResult.rows[0].system_prompt?.trim() !== "") {
           systemPromptText = globalSettingsResult.rows[0].system_prompt;
         }
       }
     } catch (dbError) {
-      console.warn(
-        "Failed to fetch system prompt, proceeding without it:",
-        dbError,
-      );
+      console.warn("Failed to fetch system prompt, proceeding without it:", dbError);
     }
 
     const generationConfig: {
@@ -352,8 +299,7 @@ export async function POST(request: NextRequest) {
       streamParams.config = generationConfig;
     }
 
-    const streamingResult =
-      await genAI.models.generateContentStream(streamParams);
+    const streamingResult = await genAI.models.generateContentStream(streamParams);
 
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
@@ -365,25 +311,20 @@ export async function POST(request: NextRequest) {
           if (chunk.text) {
             modelOutput += chunk.text;
             const jsonTextChunk = { type: "text", value: chunk.text };
-            controller.enqueue(
-              encoder.encode(JSON.stringify(jsonTextChunk) + "\n"),
-            );
+            controller.enqueue(encoder.encode(JSON.stringify(jsonTextChunk) + "\n"));
           }
 
           if (chunk.candidates && chunk.candidates.length > 0) {
             const candidate = chunk.candidates[0];
             if (candidate.groundingMetadata) {
-              const groundingMetadata: GroundingMetadata =
-                candidate.groundingMetadata;
+              const groundingMetadata: GroundingMetadata = candidate.groundingMetadata;
 
               if (groundingMetadata.groundingChunks) {
                 for (const gc of groundingMetadata.groundingChunks) {
                   if (gc.web && gc.web.title && gc.web.uri) {
                     const webInfo = gc.web;
 
-                    const isDuplicate = sourcesToStore.some(
-                      (s) => s.uri === webInfo.uri,
-                    );
+                    const isDuplicate = sourcesToStore.some((s) => s.uri === webInfo.uri);
                     if (!isDuplicate) {
                       const source = {
                         title: webInfo.title!,
@@ -394,11 +335,7 @@ export async function POST(request: NextRequest) {
                         type: "grounding",
                         sources: [source],
                       };
-                      controller.enqueue(
-                        encoder.encode(
-                          JSON.stringify(jsonGroundingChunk) + "\n",
-                        ),
-                      );
+                      controller.enqueue(encoder.encode(JSON.stringify(jsonGroundingChunk) + "\n"));
                     }
                   }
                 }
@@ -413,9 +350,7 @@ export async function POST(request: NextRequest) {
             type: "error",
             value: "Model returned an empty message. Please try again.",
           };
-          controller.enqueue(
-            encoder.encode(JSON.stringify(emptyMessageError) + "\n"),
-          );
+          controller.enqueue(encoder.encode(JSON.stringify(emptyMessageError) + "\n"));
         } else {
           await pool.query(
             `INSERT INTO messages (chat_session_id, role, content, parts, position, sources) SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5 FROM messages WHERE chat_session_id = $1`,
@@ -442,10 +377,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error in Gemini API call or DB operation:", error);
     let detailedError = error instanceof Error ? error.message : String(error);
-    if (
-      error instanceof Error &&
-      error.message.includes("got status: 400 Bad Request.")
-    ) {
+    if (error instanceof Error && error.message.includes("got status: 400 Bad Request.")) {
       try {
         const match = error.message.match(/{.*}/s);
         if (match && match[0]) {
@@ -459,19 +391,13 @@ export async function POST(request: NextRequest) {
                 detailedError = `Gemini API Error: ${jsonError.error.message}`;
               }
             } catch (e_nested_parsing) {
-              console.warn(
-                "Failed to parse nested Gemini error message string:",
-                e_nested_parsing,
-              );
+              console.warn("Failed to parse nested Gemini error message string:", e_nested_parsing);
               detailedError = `Gemini API Error: ${jsonError.error.message}`;
             }
           }
         }
       } catch (e_main_parsing) {
-        console.warn(
-          "Failed to parse main Gemini error message string:",
-          e_main_parsing,
-        );
+        console.warn("Failed to parse main Gemini error message string:", e_main_parsing);
       }
     }
     return NextResponse.json({ error: detailedError }, { status: 500 });

@@ -46,10 +46,9 @@ const Toast: FC<ToastProps> = ({ message, onClose }) => {
 
   return (
     <div
-      className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-[90%]
-      max-w-md bg-red-500/70 border border-red-600/70 backdrop-blur-sm
-      text-white rounded-2xl shadow-lg overflow-hidden transition-opacity
-      duration-300 ${visible ? "opacity-100" : "opacity-0"}`}
+      className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-[90%] max-w-md bg-red-500/70 border border-red-600/70
+        backdrop-blur-sm text-white rounded-2xl shadow-lg overflow-hidden transition-opacity duration-300
+        ${visible ? "opacity-100" : "opacity-0"}`}
       onMouseEnter={clearTimer}
       onMouseLeave={startTimer}
     >

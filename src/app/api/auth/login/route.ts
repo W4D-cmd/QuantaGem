@@ -8,35 +8,23 @@ export async function POST(request: Request) {
     const { email, password } = await request.json();
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
     }
 
     const client = await pool.connect();
     try {
-      const userResult = await client.query(
-        "SELECT id, email, password_hash FROM users WHERE email = $1",
-        [email],
-      );
+      const userResult = await client.query("SELECT id, email, password_hash FROM users WHERE email = $1", [email]);
 
       const user = userResult.rows[0];
 
       if (!user) {
-        return NextResponse.json(
-          { error: "Invalid credentials" },
-          { status: 401 },
-        );
+        return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
       }
 
       const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
       if (!passwordMatch) {
-        return NextResponse.json(
-          { error: "Invalid credentials" },
-          { status: 401 },
-        );
+        return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
       }
 
       const token = await generateAuthToken(user.id, user.email);
@@ -53,9 +41,6 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.json(
-      { error: "Internal server error during login" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error during login" }, { status: 500 });
   }
 }

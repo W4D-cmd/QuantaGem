@@ -1,0 +1,4 @@
+{
+  "plugins": ["prettier-plugin-classnames"],
+  "printWidth": 120
+}

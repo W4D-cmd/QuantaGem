@@ -9,6 +9,7 @@ const publicPaths = [
   "/api/auth/signup",
   "/api/auth/logout",
   "/api/ping",
+  "/highlightjs-themes/:path*",
 ];
 
 export async function middleware(request: NextRequest) {
@@ -18,7 +19,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (path.startsWith("/_next/") || publicPaths.includes(path)) {
+  if (
+    path.startsWith("/_next/") ||
+    publicPaths.some((publicPath) => {
+      if (publicPath.endsWith("/:path*")) {
+        const basePath = publicPath.replace("/:path*", "");
+        return path.startsWith(basePath);
+      }
+      return publicPath === path;
+    })
+  ) {
     return NextResponse.next();
   }
 
@@ -54,10 +64,7 @@ export async function middleware(request: NextRequest) {
 
     return NextResponse.next();
   } catch (error) {
-    console.error(
-      "Middleware authentication error during token verification:",
-      error,
-    );
+    console.error("Middleware authentication error during token verification:", error);
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("error", "internal_error");
     const res = NextResponse.redirect(loginUrl);

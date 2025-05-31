@@ -3,11 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Model } from "@google/genai";
 import Tooltip from "@/components/Tooltip";
-import {
-  ArrowDownTrayIcon,
-  ArrowUpTrayIcon,
-  ChevronDownIcon,
-} from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, ArrowUpTrayIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 
 export interface Props {
@@ -16,11 +12,7 @@ export interface Props {
   onChangeAction: (model: Model) => void;
 }
 
-export default function ModelSelector({
-  models,
-  selected,
-  onChangeAction,
-}: Props) {
+export default function ModelSelector({ models, selected, onChangeAction }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -45,7 +37,9 @@ export default function ModelSelector({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center h-11 px-3 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 transition-colors text-neutral-600 text-[18px] font-medium focus:outline-none"
+        className="inline-flex items-center h-11 px-3 py-2 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-900
+          text-neutral-600 dark:text-neutral-300 text-[18px] font-medium focus:outline-none transition-colors duration-300
+          ease-in-out"
         disabled={models.length === 0}
       >
         {selected ? (
@@ -53,19 +47,21 @@ export default function ModelSelector({
         ) : (
           <div className="w-4 h-4 border-3 border-neutral-300 border-t-neutral-500 rounded-full animate-spin" />
         )}
-        <ChevronDownIcon className="size-5 ml-2 text-neutral-400" />
+        <ChevronDownIcon className="size-3 stroke-3 ml-2 text-neutral-400 dark:text-neutral-600 transition-colors duration-300 ease-in-out" />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-2 min-w-md bg-white border border-neutral-200 rounded-2xl shadow-lg z-50 overflow-hidden">
-          <div className="px-4 py-2 flex items-center justify-between text-neutral-500">
+        <div
+          className="absolute left-0 top-full mt-2 min-w-md border bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800
+            transition-colors duration-300 ease-in-out rounded-2xl shadow-lg z-50 overflow-hidden"
+        >
+          <div
+            className="px-4 py-2 flex items-center justify-between text-neutral-500 dark:text-neutral-400 transition-colors duration-300
+              ease-in-out"
+          >
             <span>Model</span>
           </div>
-          <div
-            ref={listRef}
-            className="max-h-96 overflow-y-auto p-2 space-y-1"
-            style={{ scrollbarGutter: "stable" }}
-          >
+          <div ref={listRef} className="max-h-96 overflow-y-auto p-2 space-y-1" style={{ scrollbarGutter: "stable" }}>
             {models.map((m) => (
               <Tooltip key={m.name} text={m.description ?? ""}>
                 <button
@@ -75,21 +71,22 @@ export default function ModelSelector({
                     onChangeAction(m);
                     setOpen(false);
                   }}
-                  className="w-full flex items-center justify-between px-4 py-2 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between px-4 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg
+                    transition-colors duration-300 ease-in-out cursor-pointer"
                 >
                   <div className="flex flex-col">
-                    <span className="font-medium text-neutral-600">
+                    <span className="font-medium text-neutral-600 dark:text-neutral-300 transition-colors duration-300 ease-in-out">
                       {m.displayName}
                     </span>
-                    <div className="text-xs text-neutral-500 flex items-center gap-2 mt-1">
-                      <ArrowDownTrayIcon className="size-3" />
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-2 mt-1 transition-colors duration-300 ease-in-out">
+                      <ArrowDownTrayIcon className="size-3 transition-colors duration-300 ease-in-out" />
                       {m.inputTokenLimit}
-                      <ArrowUpTrayIcon className="size-3" />
+                      <ArrowUpTrayIcon className="size-3 transition-colors duration-300 ease-in-out" />
                       {m.outputTokenLimit}
                     </div>
                   </div>
                   {m.name === selected?.name && (
-                    <CheckCircleIcon className="size-4" />
+                    <CheckCircleIcon className="size-4 transition-colors duration-300 ease-in-out" />
                   )}
                 </button>
               </Tooltip>

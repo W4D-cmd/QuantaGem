@@ -19,10 +19,7 @@ if (!JWT_SECRET_VALUE) {
 
 const JWT_SECRET_KEY = new TextEncoder().encode(JWT_SECRET_VALUE);
 
-export async function generateAuthToken(
-  userId: number,
-  email: string,
-): Promise<string> {
+export async function generateAuthToken(userId: number, email: string): Promise<string> {
   const payload: AuthPayload = { userId, email };
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -31,20 +28,13 @@ export async function generateAuthToken(
     .sign(JWT_SECRET_KEY);
 }
 
-export async function verifyAuthToken(
-  token: string,
-): Promise<AuthPayload | null> {
+export async function verifyAuthToken(token: string): Promise<AuthPayload | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET_KEY, {
       algorithms: ["HS256"],
     });
 
-    if (
-      typeof payload === "object" &&
-      payload !== null &&
-      "userId" in payload &&
-      "email" in payload
-    ) {
+    if (typeof payload === "object" && payload !== null && "userId" in payload && "email" in payload) {
       return payload as AuthPayload;
     }
     return null;
@@ -54,9 +44,7 @@ export async function verifyAuthToken(
   }
 }
 
-export async function getUserIdFromRequest(
-  request: NextRequest,
-): Promise<number | null> {
+export async function getUserIdFromRequest(request: NextRequest): Promise<number | null> {
   const authHeader = request.headers.get("Authorization");
   let token: string | undefined;
 
@@ -74,9 +62,7 @@ export async function getUserIdFromRequest(
   return payload ? payload.userId : null;
 }
 
-export async function getUserFromToken(
-  request: NextRequest,
-): Promise<User | null> {
+export async function getUserFromToken(request: NextRequest): Promise<User | null> {
   const authHeader = request.headers.get("Authorization");
   let token: string | undefined;
 

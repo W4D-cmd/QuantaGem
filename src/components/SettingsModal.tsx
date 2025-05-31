@@ -22,8 +22,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   getAuthHeaders,
 }) => {
   const [systemPrompt, setSystemPrompt] = useState<string>("");
-  const [currentInitialSystemPrompt, setCurrentInitialSystemPrompt] =
-    useState<string>("");
+  const [currentInitialSystemPrompt, setCurrentInitialSystemPrompt] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [showToast, setShowToast] = useState<boolean>(false);
@@ -44,9 +43,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 const errData = await res.json().catch(() => ({
                   error: `Failed to fetch chat settings: ${res.statusText}`,
                 }));
-                throw new Error(
-                  errData.error || "Failed to fetch chat settings",
-                );
+                throw new Error(errData.error || "Failed to fetch chat settings");
               }
               return res.json();
             })
@@ -70,9 +67,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               const errData = await res.json().catch(() => ({
                 error: `Failed to fetch global settings: ${res.statusText}`,
               }));
-              throw new Error(
-                errData.error || "Failed to fetch global settings",
-              );
+              throw new Error(errData.error || "Failed to fetch global settings");
             }
             return res.json();
           })
@@ -166,23 +161,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           }}
         />
       )}
-      <Modal
-        isOpen={isOpen}
-        onClose={handleCancel}
-        title={modalTitle}
-        size="lg"
-      >
+      <Modal isOpen={isOpen} onClose={handleCancel} title={modalTitle} size="lg">
         <div className="space-y-6">
           <div>
-            <label
-              htmlFor="system-prompt"
-              className="block text-sm font-medium"
-            >
+            <label htmlFor="system-prompt" className="block text-sm font-medium">
               System Prompt
             </label>
-            <p className="text-xs text-neutral-500 mb-4 mt-1">
-              {promptDescription}
-            </p>
+            <p className="text-xs text-neutral-500 mb-4 mt-1">{promptDescription}</p>
             {isLoading && !systemPrompt && !currentInitialSystemPrompt ? (
               <div className="w-full h-32 bg-neutral-100 rounded-lg animate-pulse"></div>
             ) : (
@@ -190,9 +175,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 id="system-prompt"
                 name="system-prompt"
                 rows={8}
-                className="w-full resize-none p-3 border border-neutral-300 rounded-xl shadow-sm
-                           text-sm transition-shadow duration-200 ease-in-out
-                           focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                className="w-full resize-none p-3 border border-neutral-300 rounded-xl shadow-sm text-sm transition-shadow duration-200 ease-in-out
+                  focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                 value={systemPrompt}
                 onChange={handleInputChange}
                 placeholder="e.g., You are a helpful assistant that speaks like a pirate."
@@ -206,9 +190,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               type="button"
               onClick={handleCancel}
               disabled={isLoading}
-              className="cursor-pointer h-9 px-4 rounded-full text-sm font-medium transition-colors duration-150
-                         bg-background border border-neutral-300 hover:bg-neutral-100 text-neutral-500
-                         focus:outline-none disabled:opacity-50"
+              className="cursor-pointer h-9 px-4 rounded-full text-sm font-medium transition-colors duration-300 ease-in-out bg-background border
+                border-neutral-300 hover:bg-neutral-100 text-neutral-500 focus:outline-none disabled:opacity-50"
             >
               Cancel
             </button>
@@ -216,9 +199,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               type="button"
               onClick={handleSave}
               disabled={isLoading || !hasChanges}
-              className="cursor-pointer disabled:cursor-not-allowed h-9 px-4 rounded-full text-sm font-medium transition-colors duration-150
-                         bg-black text-white border border-transparent shadow-sm hover:bg-neutral-600
-                         focus:outline-none disabled:opacity-50"
+              className="cursor-pointer disabled:cursor-not-allowed h-9 px-4 rounded-full text-sm font-medium transition-colors duration-300
+                ease-in-out bg-black text-white border border-transparent shadow-sm hover:bg-neutral-600 focus:outline-none
+                disabled:opacity-50"
             >
               {isLoading ? "Saving..." : "Save"}
             </button>

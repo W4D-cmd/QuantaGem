@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Roboto, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import React from "react";
-import "highlight.js/styles/atom-one-light.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { HighlightJsThemeLoader } from "@/components/HighlightJsThemeLoader";
 
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-roboto" });
 
@@ -23,7 +24,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${roboto.variable} ${robotoMono.variable}`}>
-      <body className={`antialiased`}>{children}</body>
+      <body
+        className={
+          "antialiased bg-white dark:bg-neutral-950 text-black dark:text-white transition-colors duration-300 ease-in-out"
+        }
+      >
+        <ThemeProvider>
+          <HighlightJsThemeLoader />
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

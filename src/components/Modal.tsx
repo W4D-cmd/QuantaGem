@@ -13,14 +13,7 @@ interface ModalProps {
   hideCloseButton?: boolean;
 }
 
-const Modal: React.FC<ModalProps> = ({
-  isOpen,
-  onClose,
-  title,
-  children,
-  size = "md",
-  hideCloseButton = false,
-}) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = "md", hideCloseButton = false }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,7 +73,8 @@ const Modal: React.FC<ModalProps> = ({
             {!hideCloseButton && (
               <button
                 onClick={onClose}
-                className="cursor-pointer size-9 flex items-center justify-center px-2 rounded-full transition-colors duration-150 text-neutral-500 hover:bg-neutral-100 focus:outline-none"
+                className="cursor-pointer size-9 flex items-center justify-center px-2 rounded-full transition-colors duration-300 ease-in-out
+                  text-neutral-500 hover:bg-neutral-100 focus:outline-none"
                 aria-label="Close modal"
               >
                 <XMarkIcon className="size-5" />
@@ -91,7 +85,8 @@ const Modal: React.FC<ModalProps> = ({
         {!title && !hideCloseButton && (
           <button
             onClick={onClose}
-            className="cursor-pointer size-9 flex items-center justify-center px-2 rounded-full transition-colors duration-150 text-neutral-500 hover:bg-neutral-100 focus:outline-none"
+            className="cursor-pointer size-9 flex items-center justify-center px-2 rounded-full transition-colors duration-300 ease-in-out
+              text-neutral-500 hover:bg-neutral-100 focus:outline-none"
             aria-label="Close modal"
           >
             <XMarkIcon className="size-5" />

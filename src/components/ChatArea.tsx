@@ -2,14 +2,7 @@
 
 import "katex/dist/katex.min.css";
 
-import React, {
-  forwardRef,
-  memo,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-  useState,
-} from "react";
+import React, { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -60,9 +53,7 @@ const ProtectedImage = memo(
           });
 
           if (!res.ok) {
-            console.error(
-              `Failed to fetch image ${fileName}: ${res.statusText}`,
-            );
+            console.error(`Failed to fetch image ${fileName}: ${res.statusText}`);
             setImageUrl("/image.png");
             return;
           }
@@ -121,13 +112,7 @@ export default memo(
 );
 
 function ChatAreaComponent(
-  {
-    messages,
-    isLoading,
-    streamStarted,
-    onAutoScrollChange,
-    getAuthHeaders,
-  }: ChatAreaProps,
+  { messages, isLoading, streamStarted, onAutoScrollChange, getAuthHeaders }: ChatAreaProps,
   ref: React.Ref<ChatAreaHandle>,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -165,8 +150,7 @@ function ChatAreaComponent(
       if (!currentEl) return;
 
       const currentScrollTop = currentEl.scrollTop;
-      const atBottomForUserScroll =
-        currentEl.scrollHeight - currentScrollTop - currentEl.clientHeight < 1;
+      const atBottomForUserScroll = currentEl.scrollHeight - currentScrollTop - currentEl.clientHeight < 1;
 
       let effectivelyScrollingUp: boolean;
       if (event.type === "wheel") {
@@ -175,10 +159,7 @@ function ChatAreaComponent(
         effectivelyScrollingUp = currentScrollTop < lastScrollTopRef.current;
       }
 
-      if (
-        autoScrollEnabled &&
-        (effectivelyScrollingUp || !atBottomForUserScroll)
-      ) {
+      if (autoScrollEnabled && (effectivelyScrollingUp || !atBottomForUserScroll)) {
         currentEl.scrollTo({ top: currentEl.scrollTop, behavior: "auto" });
         setAutoScrollEnabled(false);
         justManuallyDisabledRef.current = true;
@@ -197,13 +178,11 @@ function ChatAreaComponent(
 
       const generalAtBottomThreshold = 20;
       const isGenerallyAtBottom =
-        currentEl.scrollHeight - currentEl.scrollTop - currentEl.clientHeight <
-        generalAtBottomThreshold;
+        currentEl.scrollHeight - currentEl.scrollTop - currentEl.clientHeight < generalAtBottomThreshold;
 
       const manualOverrideResetThreshold = 5;
       const isManuallyScrolledBackToBottom =
-        currentEl.scrollHeight - currentEl.scrollTop - currentEl.clientHeight <
-        manualOverrideResetThreshold;
+        currentEl.scrollHeight - currentEl.scrollTop - currentEl.clientHeight < manualOverrideResetThreshold;
 
       if (justManuallyDisabledRef.current) {
         if (isManuallyScrolledBackToBottom) {
@@ -248,33 +227,20 @@ function ChatAreaComponent(
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
-      scrollTimeoutRef.current = setTimeout(
-        evaluateScrollPositionAndToggleAutoscroll,
-        DEBOUNCE_DELAY,
-      );
+      scrollTimeoutRef.current = setTimeout(evaluateScrollPositionAndToggleAutoscroll, DEBOUNCE_DELAY);
     };
 
     el.addEventListener("wheel", handleUserInitiatedScroll as EventListener, {
       passive: true,
     });
-    el.addEventListener(
-      "touchstart",
-      handleUserInitiatedScroll as EventListener,
-      {
-        passive: true,
-      },
-    );
+    el.addEventListener("touchstart", handleUserInitiatedScroll as EventListener, {
+      passive: true,
+    });
     el.addEventListener("scroll", debouncedScrollHandler, { passive: true });
 
     return () => {
-      el.removeEventListener(
-        "wheel",
-        handleUserInitiatedScroll as EventListener,
-      );
-      el.removeEventListener(
-        "touchstart",
-        handleUserInitiatedScroll as EventListener,
-      );
+      el.removeEventListener("wheel", handleUserInitiatedScroll as EventListener);
+      el.removeEventListener("touchstart", handleUserInitiatedScroll as EventListener);
       el.removeEventListener("scroll", debouncedScrollHandler);
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
@@ -298,42 +264,34 @@ function ChatAreaComponent(
   }, [messages, isLoading, streamStarted, autoScrollEnabled]);
 
   return (
-    <div
-      ref={containerRef}
-      className="flex-1 overflow-y-auto px-4 py-2 focus:outline-none"
-      tabIndex={-1}
-    >
+    <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-2 focus:outline-none" tabIndex={-1}>
       <div className="mx-auto max-w-[52rem] p-4 space-y-4">
         {messages.map((msg, i) => (
           <div
             key={i}
             className={`p-4 rounded-3xl break-words overflow-hidden ${
-              msg.role === "user"
-                ? "max-w-xl bg-neutral-200 self-end ml-auto"
-                : "w-full self-start"
-            }`}
+            msg.role === "user" ? "max-w-xl bg-neutral-200 dark:bg-neutral-800 self-end ml-auto" : "w-full self-start" }`}
           >
             {msg.parts.map((part, j) => {
               if (part.type === "text" && part.text) {
                 return (
-                  <div key={j} className="prose max-w-none">
+                  <div
+                    key={j}
+                    className="prose dark:prose-invert prose-neutral prose-code:font-normal prose-pre:rounded-xl prose-code:rounded prose-pre:border
+                      prose-pre:bg-neutral-100 prose-pre:border-neutral-400/30 dark:prose-pre:bg-neutral-900
+                      dark:prose-pre:border-neutral-600/30 prose-code:bg-neutral-200 dark:prose-code:bg-neutral-800 max-w-none
+                      transition-colors duration-300 ease-in-out prose-code:before:content-none prose-code:after:content-none
+                      prose-code:py-0.5 prose-code:px-1"
+                  >
                     <ReactMarkdown
                       remarkPlugins={[remarkMath, remarkGfm]}
-                      rehypePlugins={[
-                        rehypeKatex,
-                        [rehypeHighlight, { detect: true }],
-                      ]}
+                      rehypePlugins={[rehypeKatex, [rehypeHighlight, { detect: true }]]}
                     >
                       {part.text}
                     </ReactMarkdown>
                   </div>
                 );
-              } else if (
-                part.type === "file" &&
-                part.objectName &&
-                part.mimeType &&
-                part.fileName
-              ) {
+              } else if (part.type === "file" && part.objectName && part.mimeType && part.fileName) {
                 if (part.mimeType.startsWith("image/")) {
                   return (
                     <div key={j} className="my-2">
@@ -355,9 +313,7 @@ function ChatAreaComponent(
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:text-blue-800 underline break-all"
                       >
-                        {part.fileName} ({part.mimeType},{" "}
-                        {part.size ? `${(part.size / 1024).toFixed(1)} KB` : ""}
-                        )
+                        {part.fileName} ({part.mimeType}, {part.size ? `${(part.size / 1024).toFixed(1)} KB` : ""})
                       </a>
                     </div>
                   );

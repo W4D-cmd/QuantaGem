@@ -4,16 +4,10 @@ import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
 import { getUserFromToken } from "@/lib/auth";
 
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ chatSessionId: string }> },
-) {
+export async function GET(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized: User not authenticated" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
@@ -28,10 +22,7 @@ export async function GET(
     );
 
     if (chatSessionResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Chat session not found or not owned by user" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Chat session not found or not owned by user" }, { status: 404 });
     }
 
     const chatSessionData = chatSessionResult.rows[0];
@@ -48,42 +39,28 @@ export async function GET(
       messages: messagesResult.rows,
     });
   } catch (error) {
-    console.error(
-      `Error fetching chat session ${chatSessionId} for user ${userId}:`,
-      error,
-    );
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    return NextResponse.json(
-      { error: "Failed to fetch chat session", details: errorMessage },
-      { status: 500 },
-    );
+    console.error(`Error fetching chat session ${chatSessionId} for user ${userId}:`, error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return NextResponse.json({ error: "Failed to fetch chat session", details: errorMessage }, { status: 500 });
   } finally {
     client.release();
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  context: { params: Promise<{ chatSessionId: string }> },
-) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized: User not authenticated" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
   const { chatSessionId } = await context.params;
-  const { title, lastModel, systemPrompt, keySelection } =
-    (await request.json()) as {
-      title?: string;
-      lastModel?: string;
-      systemPrompt?: string;
-      keySelection?: "free" | "paid";
-    };
+  const { title, lastModel, systemPrompt, keySelection } = (await request.json()) as {
+    title?: string;
+    lastModel?: string;
+    systemPrompt?: string;
+    keySelection?: "free" | "paid";
+  };
 
   const sets: string[] = [];
   const vals: (string | number)[] = [];
@@ -121,10 +98,7 @@ export async function PATCH(
   try {
     const result = await pool.query(sql, vals);
     if (result.rowCount === 0) {
-      return NextResponse.json(
-        { error: "Chat session not found or not owned by user" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Chat session not found or not owned by user" }, { status: 404 });
     }
     const { rows } = await pool.query(
       `SELECT id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection" FROM chat_sessions WHERE id = $1 AND user_id = $2`,
@@ -132,45 +106,29 @@ export async function PATCH(
     );
     return NextResponse.json(rows[0]);
   } catch (error) {
-    console.error(
-      `Error updating chat session ${chatSessionId} for user ${userId}:`,
-      error,
-    );
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    return NextResponse.json(
-      { error: "Failed to update chat session", details: errorMessage },
-      { status: 500 },
-    );
+    console.error(`Error updating chat session ${chatSessionId} for user ${userId}:`, error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return NextResponse.json({ error: "Failed to update chat session", details: errorMessage }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  context: { params: Promise<{ chatSessionId: string }> },
-) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized: User not authenticated" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
   const { chatSessionId } = await context.params;
 
   try {
-    const chatSessionCheck = await pool.query(
-      `SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2`,
-      [chatSessionId, userId],
-    );
+    const chatSessionCheck = await pool.query(`SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2`, [
+      chatSessionId,
+      userId,
+    ]);
 
     if (chatSessionCheck.rowCount === 0) {
-      return NextResponse.json(
-        { error: "Chat session not found or not owned by user" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Chat session not found or not owned by user" }, { status: 404 });
     }
 
     const messagesResult = await pool.query<{ parts: MessagePart[] }>(
@@ -219,8 +177,7 @@ export async function DELETE(
     if (deleteResult.rowCount === 0) {
       return NextResponse.json(
         {
-          error:
-            "Chat session not found or not owned by user, nothing deleted.",
+          error: "Chat session not found or not owned by user, nothing deleted.",
         },
         { status: 404 },
       );
@@ -231,15 +188,8 @@ export async function DELETE(
       message: "Chat session and associated files (if any) deleted.",
     });
   } catch (error) {
-    console.error(
-      `Error deleting chat session ${chatSessionId} for user ${userId}:`,
-      error,
-    );
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    return NextResponse.json(
-      { error: "Failed to delete chat session", details: errorMessage },
-      { status: 500 },
-    );
+    console.error(`Error deleting chat session ${chatSessionId} for user ${userId}:`, error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return NextResponse.json({ error: "Failed to delete chat session", details: errorMessage }, { status: 500 });
   }
 }

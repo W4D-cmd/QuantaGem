@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  ReactNode,
-  useState,
-  useRef,
-  useLayoutEffect,
-  useEffect,
-} from "react";
+import React, { ReactNode, useState, useRef, useLayoutEffect, useEffect } from "react";
 import { createPortal } from "react-dom";
 
 interface TooltipProps {
@@ -59,8 +53,7 @@ export default function Tooltip({ text, children, offset = 8 }: TooltipProps) {
     const minMargin = 8;
 
     let top = trigRect.bottom + window.scrollY + offset;
-    let left =
-      trigRect.left + window.scrollX + trigRect.width / 2 - tipRect.width / 2;
+    let left = trigRect.left + window.scrollX + trigRect.width / 2 - tipRect.width / 2;
 
     const maxLeft = window.innerWidth - tipRect.width - minMargin;
     if (left < minMargin) left = minMargin;
@@ -76,13 +69,7 @@ export default function Tooltip({ text, children, offset = 8 }: TooltipProps) {
 
   return (
     <>
-      <span
-        ref={triggerRef}
-        onMouseEnter={show}
-        onMouseLeave={hide}
-        onClick={hide}
-        className="contents"
-      >
+      <span ref={triggerRef} onMouseEnter={show} onMouseLeave={hide} onClick={hide} className="contents">
         {children}
       </span>
 
@@ -101,7 +88,7 @@ export default function Tooltip({ text, children, offset = 8 }: TooltipProps) {
             className={
               "transition-opacity duration-100 ease-in " +
               (fadeIn ? "opacity-100" : "opacity-0") +
-              " bg-black text-white text-xs rounded-lg py-1 px-2 whitespace-nowrap shadow-lg"
+              " bg-black dark:bg-white text-white dark:text-black text-xs rounded-lg py-1 px-2 whitespace-nowrap shadow-lg"
             }
           >
             {text}

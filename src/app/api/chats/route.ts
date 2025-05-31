@@ -7,10 +7,7 @@ import { getUserFromToken } from "@/lib/auth";
 export async function GET(request: NextRequest) {
   const user = await getUserFromToken(request);
   if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized: User not authenticated" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
@@ -33,10 +30,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getUserFromToken(request);
   if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized: User not authenticated" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
@@ -54,18 +48,12 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const user = await getUserFromToken(request);
   if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized: User not authenticated" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
   try {
-    const chatSessionIdsResult = await pool.query(
-      `SELECT id FROM chat_sessions WHERE user_id = $1`,
-      [userId],
-    );
+    const chatSessionIdsResult = await pool.query(`SELECT id FROM chat_sessions WHERE user_id = $1`, [userId]);
     const chatSessionIds = chatSessionIdsResult.rows.map((row) => row.id);
 
     if (chatSessionIds.length === 0) {
@@ -103,10 +91,7 @@ export async function DELETE(request: NextRequest) {
           `Successfully submitted deletion request for ${uniqueObjectNames.length} objects from MinIO for user ${userId}'s chats.`,
         );
       } catch (minioError) {
-        console.error(
-          `Error deleting objects from MinIO for user ${userId}'s chats:`,
-          minioError,
-        );
+        console.error(`Error deleting objects from MinIO for user ${userId}'s chats:`, minioError);
       }
     }
 
@@ -117,15 +102,8 @@ export async function DELETE(request: NextRequest) {
       message: "All chat sessions and associated files deleted for user.",
     });
   } catch (error) {
-    console.error(
-      `Error deleting all chat sessions for user ${userId}:`,
-      error,
-    );
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    return NextResponse.json(
-      { error: "Failed to delete all chat sessions", details: errorMessage },
-      { status: 500 },
-    );
+    console.error(`Error deleting all chat sessions for user ${userId}:`, error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return NextResponse.json({ error: "Failed to delete all chat sessions", details: errorMessage }, { status: 500 });
   }
 }

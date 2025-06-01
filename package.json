@@ -11,6 +11,7 @@
   "dependencies": {
     "@google/genai": "^1.0.0",
     "@heroicons/react": "^2.2.0",
+    "@next/font": "^14.2.15",
     "bcryptjs": "^3.0.2",
     "highlight.js": "^11.11.1",
     "jose": "^6.0.11",
@@ -38,9 +39,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.3.3",
-    "tailwindcss": "^4",
     "prettier": "^3.5.3",
     "prettier-plugin-classnames": "^0.7.8",
+    "tailwindcss": "^4",
     "typescript": "^5"
   }
 }

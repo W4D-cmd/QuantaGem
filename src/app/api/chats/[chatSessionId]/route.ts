@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
+import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
 import { getUserFromToken } from "@/lib/auth";
 
-export async function GET(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
-  const { chatSessionId } = await context.params;
+  const { chatSessionId } = await params;
   const client = await pool.connect();
   try {
     const chatSessionResult = await client.query(
-      `SELECT title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection"
-         FROM chat_sessions
-         WHERE id = $1 AND user_id = $2`,
+      `SELECT title,
+              last_model    AS "lastModel",
+              system_prompt AS "systemPrompt",
+              key_selection AS "keySelection",
+              project_id    AS "projectId"
+       FROM chat_sessions
+       WHERE id = $1
+         AND user_id = $2`,
       [chatSessionId, userId],
     );
 
@@ -29,9 +34,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
 
     const messagesResult = await client.query(
       `SELECT role, parts, sources
-         FROM messages
-         WHERE chat_session_id = $1
-         ORDER BY position`,
+       FROM messages
+       WHERE chat_session_id = $1
+       ORDER BY position`,
       [chatSessionId],
     );
     return NextResponse.json({
@@ -47,23 +52,24 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
   }
 }
 
-export async function PATCH(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
-  const { chatSessionId } = await context.params;
-  const { title, lastModel, systemPrompt, keySelection } = (await request.json()) as {
+  const { chatSessionId } = await params;
+  const { title, lastModel, systemPrompt, keySelection, projectId } = (await request.json()) as {
     title?: string;
     lastModel?: string;
     systemPrompt?: string;
     keySelection?: "free" | "paid";
+    projectId?: number | null;
   };
 
   const sets: string[] = [];
-  const vals: (string | number)[] = [];
+  const vals: (string | number | null)[] = [];
   let idx = 1;
 
   if (title !== undefined) {
@@ -82,6 +88,10 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     sets.push(`key_selection = $${idx++}`);
     vals.push(keySelection);
   }
+  if (projectId !== undefined) {
+    sets.push(`project_id = $${idx++}`);
+    vals.push(projectId);
+  }
 
   if (!sets.length) {
     return NextResponse.json({ error: "nothing to update" }, { status: 400 });
@@ -91,7 +101,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
   const sql = `
     UPDATE chat_sessions
     SET ${sets.join(", ")}
-    WHERE id = $${idx} AND user_id = $${idx + 1}
+    WHERE id = $${idx}
+      AND user_id = $${idx + 1}
   `;
   vals.push(chatSessionId, userId);
 
@@ -101,7 +112,15 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
       return NextResponse.json({ error: "Chat session not found or not owned by user" }, { status: 404 });
     }
     const { rows } = await pool.query(
-      `SELECT id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection" FROM chat_sessions WHERE id = $1 AND user_id = $2`,
+      `SELECT id,
+              title,
+              last_model    AS "lastModel",
+              system_prompt AS "systemPrompt",
+              key_selection AS "keySelection",
+              project_id    AS "projectId"
+       FROM chat_sessions
+       WHERE id = $1
+         AND user_id = $2`,
       [chatSessionId, userId],
     );
     return NextResponse.json(rows[0]);
@@ -112,27 +131,32 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
   }
 }
 
-export async function DELETE(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
-  const { chatSessionId } = await context.params;
+  const { chatSessionId } = await params;
 
   try {
-    const chatSessionCheck = await pool.query(`SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2`, [
-      chatSessionId,
-      userId,
-    ]);
+    const chatSessionCheck = await pool.query(
+      `SELECT id
+       FROM chat_sessions
+       WHERE id = $1
+         AND user_id = $2`,
+      [chatSessionId, userId],
+    );
 
     if (chatSessionCheck.rowCount === 0) {
       return NextResponse.json({ error: "Chat session not found or not owned by user" }, { status: 404 });
     }
 
     const messagesResult = await pool.query<{ parts: MessagePart[] }>(
-      `SELECT parts FROM messages WHERE chat_session_id = $1`,
+      `SELECT parts
+       FROM messages
+       WHERE chat_session_id = $1`,
       [chatSessionId],
     );
 
@@ -169,8 +193,10 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     }
 
     const deleteResult = await pool.query(
-      `DELETE FROM chat_sessions
-         WHERE id = $1 AND user_id = $2`,
+      `DELETE
+       FROM chat_sessions
+       WHERE id = $1
+         AND user_id = $2`,
       [chatSessionId, userId],
     );
 

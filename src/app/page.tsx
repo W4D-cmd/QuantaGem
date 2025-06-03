@@ -19,6 +19,7 @@ import {
   EllipsisVerticalIcon,
 } from "@heroicons/react/24/outline";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
+import ProjectManagement from "@/components/ProjectManagement";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash-preview-05-20";
 
@@ -43,6 +44,23 @@ export interface ChatListItem {
   lastModel: string;
   systemPrompt: string;
   keySelection: "free" | "paid";
+  projectId: number | null;
+}
+
+export interface ProjectListItem {
+  id: number;
+  title: string;
+  systemPrompt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectFile {
+  id: number;
+  objectName: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
 }
 
 function extractErrorMessage(err: unknown): string {
@@ -68,15 +86,36 @@ export default function Home() {
   const [isThreeDotMenuOpen, setIsThreeDotMenuOpen] = useState(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [allProjects, setAllProjects] = useState<ProjectListItem[]>([]);
+  const [displayingProjectManagementId, setDisplayingProjectManagementId] = useState<number | null>(null);
+  const [currentChatProjectId, setCurrentChatProjectId] = useState<number | null>(null);
+  const [isNewChatJustCreated, setIsNewChatJustCreated] = useState(false);
+  const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const prevActiveChatIdRef = useRef<number | null>(null);
+  const prevDisplayingProjectManagementIdRef = useRef<number | null>(null);
 
   const getAuthHeaders = useCallback((): HeadersInit => {
     const token = localStorage.getItem("__session");
     return token ? { Authorization: `Bearer ${token}` } : {};
   }, []);
+
+  const fetchAllProjects = useCallback(async () => {
+    try {
+      const res = await fetch("/api/projects", { headers: getAuthHeaders() });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      if (!res.ok) throw new Error("Failed to fetch projects.");
+      const list: ProjectListItem[] = await res.json();
+      setAllProjects(list);
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err));
+    }
+  }, [getAuthHeaders, router]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -101,7 +140,7 @@ export default function Home() {
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
-      if (isLoading) return;
+      if (isLoading || displayingProjectManagementId !== null) return;
 
       const activeElement = document.activeElement as HTMLElement;
       if (activeElement) {
@@ -124,7 +163,7 @@ export default function Home() {
     return () => {
       document.removeEventListener("keydown", handleGlobalKeyDown);
     };
-  }, [isLoading]);
+  }, [isLoading, displayingProjectManagementId]);
 
   const handleAutoScrollChange = useCallback((isEnabled: boolean) => {
     setIsAutoScrollActive(isEnabled);
@@ -148,8 +187,9 @@ export default function Home() {
   useEffect(() => {
     if (userEmail) {
       fetchAllChats();
+      fetchAllProjects();
     }
-  }, [fetchAllChats, userEmail]);
+  }, [fetchAllChats, fetchAllProjects, userEmail]);
 
   const handleScrollToBottomClick = () => {
     chatAreaRef.current?.scrollToBottomAndEnableAutoscroll();
@@ -296,12 +336,73 @@ export default function Home() {
     }
   };
 
-  const handleNewChat = useCallback(() => {
-    setActiveChatId(null);
-    setMessages([]);
-    setEditingPromptInitialValue(null);
-    setKeySelection("free");
-  }, []);
+  const createChat = useCallback(
+    async (title: string, keySelection: "free" | "paid", projectId: number | null) => {
+      try {
+        const res = await fetch("/api/chats", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({
+            title: title,
+            keySelection,
+            projectId,
+          }),
+        });
+        if (res.status === 401) {
+          router.replace("/login");
+          return null;
+        }
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || `Failed to create new chat session: ${res.statusText}`);
+        }
+        const newChat: ChatListItem = await res.json();
+        setAllChats((prev) => [newChat, ...prev]);
+        setActiveChatId(newChat.id);
+        setIsNewChatJustCreated(true);
+        return newChat.id;
+      } catch (err) {
+        setError(extractErrorMessage(err));
+        return null;
+      }
+    },
+    [getAuthHeaders, router, setAllChats, setActiveChatId, setError, setIsNewChatJustCreated],
+  );
+
+  const handleNewChat = useCallback(
+    async (projectId: number | null = null) => {
+      setMessages([]);
+      setEditingPromptInitialValue(null);
+      setKeySelection("free");
+      setCurrentChatProjectId(projectId);
+
+      if (projectId !== null) {
+        const newTitle = `Chat ${allChats.filter((chat) => chat.projectId === projectId).length + 1}`;
+        const newChatId = await createChat(newTitle, keySelection, projectId);
+
+        if (newChatId) {
+          setActiveChatId(newChatId);
+          setDisplayingProjectManagementId(null);
+
+          setExpandedProjects((prev: Set<number>) => {
+            const newSet = new Set(prev);
+            newSet.add(projectId);
+            return newSet;
+          });
+        } else {
+          setActiveChatId(null);
+          setDisplayingProjectManagementId(projectId);
+        }
+      } else {
+        setActiveChatId(null);
+        setDisplayingProjectManagementId(null);
+      }
+    },
+    [allChats, keySelection, createChat],
+  );
 
   const loadChat = useCallback(
     async (chatId: number) => {
@@ -322,10 +423,12 @@ export default function Home() {
           messages: Message[];
           systemPrompt: string;
           keySelection: "free" | "paid";
+          projectId: number | null;
         } = await res.json();
         setMessages(data.messages);
         setEditingPromptInitialValue(data.systemPrompt);
         setKeySelection(data.keySelection);
+        setCurrentChatProjectId(data.projectId);
       } catch (err: unknown) {
         const message = extractErrorMessage(err);
         setError(message);
@@ -338,57 +441,188 @@ export default function Home() {
 
   const handleSelectChat = useCallback((chatId: number) => {
     setActiveChatId(chatId);
+    setDisplayingProjectManagementId(null);
   }, []);
 
-  useEffect(() => {
-    if (activeChatId === null) {
-      if (!isLoading) {
-        setMessages([]);
-        setEditingPromptInitialValue(null);
-      }
+  const handleSelectProject = useCallback((projectId: number) => {
+    setActiveChatId(null);
+    setDisplayingProjectManagementId(projectId);
+    setCurrentChatProjectId(null);
+    setMessages([]);
+    setEditingPromptInitialValue(null);
+    setKeySelection("free");
+  }, []);
 
-      const currentSelectedModelStillValid = models.find((m) => m.name === selectedModel?.name);
-      if (!currentSelectedModelStillValid && models.length > 0) {
-        const defaultModel = models.find((m) => m.name === DEFAULT_MODEL_NAME) || models[0];
-        if (defaultModel && selectedModel?.name !== defaultModel.name) {
-          setSelectedModel(defaultModel);
-        }
+  const handleNewProject = useCallback(async () => {
+    setActiveChatId(null);
+    setMessages([]);
+    setEditingPromptInitialValue(null);
+    setKeySelection("free");
+    setIsLoading(true);
+    try {
+      const existingProjectCount = allProjects.length;
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ title: `Project ${existingProjectCount + 1}` }),
+      });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
       }
-      prevActiveChatIdRef.current = null;
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || `Failed to create new project: ${res.statusText}`);
+      }
+      const newProject: ProjectListItem = await res.json();
+      setAllProjects((prev) => [newProject, ...prev]);
+      setDisplayingProjectManagementId(newProject.id);
+      setCurrentChatProjectId(null);
+    } catch (err) {
+      setError(extractErrorMessage(err));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [allProjects, getAuthHeaders, router]);
+
+  const handleRenameProject = async (projectId: number, newTitle: string) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || `Failed to rename project: ${res.statusText}`);
+      }
+      await fetchAllProjects();
+    } catch (err: unknown) {
+      const message = extractErrorMessage(err);
+      setError(message);
+      return;
+    }
+    setAllProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, title: newTitle } : p)));
+  };
+
+  const handleDeleteProject = async (projectId: number) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this project and all its chats and files? This action cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || `Failed to delete project: ${res.statusText}`);
+      }
+    } catch (err: unknown) {
+      const message = extractErrorMessage(err);
+      setError(message);
       return;
     }
 
-    const chat = allChats.find((c) => c.id === activeChatId);
-
-    if (chat?.lastModel) {
-      const modelForThisChat = models.find((m) => m.name === chat.lastModel);
-      if (modelForThisChat && selectedModel?.name !== modelForThisChat.name) {
-        setSelectedModel(modelForThisChat);
-      }
-    } else if (chat && !chat.lastModel) {
-      if (!selectedModel && models.length > 0) {
-        const defaultModel = models.find((m) => m.name === DEFAULT_MODEL_NAME) || models[0];
-        if (defaultModel) {
-          setSelectedModel(defaultModel);
-        }
-      }
-    }
-
-    if (chat?.keySelection) {
-      setKeySelection(chat.keySelection);
-    } else {
+    setAllProjects((prev) => prev.filter((p) => p.id !== projectId));
+    setAllChats((prev) => prev.filter((c) => c.projectId !== projectId));
+    if (displayingProjectManagementId === projectId) {
+      setDisplayingProjectManagementId(null);
+      setActiveChatId(null);
+      setCurrentChatProjectId(null);
+      setMessages([]);
+      setEditingPromptInitialValue(null);
       setKeySelection("free");
     }
+  };
 
-    if (activeChatId !== prevActiveChatIdRef.current) {
-      setIsLoading(true);
-      loadChat(activeChatId).finally(() => {
-        setIsLoading(false);
-      });
+  useEffect(() => {
+    if (activeChatId === null && displayingProjectManagementId === null) {
+      if (!isLoading) {
+        setMessages([]);
+        setEditingPromptInitialValue(null);
+        setCurrentChatProjectId(null);
+      }
+      prevActiveChatIdRef.current = null;
+      prevDisplayingProjectManagementIdRef.current = null;
+      setIsNewChatJustCreated(false);
+      return;
     }
 
-    prevActiveChatIdRef.current = activeChatId;
-  }, [activeChatId, allChats, models, selectedModel, loadChat, isLoading]);
+    if (activeChatId !== null) {
+      if (activeChatId !== prevActiveChatIdRef.current) {
+        const chat = allChats.find((c) => c.id === activeChatId);
+
+        if (chat?.lastModel) {
+          const modelForThisChat = models.find((m) => m.name === chat.lastModel);
+          if (modelForThisChat && selectedModel?.name !== modelForThisChat.name) {
+            setSelectedModel(modelForThisChat);
+          }
+        } else if (chat && !chat.lastModel) {
+          if (!selectedModel && models.length > 0) {
+            const defaultModel = models.find((m) => m.name === DEFAULT_MODEL_NAME) || models[0];
+            if (defaultModel) setSelectedModel(defaultModel);
+          }
+        }
+        if (chat?.keySelection) {
+          setKeySelection(chat.keySelection);
+        } else {
+          setKeySelection("free");
+        }
+
+        if (!(isNewChatJustCreated && chat?.projectId === null)) {
+          setIsLoading(true);
+          loadChat(activeChatId).finally(() => {
+            setIsLoading(false);
+            if (isNewChatJustCreated) {
+              setIsNewChatJustCreated(false);
+            }
+          });
+        } else if (isNewChatJustCreated && chat?.projectId === null) {
+          setIsNewChatJustCreated(false);
+        }
+      }
+      prevActiveChatIdRef.current = activeChatId;
+      prevDisplayingProjectManagementIdRef.current = null;
+    } else if (displayingProjectManagementId !== null) {
+      if (displayingProjectManagementId !== prevDisplayingProjectManagementIdRef.current) {
+        setCurrentChatProjectId(null);
+        setMessages([]);
+        setEditingPromptInitialValue(null);
+        setKeySelection("free");
+        setIsNewChatJustCreated(false);
+      }
+      prevDisplayingProjectManagementIdRef.current = displayingProjectManagementId;
+      prevActiveChatIdRef.current = null;
+    }
+  }, [
+    activeChatId,
+    displayingProjectManagementId,
+    allChats,
+    models,
+    selectedModel,
+    loadChat,
+    isLoading,
+    isNewChatJustCreated,
+  ]);
 
   const handleCancel = () => {
     controller?.abort();
@@ -403,36 +637,18 @@ export default function Home() {
     }
 
     let sessionId = activeChatId;
-    let isNew = false;
     if (!sessionId) {
-      try {
-        const res = await fetch("/api/chats", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeaders(),
-          },
-          body: JSON.stringify({
-            title: `Chat ${allChats.length + 1}`,
-            keySelection,
-          }),
-        });
-        if (res.status === 401) {
-          router.replace("/login");
-          return;
-        }
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || `Failed to create new chat session: ${res.statusText}`);
-        }
-        const { id } = await res.json();
-        sessionId = id;
-        isNew = true;
-      } catch (err) {
-        setError(extractErrorMessage(err));
+      const newChatTitle = `Chat ${
+        currentChatProjectId
+          ? allChats.filter((c) => c.projectId === currentChatProjectId).length + 1
+          : allChats.filter((c) => c.projectId === null).length + 1
+      }`;
+      const newId = await createChat(newChatTitle, keySelection, currentChatProjectId);
+      if (!newId) {
         setIsLoading(false);
         return;
       }
+      sessionId = newId;
     }
 
     const newUserMessageParts: MessagePart[] = [];
@@ -454,7 +670,20 @@ export default function Home() {
       role: "user",
       parts: newUserMessageParts,
     };
-    setMessages((prev) => [...prev, newUserMessage]);
+
+    let modelMessageIndexForStream: number;
+
+    setMessages((prev) => {
+      const newMessages = [...prev, newUserMessage];
+      const placeholderMessage: Message = {
+        role: "model",
+        parts: [{ type: "text", text: "" }],
+        sources: [],
+      };
+      modelMessageIndexForStream = newMessages.length;
+      return [...newMessages, placeholderMessage];
+    });
+
     setIsLoading(true);
     setStreamStarted(false);
 
@@ -462,17 +691,6 @@ export default function Home() {
       role: msg.role,
       parts: msg.parts,
     }));
-
-    let modelMessageIndex = -1;
-    const placeholderMessage: Message = {
-      role: "model",
-      parts: [{ type: "text", text: "" }],
-      sources: [],
-    };
-    setMessages((prev) => {
-      modelMessageIndex = prev.length;
-      return [...prev, placeholderMessage];
-    });
 
     const ctrl = new AbortController();
     setController(ctrl);
@@ -531,7 +749,17 @@ export default function Home() {
 
         setMessages((prev) => {
           const updatedMessages = [...prev];
-          const messageToUpdate = updatedMessages[modelMessageIndex];
+          const messageToUpdate = updatedMessages[modelMessageIndexForStream];
+
+          if (!messageToUpdate) {
+            console.error(
+              "Attempted to update undefined message at index:",
+              modelMessageIndexForStream,
+              "Current messages state:",
+              prev,
+            );
+            return prev;
+          }
 
           for (const line of lines) {
             try {
@@ -565,10 +793,10 @@ export default function Home() {
       }
 
       if (modelReturnedEmptyMessage) {
-        setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndex));
+        setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
       }
     } catch (error: unknown) {
-      setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndex));
+      setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
       const msg =
         error instanceof DOMException && error.name === "AbortError"
           ? "Response cancelled."
@@ -579,12 +807,15 @@ export default function Home() {
     } finally {
       setIsLoading(false);
       setController(null);
-      if (isNew) setActiveChatId(sessionId);
       await fetchAllChats();
     }
   };
 
-  const handleDeleteAllChats = async () => {
+  const handleDeleteAllGlobalChats = async () => {
+    if (!confirm("Are you sure you want to delete ALL your global chats? This action cannot be undone.")) {
+      return;
+    }
+
     try {
       const res = await fetch("/api/chats", {
         method: "DELETE",
@@ -604,11 +835,13 @@ export default function Home() {
       return;
     }
 
-    setAllChats([]);
-    setActiveChatId(null);
-    setMessages([]);
-    setEditingPromptInitialValue(null);
-    setKeySelection("free");
+    setAllChats((prev) => prev.filter((c) => c.projectId !== null));
+    if (activeChatId !== null && allChats.find((c) => c.id === activeChatId)?.projectId === null) {
+      setActiveChatId(null);
+      setMessages([]);
+      setEditingPromptInitialValue(null);
+      setKeySelection("free");
+    }
   };
 
   const openGlobalSettingsModal = () => {
@@ -631,11 +864,12 @@ export default function Home() {
 
   const handleSettingsSaved = useCallback(async () => {
     await fetchAllChats();
+    await fetchAllProjects();
     if (activeChatId !== null) {
       await loadChat(activeChatId);
     }
     closeSettingsModal();
-  }, [activeChatId, fetchAllChats, loadChat]);
+  }, [activeChatId, fetchAllChats, fetchAllProjects, loadChat]);
 
   const toggleThreeDotMenu = () => {
     setIsThreeDotMenuOpen((prev) => !prev);
@@ -675,31 +909,43 @@ export default function Home() {
       {error && <Toast message={error} onClose={() => setError(null)} />}
       <Sidebar
         chats={allChats}
+        projects={allProjects}
         activeChatId={activeChatId}
+        activeProjectId={displayingProjectManagementId}
         onNewChat={handleNewChat}
         onSelectChat={handleSelectChat}
         onRenameChat={handleRenameChat}
         onDeleteChat={handleDeleteChat}
-        onDeleteAllChats={handleDeleteAllChats}
+        onDeleteAllGlobalChats={handleDeleteAllGlobalChats}
         onOpenChatSettings={openChatSettingsModal}
+        onNewProject={handleNewProject}
+        onSelectProject={handleSelectProject}
+        onRenameProject={handleRenameProject}
+        onDeleteProject={handleDeleteProject}
         userEmail={userEmail}
+        expandedProjects={expandedProjects}
+        onToggleProjectExpansion={setExpandedProjects}
       />
       <main className="flex-1 flex flex-col relative">
         <div
-          className="flex-none sticky top-0 z-10 px-4 py-2 border-b border-neutral-100 dark:border-neutral-950 transition-colors duration-300
-            ease-in-out flex items-center justify-between"
+          className="flex-none sticky min-h-16 top-0 z-10 px-4 py-2 border-b border-neutral-100 dark:border-neutral-950 transition-colors
+            duration-300 ease-in-out flex items-center justify-between"
         >
-          <ModelSelector models={models} selected={selectedModel} onChangeAction={handleModelChange} />
+          {displayingProjectManagementId === null && (
+            <>
+              <ModelSelector models={models} selected={selectedModel} onChangeAction={handleModelChange} />
 
-          <div className="flex items-center">
-            <Tooltip text="Switch between free and paid API key">
-              <ToggleApiKeyButton selectedKey={keySelection} onToggleAction={handleKeySelectionToggle} />
-            </Tooltip>
-
+              <div className="flex items-center ml-4">
+                <Tooltip text="Switch between free and paid API key">
+                  <ToggleApiKeyButton selectedKey={keySelection} onToggleAction={handleKeySelectionToggle} />
+                </Tooltip>
+              </div>
+            </>
+          )}
+          <div className="flex items-center ml-auto">
             <div className="relative ms-2">
               <ThemeToggleButton />
             </div>
-
             <div className="relative ms-2">
               <Tooltip text="More options">
                 <button
@@ -725,44 +971,63 @@ export default function Home() {
           </div>
         </div>
 
-        <ChatArea
-          ref={chatAreaRef}
-          messages={messages}
-          isLoading={isLoading}
-          streamStarted={streamStarted}
-          onAutoScrollChange={handleAutoScrollChange}
-          getAuthHeaders={getAuthHeaders}
-        />
-
-        <div className="flex-none p-4">
-          <div className="mx-auto max-w-[52rem]">
-            <div className="relative h-0">
-              <div
-                className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300 ease-in-out
-                  ${isAutoScrollActive ? "opacity-0 pointer-events-none" : "opacity-100"} `}
-              >
-                <button
-                  onClick={handleScrollToBottomClick}
-                  className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-300
-                    ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-900
-                    dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 shadow-lg"
-                >
-                  <ArrowDownIcon className="size-5" />
-                </button>
-              </div>
-            </div>
-
-            <ChatInput
-              ref={chatInputRef}
-              onSendMessageAction={handleSendMessage}
-              onCancelAction={handleCancel}
+        {displayingProjectManagementId !== null ? (
+          <ProjectManagement
+            projectId={displayingProjectManagementId}
+            getAuthHeaders={getAuthHeaders}
+            onProjectUpdated={fetchAllProjects}
+            onProjectFileAction={setError}
+            onProjectSystemPromptUpdated={async () => {
+              await fetchAllProjects();
+              if (activeChatId) {
+                await loadChat(activeChatId);
+              }
+            }}
+          />
+        ) : (
+          <>
+            <ChatArea
+              ref={chatAreaRef}
+              messages={messages}
               isLoading={isLoading}
-              isSearchActive={isSearchActive}
-              onToggleSearch={setIsSearchActive}
+              streamStarted={streamStarted}
+              onAutoScrollChange={handleAutoScrollChange}
               getAuthHeaders={getAuthHeaders}
             />
-          </div>
-        </div>
+
+            <div className="flex-none p-4">
+              <div className="mx-auto max-w-[52rem]">
+                <div className="relative h-0">
+                  <div
+                    className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300 ease-in-out
+                      ${isAutoScrollActive ? "opacity-0 pointer-events-none" : "opacity-100"} `}
+                  >
+                    <button
+                      onClick={handleScrollToBottomClick}
+                      className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-300
+                        ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-900
+                        dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 shadow-lg"
+                    >
+                      <ArrowDownIcon className="size-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <ChatInput
+                  ref={chatInputRef}
+                  onSendMessageAction={handleSendMessage}
+                  onCancelAction={handleCancel}
+                  isLoading={isLoading}
+                  isSearchActive={isSearchActive}
+                  onToggleSearch={setIsSearchActive}
+                  getAuthHeaders={getAuthHeaders}
+                  activeProjectId={currentChatProjectId}
+                  onError={(msg) => setError(msg)}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </main>
 
       <SettingsModal

@@ -16,6 +16,7 @@ import { PaperClipIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { ArrowUpCircleIcon, StopCircleIcon } from "@heroicons/react/24/solid";
 import { GlobeAltIcon as OutlineGlobeAltIcon } from "@heroicons/react/24/outline";
 import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
+import { ProjectFile } from "@/app/page";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -31,6 +32,8 @@ interface ChatInputProps {
   isSearchActive: boolean;
   onToggleSearch: (isActive: boolean) => void;
   getAuthHeaders: () => HeadersInit;
+  activeProjectId: number | null;
+  onError: (message: string) => void;
 }
 
 export interface ChatInputHandle {
@@ -38,18 +41,58 @@ export interface ChatInputHandle {
 }
 
 const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
-  ({ onSendMessageAction, onCancelAction, isLoading, isSearchActive, onToggleSearch, getAuthHeaders }, ref) => {
+  (
+    {
+      onSendMessageAction,
+      onCancelAction,
+      isLoading,
+      isSearchActive,
+      onToggleSearch,
+      getAuthHeaders,
+      activeProjectId,
+      onError,
+    },
+    ref,
+  ) => {
     const [input, setInput] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedFiles, setSelectedFiles] = useState<UploadedFileInfo[]>([]);
     const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
+    const [showFileSuggestions, setShowFileSuggestions] = useState(false);
+    const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
+    const [filteredProjectFiles, setFilteredProjectFiles] = useState<ProjectFile[]>([]);
+    const [highlightedSuggestionIndex, setHighlightedSuggestionIndex] = useState(-1);
 
     useImperativeHandle(ref, () => ({
       focusInput: () => {
         textareaRef.current?.focus();
       },
     }));
+
+    useEffect(() => {
+      if (activeProjectId !== null) {
+        const fetchProjectFiles = async () => {
+          try {
+            const res = await fetch(`/api/projects/${activeProjectId}/files`, {
+              headers: getAuthHeaders(),
+            });
+            if (!res.ok) {
+              const errorData = await res.json();
+              throw new Error(errorData.error || `Failed to fetch project files.`);
+            }
+            const files: ProjectFile[] = await res.json();
+            setProjectFiles(files);
+          } catch (err: unknown) {
+            onError(err instanceof Error ? err.message : String(err));
+            setProjectFiles([]);
+          }
+        };
+        fetchProjectFiles();
+      } else {
+        setProjectFiles([]);
+      }
+    }, [activeProjectId, getAuthHeaders, onError]);
 
     const processAndUploadFiles = async (filesToUpload: File[]) => {
       if (filesToUpload.length === 0) return;
@@ -60,7 +103,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const formData = new FormData();
         formData.append("file", file);
         try {
-          const response = await fetch("/api/files/upload", {
+          const uploadEndpoint =
+            activeProjectId !== null ? `/api/projects/${activeProjectId}/files` : "/api/files/upload";
+          const response = await fetch(uploadEndpoint, {
             method: "POST",
             body: formData,
             headers: getAuthHeaders(),
@@ -70,9 +115,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             throw new Error(errorData.error || `Upload failed for ${file.name}`);
           }
           const result: UploadedFileInfo = await response.json();
+          if (activeProjectId !== null) {
+            setProjectFiles((prev) => [...prev, result as ProjectFile]);
+          }
           return result;
         } catch (error) {
           console.error("Upload error:", error);
+          onError(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : String(error)}`);
           return null;
         }
       });
@@ -126,18 +175,82 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       setSelectedFiles((prev) => prev.filter((file) => file.objectName !== objectNameToRemove));
     };
 
-    const submit = () => {
-      if ((!input.trim() && selectedFiles.length === 0) || isLoading) return;
-      onSendMessageAction(input, selectedFiles, isSearchActive);
-      setInput("");
-      setSelectedFiles([]);
+    const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      setInput(value);
+
+      if (activeProjectId !== null) {
+        const hashIndex = value.lastIndexOf("#");
+        if (hashIndex !== -1 && (hashIndex === 0 || value[hashIndex - 1] === " " || value[hashIndex - 1] === "\n")) {
+          const searchText = value.substring(hashIndex + 1);
+          const cleanedSearchText = searchText.replace(/\s/g, "").toLowerCase();
+
+          const filtered = projectFiles.filter((file) =>
+            file.fileName.replace(/\s/g, "").toLowerCase().includes(cleanedSearchText),
+          );
+          setFilteredProjectFiles(filtered);
+          setShowFileSuggestions(filtered.length > 0);
+          setHighlightedSuggestionIndex(filtered.length > 0 ? 0 : -1);
+        } else {
+          setShowFileSuggestions(false);
+          setFilteredProjectFiles([]);
+          setHighlightedSuggestionIndex(-1);
+        }
+      }
+    };
+
+    const selectFileSuggestion = (file: ProjectFile) => {
+      const hashIndex = input.lastIndexOf("#");
+      if (hashIndex !== -1) {
+        const prefix = input.substring(0, hashIndex);
+        setInput(prefix);
+        setSelectedFiles((prev) => {
+          if (!prev.some((sf) => sf.objectName === file.objectName)) {
+            return [
+              ...prev,
+              {
+                objectName: file.objectName,
+                fileName: file.fileName,
+                mimeType: file.mimeType,
+                size: file.size,
+              },
+            ];
+          }
+          return prev;
+        });
+      }
+      setShowFileSuggestions(false);
+      setFilteredProjectFiles([]);
+      setHighlightedSuggestionIndex(-1);
+      textareaRef.current?.focus();
     };
 
     const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        submit();
+        if (showFileSuggestions && highlightedSuggestionIndex !== -1) {
+          selectFileSuggestion(filteredProjectFiles[highlightedSuggestionIndex]);
+        } else {
+          submit();
+        }
+      } else if (showFileSuggestions && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        e.preventDefault();
+        if (e.key === "ArrowUp") {
+          setHighlightedSuggestionIndex((prev) => (prev <= 0 ? filteredProjectFiles.length - 1 : prev - 1));
+        } else {
+          setHighlightedSuggestionIndex((prev) => (prev >= filteredProjectFiles.length - 1 ? 0 : prev + 1));
+        }
       }
+    };
+
+    const submit = () => {
+      if ((!input.trim() && selectedFiles.length === 0) || isLoading) return;
+      onSendMessageAction(input, selectedFiles, isSearchActive);
+      setInput("");
+      setSelectedFiles([]);
+      setShowFileSuggestions(false);
+      setFilteredProjectFiles([]);
+      setHighlightedSuggestionIndex(-1);
     };
 
     const onSubmit = (e: FormEvent) => {
@@ -147,7 +260,32 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     return (
       <form onSubmit={onSubmit} className="p-4 pt-0 flex justify-center">
-        <div className="w-full max-w-[52rem]">
+        <div className="w-full max-w-[52rem] relative">
+          {showFileSuggestions && filteredProjectFiles.length > 0 && (
+            <div
+              className="absolute bottom-[100%] left-1/2 -translate-x-1/2 w-full max-w-[52rem] mb-2 bg-white dark:bg-neutral-800 border
+                border-neutral-300 dark:border-neutral-700 rounded-lg shadow-lg overflow-hidden z-20"
+            >
+              <ul className="max-h-48 overflow-y-auto">
+                {filteredProjectFiles.map((file, index) => (
+                  <li
+                    key={file.id}
+                    className={`px-4 py-2 cursor-pointer text-sm flex justify-between items-center ${
+                    index === highlightedSuggestionIndex
+                        ? "bg-blue-100 dark:bg-blue-700 text-blue-900 dark:text-white"
+                        : "hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200"
+                    }`}
+                    onClick={() => selectFileSuggestion(file)}
+                  >
+                    <span>
+                      {file.fileName} ({`${(file.size / 1024).toFixed(1)} KB`})
+                    </span>
+                    <span className="text-neutral-500 dark:text-neutral-400 text-xs">{file.mimeType}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {selectedFiles.length > 0 && (
             <div
               className="mb-2 p-2 border border-neutral-100 dark:border-neutral-900 rounded-xl flex flex-wrap gap-2 transition-colors
@@ -180,7 +318,6 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               ))}
             </div>
           )}
-
           <div
             className="relative flex flex-col rounded-3xl border border-neutral-300 dark:border-neutral-900 overflow-hidden shadow-lg
               transition duration-300 ease-in-out focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500
@@ -190,7 +327,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               <textarea
                 ref={textareaRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={onKeyDown}
                 onPaste={handlePaste}
                 placeholder="Send a message..."

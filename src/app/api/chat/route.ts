@@ -185,7 +185,10 @@ export async function POST(request: NextRequest) {
 
   try {
     await pool.query(
-      `INSERT INTO messages (chat_session_id, role, content, parts, position, sources) SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5 FROM messages WHERE chat_session_id = $1`,
+      `INSERT INTO messages (chat_session_id, role, content, parts, position, sources)
+       SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5
+       FROM messages
+       WHERE chat_session_id = $1`,
       [chatSessionId, "user", combinedUserTextForDB, JSON.stringify(newMessageAppParts), JSON.stringify([])],
     );
 
@@ -255,13 +258,26 @@ export async function POST(request: NextRequest) {
     let systemPromptText: string | null = null;
     try {
       const chatSettingsResult = await pool.query(
-        "SELECT system_prompt FROM chat_sessions WHERE id = $1 AND user_id = $2",
+        "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
         [chatSessionId, userId],
       );
 
-      if (chatSettingsResult.rows.length > 0 && chatSettingsResult.rows[0].system_prompt?.trim() !== "") {
-        systemPromptText = chatSettingsResult.rows[0].system_prompt;
-      } else {
+      const chatSpecificPrompt = chatSettingsResult.rows[0]?.system_prompt?.trim();
+      const associatedProjectId = chatSettingsResult.rows[0]?.project_id;
+
+      if (chatSpecificPrompt) {
+        systemPromptText = chatSpecificPrompt;
+      } else if (associatedProjectId) {
+        const projectSettingsResult = await pool.query(
+          "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
+          [associatedProjectId, userId],
+        );
+        if (projectSettingsResult.rows.length > 0 && projectSettingsResult.rows[0].system_prompt?.trim() !== "") {
+          systemPromptText = projectSettingsResult.rows[0].system_prompt;
+        }
+      }
+
+      if (!systemPromptText) {
         const globalSettingsResult = await pool.query("SELECT system_prompt FROM user_settings WHERE user_id = $1", [
           userId,
         ]);
@@ -353,7 +369,10 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode(JSON.stringify(emptyMessageError) + "\n"));
         } else {
           await pool.query(
-            `INSERT INTO messages (chat_session_id, role, content, parts, position, sources) SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5 FROM messages WHERE chat_session_id = $1`,
+            `INSERT INTO messages (chat_session_id, role, content, parts, position, sources)
+             SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5
+             FROM messages
+             WHERE chat_session_id = $1`,
             [
               chatSessionId,
               "model",
@@ -363,7 +382,12 @@ export async function POST(request: NextRequest) {
             ],
           );
           await pool.query(
-            `UPDATE chat_sessions SET last_model = $2, key_selection = $3, updated_at = now() WHERE id = $1 AND user_id = $4`,
+            `UPDATE chat_sessions
+             SET last_model = $2,
+                 key_selection = $3,
+                 updated_at = now()
+             WHERE id = $1
+               AND user_id = $4`,
             [chatSessionId, model, keySelection, userId],
           );
         }

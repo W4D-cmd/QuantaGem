@@ -692,7 +692,7 @@ export default function Home() {
     }
 
     let sessionId = activeChatId;
-    let isFirstMessageInNewChatSession = false;
+    let isFirstMessageForChatSession = false;
 
     if (!sessionId) {
       const newChatTitle = `Chat ${
@@ -706,7 +706,9 @@ export default function Home() {
         return;
       }
       sessionId = newId;
-      isFirstMessageInNewChatSession = true;
+      isFirstMessageForChatSession = true;
+    } else if (messages.length === 0) {
+      isFirstMessageForChatSession = true;
     }
 
     const newUserMessageParts: MessagePart[] = [];
@@ -753,7 +755,7 @@ export default function Home() {
     const ctrl = new AbortController();
     setController(ctrl);
 
-    if (isFirstMessageInNewChatSession && inputText.trim()) {
+    if (isFirstMessageForChatSession && inputText.trim()) {
       await generateAndSetChatTitle(
         sessionId,
         inputText.trim(),

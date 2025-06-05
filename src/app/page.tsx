@@ -20,6 +20,7 @@ import {
 } from "@heroicons/react/24/outline";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import ProjectManagement from "@/components/ProjectManagement";
+import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash-preview-05-20";
 
@@ -61,6 +62,60 @@ export interface ProjectFile {
   fileName: string;
   mimeType: string;
   size: number;
+}
+
+async function generateAndSetChatTitle(
+  chatSessionId: number,
+  userMessageContent: string,
+  keySelection: "free" | "paid",
+  getAuthHeaders: () => HeadersInit,
+  router: AppRouterInstance,
+  setError: (msg: string | null) => void,
+  fetchAllChats: () => Promise<void>,
+) {
+  try {
+    const res = await fetch("/api/generate-chat-title", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ userMessageContent, keySelection }),
+    });
+
+    if (res.status === 401) {
+      router.replace("/login");
+      return;
+    }
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || `Failed to generate title: ${res.statusText}`);
+    }
+
+    const { title } = await res.json();
+
+    const patchRes = await fetch(`/api/chats/${chatSessionId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ title }),
+    });
+
+    if (patchRes.status === 401) {
+      router.replace("/login");
+      return;
+    }
+    if (!patchRes.ok) {
+      const errorData = await patchRes.json();
+      throw new Error(errorData.error || `Failed to update chat title: ${patchRes.statusText}`);
+    }
+
+    await fetchAllChats();
+  } catch (err: unknown) {
+    setError(extractErrorMessage(err));
+  }
 }
 
 function extractErrorMessage(err: unknown): string {
@@ -637,6 +692,8 @@ export default function Home() {
     }
 
     let sessionId = activeChatId;
+    let isFirstMessageInNewChatSession = false;
+
     if (!sessionId) {
       const newChatTitle = `Chat ${
         currentChatProjectId
@@ -649,6 +706,7 @@ export default function Home() {
         return;
       }
       sessionId = newId;
+      isFirstMessageInNewChatSession = true;
     }
 
     const newUserMessageParts: MessagePart[] = [];
@@ -694,6 +752,18 @@ export default function Home() {
 
     const ctrl = new AbortController();
     setController(ctrl);
+
+    if (isFirstMessageInNewChatSession && inputText.trim()) {
+      await generateAndSetChatTitle(
+        sessionId,
+        inputText.trim(),
+        keySelection,
+        getAuthHeaders,
+        router,
+        setError,
+        fetchAllChats,
+      );
+    }
 
     try {
       const res = await fetch("/api/chat", {

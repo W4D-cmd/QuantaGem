@@ -270,16 +270,18 @@ function ChatAreaComponent(
           <div
             key={i}
             className={`p-4 rounded-3xl break-words overflow-hidden ${
-            msg.role === "user" ? "max-w-xl bg-neutral-200 dark:bg-neutral-800 self-end ml-auto" : "w-full self-start" }`}
+            msg.role === "user" ? "max-w-xl bg-neutral-100 dark:bg-neutral-800 self-end ml-auto" : "w-full self-start" }`}
           >
             {msg.parts.map((part, j) => {
               if (part.type === "text" && part.text) {
                 return (
                   <div
                     key={j}
-                    className="prose dark:prose-invert prose-neutral prose-code:font-normal prose-pre:rounded-xl prose-code:rounded prose-pre:border
+                    className="prose dark:prose-invert prose-neutral prose-code:font-normal prose-code:text-black dark:prose-code:text-white
+                      prose-li:text-neutral-950 dark:prose-li:text-neutral-50 prose-p:text-neutral-950 dark:prose-p:text-neutral-50
+                      prose-headings:text-black dark:prose-headings:text-white prose-pre:rounded-xl prose-code:rounded prose-pre:border
                       prose-pre:bg-neutral-100 prose-pre:border-neutral-400/30 dark:prose-pre:bg-neutral-900
-                      dark:prose-pre:border-neutral-600/30 prose-code:bg-neutral-200 dark:prose-code:bg-neutral-800 max-w-none
+                      dark:prose-pre:border-neutral-600/30 prose-code:bg-neutral-200 dark:prose-code:bg-neutral-700 max-w-none
                       transition-colors duration-300 ease-in-out prose-code:before:content-none prose-code:after:content-none
                       prose-code:py-0.5 prose-code:px-1"
                   >

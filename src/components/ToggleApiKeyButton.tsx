@@ -19,7 +19,7 @@ export default function ToggleApiKeyButton({ selectedKey, onToggleAction }: Prop
         isPaid
             ? `bg-black text-white border hover:bg-neutral-600 dark:bg-white dark:text-neutral-900 dark:border-neutral-200
               dark:hover:bg-neutral-400 dark:hover:border-neutral-400`
-            : `bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-black dark:border-neutral-900
+            : `bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-950 dark:border-neutral-900
               dark:text-neutral-300 dark:hover:bg-neutral-700`
         }`}
     >

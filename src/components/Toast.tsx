@@ -67,7 +67,7 @@ const Toast: FC<ToastProps> = ({ message, onClose }) => {
       </div>
       <div className="h-1 overflow-hidden">
         <div
-          className="h-full bg-red-600/70 transition-[width] ease-linear duration-50"
+          className="h-full bg-red-600/70 dark:bg-red-800/70 transition-[width] ease-linear duration-50"
           style={{ width: `${progress}%` }}
         />
       </div>

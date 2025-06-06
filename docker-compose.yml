@@ -16,7 +16,7 @@ services:
       - "5432:5432"
 
   minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    image: minio/minio:RELEASE.2025-05-24T17-08-30Z
     env_file:
       - .env
       - .env.local
@@ -36,6 +36,22 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
 
+  stt-service:
+    build:
+      context: ./stt-service
+      dockerfile: Dockerfile
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    environment:
+      WHISPER_MODEL_DIR: /app/models
+    volumes:
+      - stt_models:/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
   app:
     build: .
     env_file:
@@ -46,6 +62,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      stt-service:
+        condition: service_healthy
     ports:
       - "3000:3000"
     command: npm run start
@@ -53,3 +71,4 @@ services:
 volumes:
   db_data:
   minio_data:
+  stt_models:

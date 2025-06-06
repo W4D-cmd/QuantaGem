@@ -1,22 +1,30 @@
 "use client";
 
 import React, {
-  useState,
-  useRef,
-  useEffect,
-  FormEvent,
-  KeyboardEvent,
   ChangeEvent,
-  forwardRef,
-  useImperativeHandle,
   ClipboardEvent,
+  FormEvent,
+  forwardRef,
+  KeyboardEvent,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
 } from "react";
 import Tooltip from "@/components/Tooltip";
-import { PaperClipIcon, XCircleIcon } from "@heroicons/react/24/outline";
-import { ArrowUpCircleIcon, StopCircleIcon } from "@heroicons/react/24/solid";
-import { GlobeAltIcon as OutlineGlobeAltIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowPathIcon,
+  CheckIcon,
+  GlobeAltIcon as OutlineGlobeAltIcon,
+  MicrophoneIcon,
+  PaperClipIcon,
+  XCircleIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
 import { ProjectFile } from "@/app/page";
+import { ArrowUpIcon } from "@heroicons/react/20/solid";
+import { StopIcon } from "@heroicons/react/16/solid";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -33,7 +41,7 @@ interface ChatInputProps {
   onToggleSearch: (isActive: boolean) => void;
   getAuthHeaders: () => HeadersInit;
   activeProjectId: number | null;
-  onError: (message: string) => void;
+  onError: (message: string | null) => void;
 }
 
 export interface ChatInputHandle {
@@ -63,6 +71,11 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
     const [filteredProjectFiles, setFilteredProjectFiles] = useState<ProjectFile[]>([]);
     const [highlightedSuggestionIndex, setHighlightedSuggestionIndex] = useState(-1);
+
+    const [isRecording, setIsRecording] = useState(false);
+    const [isTranscribing, setIsTranscribing] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
 
     useImperativeHandle(ref, () => ({
       focusInput: () => {
@@ -140,7 +153,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       const newHeight = Math.min(ta.scrollHeight, 320);
       ta.style.height = `${newHeight}px`;
       ta.style.overflowY = ta.scrollHeight > 320 ? "auto" : "hidden";
-    }, [input]);
+    }, [input, selectedFiles]);
 
     const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
       if (!event.target.files) return;
@@ -244,7 +257,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     };
 
     const submit = () => {
-      if ((!input.trim() && selectedFiles.length === 0) || isLoading) return;
+      if ((!input.trim() && selectedFiles.length === 0) || isLoading || isRecording || isTranscribing) return;
       onSendMessageAction(input, selectedFiles, isSearchActive);
       setInput("");
       setSelectedFiles([]);
@@ -256,6 +269,94 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const onSubmit = (e: FormEvent) => {
       e.preventDefault();
       submit();
+    };
+
+    const startRecording = async () => {
+      if (isLoading) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: "audio/webm" });
+        audioChunksRef.current = [];
+
+        mediaRecorderRef.current.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorderRef.current.onstop = async () => {
+          setIsRecording(false);
+          stream.getTracks().forEach((track) => track.stop());
+          if (audioChunksRef.current.length > 0) {
+            const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+            await transcribeAudio(audioBlob);
+          }
+          audioChunksRef.current = [];
+        };
+
+        mediaRecorderRef.current.start();
+        setIsRecording(true);
+      } catch (err) {
+        onError(`Microphone access denied or error: ${err instanceof Error ? err.message : String(err)}`);
+        console.error("Error accessing microphone:", err);
+      }
+    };
+
+    const cancelRecording = () => {
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.onstop = null;
+        if (mediaRecorderRef.current.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
+        mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+      }
+      audioChunksRef.current = [];
+      setIsRecording(false);
+    };
+
+    const submitRecordingForTranscription = () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+    };
+
+    const transcribeAudio = async (audioBlob: Blob) => {
+      onError(null);
+      setIsTranscribing(true);
+
+      try {
+        const formData = new FormData();
+        formData.append("audio_file", audioBlob, "recording.webm");
+
+        const response = await fetch("/api/stt/transcribe", {
+          method: "POST",
+          headers: {
+            ...getAuthHeaders(),
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to transcribe audio.");
+        }
+
+        const transcription = await response.text();
+        setInput((prev) => (prev ? prev + " " : "") + transcription);
+        textareaRef.current?.focus();
+      } catch (err) {
+        onError(`Transcription error: ${err instanceof Error ? err.message : String(err)}`);
+        setInput("");
+        console.error("Error during transcription:", err);
+      } finally {
+        setIsTranscribing(false);
+      }
+    };
+
+    const getMainButtonAction = () => {
+      if (isLoading) return onCancelAction;
+      if (isRecording) return submitRecordingForTranscription;
+      return undefined;
     };
 
     return (
@@ -339,7 +440,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   overflowY: (textareaRef.current?.scrollHeight ?? 0) > 320 ? "auto" : "hidden",
                   scrollbarGutter: "stable",
                 }}
-                disabled={isLoading}
+                disabled={isLoading || isRecording || isTranscribing}
               />
             </div>
 
@@ -352,8 +453,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={isLoading}
-                    className="cursor-pointer h-9 flex items-center justify-center px-2 rounded-full text-sm font-medium border transition-colors
+                    disabled={isLoading || isRecording || isTranscribing}
+                    className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium border transition-colors
                       duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800
                       dark:text-neutral-400 dark:hover:bg-neutral-700"
                   >
@@ -366,12 +467,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   onChange={handleFileChange}
                   multiple
                   className="hidden"
-                  disabled={isLoading}
+                  disabled={isLoading || isRecording || isTranscribing}
                 />
                 <Tooltip text="Search the web">
                   <button
                     type="button"
                     onClick={() => onToggleSearch(!isSearchActive)}
+                    disabled={isRecording || isTranscribing}
                     className={` cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium transition-colors duration-300
                       ease-in-out ${
                       isSearchActive
@@ -391,19 +493,57 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 </Tooltip>
               </div>
 
-              <button
-                type={isLoading ? "button" : "submit"}
-                onClick={isLoading ? onCancelAction : undefined}
-                disabled={isLoading ? false : !input.trim() && selectedFiles.length === 0}
-                className="size-10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:text-neutral-400
-                  transition-colors duration-300 ease-in-out"
-              >
-                {isLoading ? (
-                  <StopCircleIcon className="transition-colors duration-300 ease-in-out" />
-                ) : (
-                  <ArrowUpCircleIcon className="transition-colors duration-300 ease-in-out" />
+              <div className="flex items-center gap-2">
+                {!isLoading && !isTranscribing && (
+                  <Tooltip text={isRecording ? "Cancel recording" : "Dictate message"}>
+                    <button
+                      type="button"
+                      onClick={isRecording ? cancelRecording : startRecording}
+                      disabled={isLoading || isTranscribing || uploadingFiles.length > 0}
+                      className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium border transition-colors
+                        duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800
+                        dark:hover:bg-neutral-700"
+                    >
+                      {isRecording ? (
+                        <XMarkIcon className="size-5 text-red-500" />
+                      ) : (
+                        <MicrophoneIcon className="size-5 text-neutral-500 dark:text-neutral-300" />
+                      )}
+                    </button>
+                  </Tooltip>
                 )}
-              </button>
+
+                <button
+                  type={isLoading || isRecording || isTranscribing ? "button" : "submit"}
+                  onClick={getMainButtonAction()}
+                  disabled={
+                    isLoading
+                      ? false
+                      : isTranscribing
+                        ? true
+                        : isRecording
+                          ? false
+                          : !input.trim() && selectedFiles.length === 0
+                  }
+                  className={`cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full flex items-center justify-center
+                    transition-colors duration-300 ease-in-out ${
+                    isRecording
+                        ? `size-9 border bg-white border-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800
+                          dark:hover:bg-neutral-700`
+                        : "size-9 bg-black text-white hover:bg-neutral-600 dark:bg-white dark:text-black dark:hover:bg-neutral-400"
+                    }`}
+                >
+                  {isLoading ? (
+                    <StopIcon className="size-5" />
+                  ) : isTranscribing ? (
+                    <ArrowPathIcon className="size-5 animate-spin" />
+                  ) : isRecording ? (
+                    <CheckIcon className="size-5 text-green-500" />
+                  ) : (
+                    <ArrowUpIcon className="size-5 stroke-2" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

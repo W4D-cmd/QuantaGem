@@ -26,6 +26,7 @@ interface ChatAreaProps {
   streamStarted: boolean;
   onAutoScrollChange?: (isAutoScrollEnabled: boolean) => void;
   getAuthHeaders: GetAuthHeaders;
+  activeChatId: number | null;
 }
 
 export interface ChatAreaHandle {
@@ -208,10 +209,12 @@ export default memo(
 );
 
 function ChatAreaComponent(
-  { messages, isLoading, streamStarted, onAutoScrollChange, getAuthHeaders }: ChatAreaProps,
+  { messages, isLoading, streamStarted, onAutoScrollChange, getAuthHeaders, activeChatId }: ChatAreaProps,
   ref: React.Ref<ChatAreaHandle>,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const previousActiveChatIdRef = useRef<number | null>(null);
+  const scrolledOnLoadRef = useRef(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const justManuallyDisabledRef = useRef(false);
   const lastScrollTopRef = useRef(0);
@@ -244,6 +247,10 @@ function ChatAreaComponent(
     const handleUserInitiatedScroll = (event: WheelEvent | TouchEvent) => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
+
+      if (currentEl.scrollHeight <= currentEl.clientHeight) {
+        return;
+      }
 
       const currentScrollTop = currentEl.scrollTop;
       const atBottomForUserScroll = currentEl.scrollHeight - currentScrollTop - currentEl.clientHeight < 1;
@@ -346,13 +353,35 @@ function ChatAreaComponent(
     const el = containerRef.current;
     if (!el) return;
 
+    if (activeChatId !== previousActiveChatIdRef.current) {
+      scrolledOnLoadRef.current = false;
+    }
+
+    if (
+      (!isLoading && messages.length > 0 && !scrolledOnLoadRef.current) ||
+      (activeChatId === null && messages.length === 0 && !scrolledOnLoadRef.current)
+    ) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+      setAutoScrollEnabled(true);
+      justManuallyDisabledRef.current = false;
+      if (onAutoScrollChange) {
+        onAutoScrollChange(true);
+      }
+      scrolledOnLoadRef.current = true;
+    }
+
+    previousActiveChatIdRef.current = activeChatId;
+  }, [activeChatId, isLoading, messages.length, onAutoScrollChange]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
     if (justManuallyDisabledRef.current) {
       return;
     }
 
-    if (isLoading && !streamStarted) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
-    } else if (isLoading && streamStarted && autoScrollEnabled) {
+    if (isLoading && streamStarted && autoScrollEnabled) {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
   }, [messages, isLoading, streamStarted, autoScrollEnabled]);

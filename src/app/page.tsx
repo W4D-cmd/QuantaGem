@@ -743,6 +743,7 @@ export default function Home() {
       modelMessageIndexForStream = newMessages.length;
       return [...newMessages, placeholderMessage];
     });
+    chatAreaRef.current?.scrollToBottomAndEnableAutoscroll();
 
     setIsLoading(true);
     setStreamStarted(false);
@@ -1065,6 +1066,7 @@ export default function Home() {
               streamStarted={streamStarted}
               onAutoScrollChange={handleAutoScrollChange}
               getAuthHeaders={getAuthHeaders}
+              activeChatId={activeChatId}
             />
 
             <div className="flex-none p-4">

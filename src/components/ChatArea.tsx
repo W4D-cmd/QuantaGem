@@ -374,17 +374,13 @@ function ChatAreaComponent(
   }, [activeChatId, isLoading, messages.length, onAutoScrollChange]);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    if (justManuallyDisabledRef.current) {
-      return;
+    if (autoScrollEnabled && containerRef.current) {
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
     }
-
-    if (isLoading && streamStarted && autoScrollEnabled) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    }
-  }, [messages, isLoading, streamStarted, autoScrollEnabled]);
+  }, [messages, autoScrollEnabled]);
 
   const markdownComponents: Components = {
     pre: ({ className, children }) => (

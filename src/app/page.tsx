@@ -806,6 +806,7 @@ export default function Home() {
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
       let isFirstChunk = true;
       let textAccumulator = "";
+      let streamBuffer = "";
       const currentSources: Array<{ title: string; uri: string }> = [];
       let modelReturnedEmptyMessage = false;
 
@@ -818,7 +819,11 @@ export default function Home() {
           isFirstChunk = false;
         }
 
-        const lines = value.split("\n").filter((line) => line.trim() !== "");
+        streamBuffer += value;
+        const lines = streamBuffer.split("\n");
+        streamBuffer = lines.pop() || "";
+
+        if (lines.length === 0) continue;
 
         setMessages((prev) => {
           const updatedMessages = [...prev];
@@ -835,6 +840,8 @@ export default function Home() {
           }
 
           for (const line of lines) {
+            if (line.trim() === "") continue;
+
             try {
               const parsedChunk = JSON.parse(line);
               if (parsedChunk.type === "text") {
@@ -854,7 +861,6 @@ export default function Home() {
               }
             } catch (jsonError) {
               console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
-              textAccumulator += line;
             }
           }
 

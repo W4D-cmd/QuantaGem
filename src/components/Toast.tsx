@@ -52,15 +52,15 @@ const Toast: FC<ToastProps> = ({ message, onClose }) => {
       onMouseEnter={clearTimer}
       onMouseLeave={startTimer}
     >
-      <div className="flex items-center justify-between px-4 py-3">
-        <span className="text-sm">{message}</span>
+      <div className="flex items-start justify-between px-3 py-3">
+        <span className="text-sm flex-1 mr-4 max-h-[160px] overflow-y-auto break-words">{message}</span>
         <button
           onClick={() => {
             clearTimer();
             setVisible(false);
             setTimeout(onClose, 300);
           }}
-          className="cursor-pointer p-2 rounded-lg hover:bg-red-600/30 transition-colors"
+          className="cursor-pointer p-2 rounded-lg hover:bg-red-600/30 transition-colors flex-none"
         >
           <XMarkIcon className="size-5" />
         </button>

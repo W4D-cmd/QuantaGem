@@ -22,7 +22,7 @@ import ThemeToggleButton from "@/components/ThemeToggleButton";
 import ProjectManagement from "@/components/ProjectManagement";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
-const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash-preview-05-20";
+const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
 
 export interface MessagePart {
   type: "text" | "file";

@@ -6,6 +6,7 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   Cog6ToothIcon,
+  DocumentDuplicateIcon,
   EllipsisHorizontalIcon,
   FolderOpenIcon,
   FolderPlusIcon,
@@ -29,6 +30,7 @@ interface SidebarProps {
   onSelectProject: (projectId: number) => void;
   onRenameProject: (projectId: number, newTitle: string) => void;
   onDeleteProject: (projectId: number) => void;
+  onDuplicateChat: (chatId: number) => void;
   userEmail: string | null;
   expandedProjects: Set<number>;
   onToggleProjectExpansion: React.Dispatch<React.SetStateAction<Set<number>>>;
@@ -49,6 +51,7 @@ export default function Sidebar({
   onSelectProject,
   onRenameProject,
   onDeleteProject,
+  onDuplicateChat,
   userEmail,
   expandedProjects,
   onToggleProjectExpansion,
@@ -152,6 +155,14 @@ export default function Sidebar({
                             icon: <Cog6ToothIcon className="size-4" />,
                             label: "Settings",
                             onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
+                          },
+                          {
+                            id: "duplicate",
+                            icon: <DocumentDuplicateIcon className="size-4" />,
+                            label: "Duplicate",
+                            onClick: () => {
+                              onDuplicateChat(chat.id);
+                            },
                           },
                           {
                             id: "rename",
@@ -297,6 +308,14 @@ export default function Sidebar({
                                       icon: <Cog6ToothIcon className="size-4" />,
                                       label: "Settings",
                                       onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
+                                    },
+                                    {
+                                      id: "duplicate",
+                                      icon: <PencilSquareIcon className="size-4" />,
+                                      label: "Duplicate",
+                                      onClick: () => {
+                                        onDuplicateChat(chat.id);
+                                      },
                                     },
                                     {
                                       id: "rename",

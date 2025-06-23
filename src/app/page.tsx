@@ -391,6 +391,36 @@ export default function Home() {
     }
   };
 
+  const handleDuplicateChat = useCallback(
+    async (chatId: number) => {
+      try {
+        const res = await fetch("/api/chats/duplicate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({ chatId }),
+        });
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || `Failed to duplicate chat: ${res.statusText}`);
+        }
+        const newChat: ChatListItem = await res.json();
+        await fetchAllChats();
+        setActiveChatId(newChat.id);
+        setDisplayingProjectManagementId(null);
+      } catch (err: unknown) {
+        setError(extractErrorMessage(err));
+      }
+    },
+    [getAuthHeaders, router, fetchAllChats, setActiveChatId, setDisplayingProjectManagementId],
+  );
+
   const createChat = useCallback(
     async (title: string, keySelection: "free" | "paid", projectId: number | null) => {
       try {
@@ -1001,6 +1031,7 @@ export default function Home() {
         onSelectProject={handleSelectProject}
         onRenameProject={handleRenameProject}
         onDeleteProject={handleDeleteProject}
+        onDuplicateChat={handleDuplicateChat}
         userEmail={userEmail}
         expandedProjects={expandedProjects}
         onToggleProjectExpansion={setExpandedProjects}

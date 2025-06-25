@@ -501,6 +501,14 @@ export default function Home() {
           return;
         }
         if (!res.ok) {
+          if (res.status === 404) {
+            setActiveChatId(null);
+            setMessages([]);
+            setEditingPromptInitialValue(null);
+            setKeySelection("free");
+            setCurrentChatProjectId(null);
+          }
+
           const errorData = await res.json();
           throw new Error(errorData.error || `Failed to load chat: ${res.statusText}`);
         }
@@ -521,7 +529,15 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [getAuthHeaders, router],
+    [
+      getAuthHeaders,
+      router,
+      setActiveChatId,
+      setMessages,
+      setEditingPromptInitialValue,
+      setKeySelection,
+      setCurrentChatProjectId,
+    ],
   );
 
   const handleSelectChat = useCallback((chatId: number) => {

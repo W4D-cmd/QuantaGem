@@ -78,11 +78,11 @@ export default function Sidebar({
 
   return (
     <div
-      className="w-70 h-full bg-neutral-100 dark:bg-neutral-900 p-4 pt-2 overflow-y-auto flex flex-col transition-colors duration-300
-        ease-in-out"
+      className="w-70 h-full bg-neutral-100 dark:bg-neutral-900 pt-2 pb-4 pl-4 pr-1 overflow-y-auto flex flex-col transition-colors
+        duration-300 ease-in-out"
     >
       <div className="flex-none mb-4">
-        <div className="flex justify-end space-x-2">
+        <div className="flex-none pr-2 flex items-center justify-between">
           <Tooltip text={"Delete all chats (no project chats)"}>
             <button
               onClick={onDeleteAllGlobalChats}
@@ -92,23 +92,25 @@ export default function Sidebar({
             </button>
           </Tooltip>
 
-          <Tooltip text={"New project"}>
-            <button
-              onClick={onNewProject}
-              className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-300 ease-in-out"
-            >
-              <FolderPlusIcon className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out" />
-            </button>
-          </Tooltip>
+          <div className="flex space-x-2">
+            <Tooltip text={"New project"}>
+              <button
+                onClick={onNewProject}
+                className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-300 ease-in-out"
+              >
+                <FolderPlusIcon className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out" />
+              </button>
+            </Tooltip>
 
-          <Tooltip text={"New chat"}>
-            <button
-              onClick={() => onNewChat(null)}
-              className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-300 ease-in-out"
-            >
-              <PencilSquareIcon className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out" />
-            </button>
-          </Tooltip>
+            <Tooltip text={"New chat"}>
+              <button
+                onClick={() => onNewChat(null)}
+                className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-300 ease-in-out"
+              >
+                <PencilSquareIcon className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out" />
+              </button>
+            </Tooltip>
+          </div>
         </div>
       </div>
 
@@ -359,7 +361,7 @@ export default function Sidebar({
 
       {userEmail && (
         <div
-          className="mb-0 text-center text-sm p-2 rounded-lg text-neutral-700 dark:text-neutral-200 bg-neutral-200 dark:bg-neutral-800
+          className="mt-4 mb-0 text-center text-sm p-2 rounded-lg text-neutral-700 dark:text-neutral-200 bg-neutral-200 dark:bg-neutral-800
             transition-colors duration-300 ease-in-out"
         >
           Logged in as: <br />

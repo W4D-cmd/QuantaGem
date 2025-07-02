@@ -70,10 +70,11 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
-                className="w-full appearance-none rounded-xl border border-neutral-300 dark:border-neutral-700 px-3 py-2 placeholder-neutral-400
-                  dark:placeholder-neutral-500 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 bg-white
-                  dark:bg-neutral-950 text-black dark:text-white disabled:bg-neutral-100 dark:disabled:bg-neutral-800
-                  disabled:text-neutral-500 dark:disabled:text-neutral-400"
+                className="w-full appearance-none rounded-xl border border-neutral-300 dark:border-neutral-700 px-3 py-2
+                  placeholder-neutral-400 dark:placeholder-neutral-500 shadow-sm focus:border-blue-500
+                  focus:outline-none focus:ring-blue-500 bg-white dark:bg-neutral-950 text-black dark:text-white
+                  disabled:bg-neutral-100 dark:disabled:bg-neutral-800 disabled:text-neutral-500
+                  dark:disabled:text-neutral-400"
               />
             </div>
           </div>
@@ -92,10 +93,11 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
-                className="w-full appearance-none rounded-xl border border-neutral-300 dark:border-neutral-700 px-3 py-2 placeholder-neutral-400
-                  dark:placeholder-neutral-500 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 bg-white
-                  dark:bg-neutral-950 text-black dark:text-white disabled:bg-neutral-100 dark:disabled:bg-neutral-800
-                  disabled:text-neutral-500 dark:disabled:text-neutral-400"
+                className="w-full appearance-none rounded-xl border border-neutral-300 dark:border-neutral-700 px-3 py-2
+                  placeholder-neutral-400 dark:placeholder-neutral-500 shadow-sm focus:border-blue-500
+                  focus:outline-none focus:ring-blue-500 bg-white dark:bg-neutral-950 text-black dark:text-white
+                  disabled:bg-neutral-100 dark:disabled:bg-neutral-800 disabled:text-neutral-500
+                  dark:disabled:text-neutral-400"
               />
             </div>
             <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
@@ -107,9 +109,10 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="flex w-full justify-center rounded-xl border border-transparent bg-black dark:bg-blue-600 px-4 py-2 text-sm font-medium
-                text-white shadow-sm hover:bg-neutral-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500
-                focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-neutral-400 dark:disabled:bg-blue-800"
+              className="flex w-full justify-center rounded-xl border border-transparent bg-black dark:bg-blue-600 px-4
+                py-2 text-sm font-medium text-white shadow-sm hover:bg-neutral-600 dark:hover:bg-blue-700
+                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50
+                disabled:cursor-not-allowed disabled:bg-neutral-400 dark:disabled:bg-blue-800"
             >
               {isLoading ? "Creating account..." : "Create Account"}
             </button>

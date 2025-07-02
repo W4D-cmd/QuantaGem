@@ -88,7 +88,8 @@ export default function Tooltip({ text, children, offset = 8 }: TooltipProps) {
             className={
               "transition-opacity duration-100 ease-in " +
               (fadeIn ? "opacity-100" : "opacity-0") +
-              " bg-black dark:bg-white text-white dark:text-black text-xs rounded-lg py-1 px-2 whitespace-nowrap shadow-lg"
+              ` bg-black dark:bg-white text-white dark:text-black text-xs rounded-lg py-1 px-2 whitespace-nowrap
+              shadow-lg`
             }
           >
             {text}

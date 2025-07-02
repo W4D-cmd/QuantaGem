@@ -169,15 +169,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </label>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 mt-1">{promptDescription}</p>
             {isLoading && !systemPrompt && !currentInitialSystemPrompt ? (
-              <div className="w-full h-32 bg-neutral-100 dark:bg-neutral-800 rounded-lg animate-pulse transition-colors duration-300 ease-in-out"></div>
+              <div
+                className="w-full h-32 bg-neutral-100 dark:bg-neutral-800 rounded-lg animate-pulse transition-colors
+                  duration-300 ease-in-out"
+              ></div>
             ) : (
               <textarea
                 id="system-prompt"
                 name="system-prompt"
                 rows={8}
-                className="w-full resize-none p-3 border border-neutral-300 dark:border-neutral-700 rounded-xl shadow-sm text-sm bg-white
-                  dark:bg-neutral-950 text-black dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none
-                  focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out"
+                className="w-full resize-none p-3 border border-neutral-300 dark:border-neutral-700 rounded-xl shadow-sm
+                  text-sm bg-white dark:bg-neutral-950 text-black dark:text-white placeholder-neutral-400
+                  dark:placeholder-neutral-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500
+                  focus:ring-opacity-50 transition-all duration-300 ease-in-out"
                 value={systemPrompt}
                 onChange={handleInputChange}
                 placeholder="e.g., You are a helpful assistant that speaks like a pirate."
@@ -191,9 +195,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               type="button"
               onClick={handleCancel}
               disabled={isLoading}
-              className="cursor-pointer h-9 px-4 rounded-full text-sm font-medium transition-colors duration-300 ease-in-out bg-white
-                dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800
-                text-neutral-500 dark:text-neutral-300 focus:outline-none disabled:opacity-50"
+              className="cursor-pointer h-9 px-4 rounded-full text-sm font-medium transition-colors duration-300
+                ease-in-out bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800
+                hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-300 focus:outline-none
+                disabled:opacity-50"
             >
               Cancel
             </button>
@@ -201,9 +206,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               type="button"
               onClick={handleSave}
               disabled={isLoading || !hasChanges}
-              className="cursor-pointer disabled:cursor-not-allowed h-9 px-4 rounded-full text-sm font-medium transition-colors duration-300
-                ease-in-out bg-black dark:bg-blue-600 text-white border border-transparent shadow-sm hover:bg-neutral-600
-                dark:hover:bg-blue-700 focus:outline-none disabled:opacity-50"
+              className="cursor-pointer disabled:cursor-not-allowed h-9 px-4 rounded-full text-sm font-medium
+                transition-colors duration-300 ease-in-out bg-black dark:bg-blue-600 text-white border
+                border-transparent shadow-sm hover:bg-neutral-600 dark:hover:bg-blue-700 focus:outline-none
+                disabled:opacity-50"
             >
               {isLoading ? "Saving..." : "Save"}
             </button>

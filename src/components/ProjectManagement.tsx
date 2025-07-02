@@ -182,7 +182,10 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
 
       <h2 className="text-2xl font-bold mb-4 text-neutral-900 dark:text-white">Project Settings</h2>
 
-      <div className="bg-white dark:bg-neutral-900 p-6 rounded-2xl shadow-lg border border-neutral-200 dark:border-neutral-800 mb-6">
+      <div
+        className="bg-white dark:bg-neutral-900 p-6 rounded-2xl shadow-lg border border-neutral-200
+          dark:border-neutral-800 mb-6"
+      >
         <h3 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-white">Project Information</h3>
         <div className="mb-4">
           <label
@@ -196,9 +199,9 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
             type="text"
             value={projectTitle}
             onChange={handleTitleChange}
-            className="w-full p-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-neutral-50 dark:bg-neutral-800
-              text-neutral-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500
-              focus:ring-opacity-50 transition-all duration-300 ease-in-out"
+            className="w-full p-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-neutral-50
+              dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-2
+              focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out"
             disabled={isSaving}
           />
         </div>
@@ -218,9 +221,9 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
             rows={6}
             value={projectSystemPrompt}
             onChange={handleSystemPromptChange}
-            className="w-full p-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-neutral-50 dark:bg-neutral-800
-              text-neutral-900 dark:text-white resize-y focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500
-              focus:ring-opacity-50 transition-all duration-300 ease-in-out"
+            className="w-full p-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-neutral-50
+              dark:bg-neutral-800 text-neutral-900 dark:text-white resize-y focus:outline-none focus:border-blue-500
+              focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out"
             placeholder="e.g., You are an expert in software development and only respond with code examples."
             disabled={isSaving}
           />
@@ -229,15 +232,18 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
           <button
             onClick={handleSaveProjectSettings}
             disabled={isSaving || !hasSettingsChanged}
-            className="cursor-pointer px-6 py-2 rounded-full bg-black text-white text-sm font-medium hover:bg-neutral-700 disabled:opacity-50
-              disabled:cursor-not-allowed transition-colors"
+            className="cursor-pointer px-6 py-2 rounded-full bg-black text-white text-sm font-medium
+              hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isSaving ? "Saving..." : "Save Settings"}
           </button>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-neutral-900 p-6 rounded-2xl shadow-lg border border-neutral-200 dark:border-neutral-800">
+      <div
+        className="bg-white dark:bg-neutral-900 p-6 rounded-2xl shadow-lg border border-neutral-200
+          dark:border-neutral-800"
+      >
         <h3 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-white">Project Files</h3>
 
         {projectFiles.length === 0 && uploadingFiles.length === 0 && (
@@ -249,8 +255,8 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
             {projectFiles.map((file) => (
               <li
                 key={file.id}
-                className="flex items-center justify-between p-3 bg-neutral-100 dark:bg-neutral-800 rounded-lg border border-neutral-200
-                  dark:border-neutral-700"
+                className="flex items-center justify-between p-3 bg-neutral-100 dark:bg-neutral-800 rounded-lg border
+                  border-neutral-200 dark:border-neutral-700"
               >
                 <span className="text-sm text-neutral-800 dark:text-neutral-200 truncate pr-2">
                   {file.fileName} ({`${(file.size / 1024).toFixed(1)} KB`})
@@ -258,8 +264,8 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
                 <button
                   onClick={() => handleDeleteFile(file.id, file.fileName)}
                   disabled={isSaving}
-                  className="p-1 rounded-full text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 disabled:opacity-50
-                    disabled:cursor-not-allowed"
+                  className="p-1 rounded-full text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50
+                    disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Delete file"
                 >
                   <XCircleIcon className="size-5" />
@@ -271,8 +277,8 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
 
         {uploadingFiles.length > 0 && (
           <div
-            className="mb-4 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-700
-              dark:text-blue-200"
+            className="mb-4 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800
+              text-blue-700 dark:text-blue-200"
           >
             <p className="font-semibold text-sm mb-1">Uploading...</p>
             <ul className="list-disc list-inside text-xs">
@@ -295,8 +301,9 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isSaving}
-            className="cursor-pointer px-6 py-2 rounded-full bg-blue-600 dark:bg-blue-600 text-white text-sm font-medium hover:bg-blue-700
-              dark:hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            className="cursor-pointer px-6 py-2 rounded-full bg-blue-600 dark:bg-blue-600 text-white text-sm font-medium
+              hover:bg-blue-700 dark:hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors
+              flex items-center gap-2"
           >
             <ArrowUpTrayIcon className="size-5" /> Upload New File
           </button>

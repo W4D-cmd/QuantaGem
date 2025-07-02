@@ -1054,8 +1054,8 @@ export default function Home() {
       />
       <main className="flex-1 flex flex-col relative">
         <div
-          className="flex-none sticky min-h-16 top-0 z-10 px-4 py-2 border-b border-neutral-100 dark:border-neutral-950 transition-colors
-            duration-300 ease-in-out flex items-center justify-between"
+          className="flex-none sticky min-h-16 top-0 z-10 px-4 py-2 border-b border-neutral-100 dark:border-neutral-950
+            transition-colors duration-300 ease-in-out flex items-center justify-between"
         >
           {displayingProjectManagementId === null && (
             <>
@@ -1077,8 +1077,8 @@ export default function Home() {
                 <button
                   ref={threeDotMenuButtonRef}
                   onClick={toggleThreeDotMenu}
-                  className="cursor-pointer size-9 flex items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100
-                    dark:hover:bg-neutral-900 transition-colors duration-300 ease-in-out"
+                  className="cursor-pointer size-9 flex items-center justify-center rounded-full text-neutral-500
+                    hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors duration-300 ease-in-out"
                   aria-label="More options"
                 >
                   <EllipsisVerticalIcon className="size-5" />
@@ -1126,14 +1126,15 @@ export default function Home() {
               <div className="mx-auto max-w-[52rem]">
                 <div className="relative h-0">
                   <div
-                    className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300 ease-in-out
-                      ${isAutoScrollActive ? "opacity-0 pointer-events-none" : "opacity-100"} `}
+                    className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300
+                      ease-in-out ${isAutoScrollActive ? "opacity-0 pointer-events-none" : "opacity-100"} `}
                   >
                     <button
                       onClick={handleScrollToBottomClick}
-                      className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-300
-                        ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-900
-                        dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 shadow-lg"
+                      className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
+                        transition-colors duration-300 ease-in-out bg-white border border-neutral-300
+                        hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-900 dark:border-neutral-800
+                        dark:text-neutral-300 dark:hover:bg-neutral-700 shadow-lg"
                     >
                       <ArrowDownIcon className="size-5" />
                     </button>

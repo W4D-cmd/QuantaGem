@@ -364,15 +364,16 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         <div className="w-full max-w-[52rem] relative">
           {showFileSuggestions && filteredProjectFiles.length > 0 && (
             <div
-              className="absolute bottom-[100%] left-1/2 -translate-x-1/2 w-full max-w-[52rem] mb-2 bg-white dark:bg-neutral-800 border
-                border-neutral-300 dark:border-neutral-700 rounded-lg shadow-lg overflow-hidden z-20"
+              className="absolute bottom-[100%] left-1/2 -translate-x-1/2 w-full max-w-[52rem] mb-2 bg-white
+                dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg shadow-lg
+                overflow-hidden z-20"
             >
               <ul className="max-h-48 overflow-y-auto">
                 {filteredProjectFiles.map((file, index) => (
                   <li
                     key={file.id}
                     className={`px-4 py-2 cursor-pointer text-sm flex justify-between items-center ${
-                    index === highlightedSuggestionIndex
+                      index === highlightedSuggestionIndex
                         ? "bg-blue-100 dark:bg-blue-700 text-blue-900 dark:text-white"
                         : "hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200"
                     }`}
@@ -389,14 +390,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           )}
           {selectedFiles.length > 0 && (
             <div
-              className="mb-2 p-2 border border-neutral-100 dark:border-neutral-900 rounded-xl flex flex-wrap gap-2 transition-colors
-                duration-300 ease-in-out"
+              className="mb-2 p-2 border border-neutral-100 dark:border-neutral-900 rounded-xl flex flex-wrap gap-2
+                transition-colors duration-300 ease-in-out"
             >
               {selectedFiles.map((file) => (
                 <div
                   key={file.objectName}
-                  className="bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-400 px-3 py-1 rounded-full text-sm flex
-                    items-center gap-2 transition-colors duration-300 ease-in-out"
+                  className="bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-400 px-3 py-1
+                    rounded-full text-sm flex items-center gap-2 transition-colors duration-300 ease-in-out"
                 >
                   <span>{file.fileName}</span>
                   {!isLoading && (
@@ -420,9 +421,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             </div>
           )}
           <div
-            className="relative flex flex-col rounded-3xl border border-neutral-300 dark:border-neutral-900 overflow-hidden shadow-lg
-              transition duration-300 ease-in-out focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500
-              focus-within:ring-opacity-50"
+            className="relative flex flex-col rounded-3xl border border-neutral-300 dark:border-neutral-900
+              overflow-hidden shadow-lg transition duration-300 ease-in-out focus-within:border-blue-500
+              focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-opacity-50"
           >
             <div className="p-4 bg-white dark:bg-neutral-900 transition-colors duration-300 ease-in-out">
               <textarea
@@ -433,8 +434,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 onPaste={handlePaste}
                 placeholder="Send a message..."
                 rows={1}
-                className="w-full resize-none border-none p-0 focus:outline-none bg-white dark:bg-neutral-900 transition-colors duration-300
-                  ease-in-out placeholder-neutral-500 dark:placeholder-neutral-400"
+                className="w-full resize-none border-none p-0 focus:outline-none bg-white dark:bg-neutral-900
+                  transition-colors duration-300 ease-in-out placeholder-neutral-500 dark:placeholder-neutral-400"
                 style={{
                   maxHeight: "320px",
                   overflowY: (textareaRef.current?.scrollHeight ?? 0) > 320 ? "auto" : "hidden",
@@ -445,8 +446,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             </div>
 
             <div
-              className="border-t bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 p-2 ps-3 flex justify-between
-                items-center transition-colors duration-300 ease-in-out"
+              className="border-t bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 p-2 ps-3 flex
+                justify-between items-center transition-colors duration-300 ease-in-out"
             >
               <div className="flex items-center gap-2">
                 <Tooltip text="Attach files">
@@ -454,11 +455,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isLoading || isRecording || isTranscribing}
-                    className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium border transition-colors
-                      duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800
-                      dark:text-neutral-400 dark:hover:bg-neutral-700"
+                    className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
+                      border transition-colors duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100
+                      dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
                   >
-                    <PaperClipIcon className="size-5 text-neutral-500 dark:text-neutral-300 transition-colors duration-300 ease-in-out" />
+                    <PaperClipIcon
+                      className="size-5 text-neutral-500 dark:text-neutral-300 transition-colors duration-300
+                        ease-in-out"
+                    />
                   </button>
                 </Tooltip>
                 <input
@@ -474,19 +478,24 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     type="button"
                     onClick={() => onToggleSearch(!isSearchActive)}
                     disabled={isRecording || isTranscribing}
-                    className={` cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium transition-colors duration-300
-                      ease-in-out ${
-                      isSearchActive
-                          ? `bg-black text-white border hover:bg-neutral-600 dark:bg-white dark:text-neutral-900 dark:border-neutral-200
-                            dark:hover:bg-neutral-400 dark:hover:border-neutral-400`
-                          : `bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-900 dark:border-neutral-800
-                            dark:text-neutral-300 dark:hover:bg-neutral-700`
+                    className={` cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
+                      transition-colors duration-300 ease-in-out ${
+                        isSearchActive
+                          ? `bg-black text-white border hover:bg-neutral-600 dark:bg-white dark:text-neutral-900
+                            dark:border-neutral-200 dark:hover:bg-neutral-400 dark:hover:border-neutral-400`
+                          : `bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500
+                            dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700`
                       } `}
                   >
                     {isSearchActive ? (
-                      <SolidGlobeAltIcon className="size-5 text-white dark:text-neutral-900 transition-colors duration-300 ease-in-out" />
+                      <SolidGlobeAltIcon
+                        className="size-5 text-white dark:text-neutral-900 transition-colors duration-300 ease-in-out"
+                      />
                     ) : (
-                      <OutlineGlobeAltIcon className="size-5 text-neutral-500 dark:text-neutral-300 transition-colors duration-300 ease-in-out" />
+                      <OutlineGlobeAltIcon
+                        className="size-5 text-neutral-500 dark:text-neutral-300 transition-colors duration-300
+                          ease-in-out"
+                      />
                     )}
                     <span>Search</span>
                   </button>
@@ -500,9 +509,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       type="button"
                       onClick={isRecording ? cancelRecording : startRecording}
                       disabled={isLoading || isTranscribing || uploadingFiles.length > 0}
-                      className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium border transition-colors
-                        duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800
-                        dark:hover:bg-neutral-700"
+                      className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
+                        border transition-colors duration-300 ease-in-out bg-white border-neutral-300
+                        hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700"
                     >
                       {isRecording ? (
                         <XMarkIcon className="size-5 text-red-500" />
@@ -525,12 +534,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           ? false
                           : !input.trim() && selectedFiles.length === 0
                   }
-                  className={`cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full flex items-center justify-center
-                    transition-colors duration-300 ease-in-out ${
-                    isRecording
-                        ? `size-9 border bg-white border-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800
-                          dark:hover:bg-neutral-700`
-                        : "size-9 bg-black text-white hover:bg-neutral-600 dark:bg-white dark:text-black dark:hover:bg-neutral-400"
+                  className={`cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full flex
+                    items-center justify-center transition-colors duration-300 ease-in-out ${
+                      isRecording
+                        ? `size-9 border bg-white border-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900
+                          dark:border-neutral-800 dark:hover:bg-neutral-700`
+                        : `size-9 bg-black text-white hover:bg-neutral-600 dark:bg-white dark:text-black
+                          dark:hover:bg-neutral-400`
                     }`}
                 >
                   {isLoading ? (

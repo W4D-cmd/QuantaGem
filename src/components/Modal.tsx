@@ -60,8 +60,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
     >
       <div
         ref={modalRef}
-        className={`focus:outline-none bg-white dark:bg-neutral-900 rounded-2xl shadow-xl flex flex-col overflow-hidden w-full
-          ${sizeClasses[size]} transition-colors duration-300 ease-in-out`}
+        className={`focus:outline-none bg-white dark:bg-neutral-900 rounded-2xl shadow-xl flex flex-col overflow-hidden
+          w-full ${sizeClasses[size]} transition-colors duration-300 ease-in-out`}
         onClick={(e) => e.stopPropagation()}
         tabIndex={-1}
         role="document"
@@ -74,8 +74,9 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
             {!hideCloseButton && (
               <button
                 onClick={onClose}
-                className="cursor-pointer size-9 flex items-center justify-center px-2 rounded-full transition-colors duration-300 ease-in-out
-                  text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 focus:outline-none"
+                className="cursor-pointer size-9 flex items-center justify-center px-2 rounded-full transition-colors
+                  duration-300 ease-in-out text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100
+                  dark:hover:bg-neutral-800 focus:outline-none"
                 aria-label="Close modal"
               >
                 <XMarkIcon className="size-5" />
@@ -86,8 +87,9 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
         {!title && !hideCloseButton && (
           <button
             onClick={onClose}
-            className="cursor-pointer size-9 flex items-center justify-center px-2 rounded-full transition-colors duration-300 ease-in-out
-              text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 focus:outline-none"
+            className="cursor-pointer size-9 flex items-center justify-center px-2 rounded-full transition-colors
+              duration-300 ease-in-out text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100
+              dark:hover:bg-neutral-800 focus:outline-none"
             aria-label="Close modal"
           >
             <XMarkIcon className="size-5" />

@@ -78,17 +78,20 @@ export default function Sidebar({
 
   return (
     <div
-      className="w-70 h-full bg-neutral-100 dark:bg-neutral-900 pt-2 pb-4 pl-4 pr-1 overflow-y-auto flex flex-col transition-colors
-        duration-300 ease-in-out"
+      className="w-70 h-full bg-neutral-100 dark:bg-neutral-900 pt-2 pb-4 pl-4 pr-1 overflow-y-auto flex flex-col
+        transition-colors duration-300 ease-in-out"
     >
       <div className="flex-none mb-4">
         <div className="flex-none pr-2 flex items-center justify-between">
           <Tooltip text={"Delete all chats (no project chats)"}>
             <button
               onClick={onDeleteAllGlobalChats}
-              className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-300 ease-in-out"
+              className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors
+                duration-300 ease-in-out"
             >
-              <TrashIcon className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out" />
+              <TrashIcon
+                className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out"
+              />
             </button>
           </Tooltip>
 
@@ -96,18 +99,24 @@ export default function Sidebar({
             <Tooltip text={"New project"}>
               <button
                 onClick={onNewProject}
-                className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-300 ease-in-out"
+                className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800
+                  transition-colors duration-300 ease-in-out"
               >
-                <FolderPlusIcon className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out" />
+                <FolderPlusIcon
+                  className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out"
+                />
               </button>
             </Tooltip>
 
             <Tooltip text={"New chat"}>
               <button
                 onClick={() => onNewChat(null)}
-                className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-300 ease-in-out"
+                className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800
+                  transition-colors duration-300 ease-in-out"
               >
-                <PencilSquareIcon className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out" />
+                <PencilSquareIcon
+                  className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out"
+                />
               </button>
             </Tooltip>
           </div>
@@ -123,10 +132,12 @@ export default function Sidebar({
                 <li key={chat.id} className="mb-0.5 relative group">
                   <button
                     onClick={() => onSelectChat(chat.id)}
-                    className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none text-neutral-900 dark:text-white
-                    transition-colors duration-300 ease-in-out flex items-center justify-between ${
-                    chat.id === activeChatId
-                        ? "font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700 hover:dark:bg-neutral-700"
+                    className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none
+                    text-neutral-900 dark:text-white transition-colors duration-300 ease-in-out flex items-center
+                    justify-between ${
+                      chat.id === activeChatId
+                        ? `font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700
+                          hover:dark:bg-neutral-700`
                         : "hover:bg-neutral-200 dark:hover:bg-neutral-800"
                     }`}
                   >
@@ -213,10 +224,12 @@ export default function Sidebar({
                     </button>
                     <button
                       onClick={() => onSelectProject(project.id)}
-                      className={`cursor-pointer flex-1 text-sm text-left p-2 rounded-lg focus:outline-none text-neutral-900 dark:text-white +
-                      transition-colors duration-300 ease-in-out flex items-center justify-between ${
-                      project.id === activeProjectId
-                          ? "font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700 hover:dark:bg-neutral-700"
+                      className={`cursor-pointer flex-1 text-sm text-left p-2 rounded-lg focus:outline-none
+                      text-neutral-900 dark:text-white + transition-colors duration-300 ease-in-out flex items-center
+                      justify-between ${
+                        project.id === activeProjectId
+                          ? `font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700
+                            hover:dark:bg-neutral-700`
                           : "hover:bg-neutral-200 dark:hover:bg-neutral-800"
                       }`}
                     >
@@ -277,10 +290,12 @@ export default function Sidebar({
                           <li key={chat.id} className="mb-0.5 relative group">
                             <button
                               onClick={() => onSelectChat(chat.id)}
-                              className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none text-neutral-900 dark:text-white +
-                                transition-colors duration-300 ease-in-out flex items-center justify-between ${
-                                chat.id === activeChatId
-                                    ? "font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700 hover:dark:bg-neutral-700"
+                              className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none
+                                text-neutral-900 dark:text-white + transition-colors duration-300 ease-in-out flex
+                                items-center justify-between ${
+                                  chat.id === activeChatId
+                                    ? `font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700
+                                      hover:dark:bg-neutral-700`
                                     : "hover:bg-neutral-200 dark:hover:bg-neutral-800"
                                 }`}
                             >
@@ -362,8 +377,8 @@ export default function Sidebar({
       {userEmail && (
         <div className="pr-3">
           <div
-            className="mt-4 mb-0 text-center text-sm p-2 rounded-lg text-neutral-700 dark:text-neutral-200 bg-neutral-200 dark:bg-neutral-800
-              transition-colors duration-300 ease-in-out"
+            className="mt-4 mb-0 text-center text-sm p-2 rounded-lg text-neutral-700 dark:text-neutral-200
+              bg-neutral-200 dark:bg-neutral-800 transition-colors duration-300 ease-in-out"
           >
             Logged in as: <br />
             <span className="font-semibold">{userEmail}</span>

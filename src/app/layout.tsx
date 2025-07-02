@@ -17,9 +17,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={
-          "antialiased bg-white dark:bg-neutral-950 text-black dark:text-white transition-colors duration-300 ease-in-out"
-        }
+        className={`antialiased bg-white dark:bg-neutral-950 text-black dark:text-white transition-colors duration-300
+          ease-in-out`}
       >
         <ThemeProvider>
           <HighlightJsThemeLoader />

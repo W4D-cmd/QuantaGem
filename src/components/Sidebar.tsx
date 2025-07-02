@@ -360,12 +360,14 @@ export default function Sidebar({
       </div>
 
       {userEmail && (
-        <div
-          className="mt-4 mb-0 text-center text-sm p-2 rounded-lg text-neutral-700 dark:text-neutral-200 bg-neutral-200 dark:bg-neutral-800
-            transition-colors duration-300 ease-in-out"
-        >
-          Logged in as: <br />
-          <span className="font-semibold">{userEmail}</span>
+        <div className="pr-3">
+          <div
+            className="mt-4 mb-0 text-center text-sm p-2 rounded-lg text-neutral-700 dark:text-neutral-200 bg-neutral-200 dark:bg-neutral-800
+              transition-colors duration-300 ease-in-out"
+          >
+            Logged in as: <br />
+            <span className="font-semibold">{userEmail}</span>
+          </div>
         </div>
       )}
     </div>

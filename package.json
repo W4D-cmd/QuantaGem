@@ -17,7 +17,7 @@
     "ioredis": "^5.6.1",
     "jose": "^6.0.11",
     "minio": "^8.0.5",
-    "next": "15.3.4",
+    "next": "15.3.5",
     "pg": "^8.16.0",
     "postcss": "^8.5.4",
     "rate-limiter-flexible": "^7.1.1",

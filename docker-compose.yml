@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:17-alpine
+    restart: unless-stopped
     env_file:
       - .env
       - .env.local
@@ -15,6 +16,7 @@ services:
 
   minio:
     image: minio/minio:RELEASE.2025-06-13T11-33-47Z
+    restart: unless-stopped
     env_file:
       - .env
       - .env.local
@@ -35,6 +37,7 @@ services:
     build:
       context: ./stt-service
       dockerfile: Dockerfile
+    restart: unless-stopped
     command: uvicorn main:app --host 0.0.0.0 --port 8000
     environment:
       WHISPER_MODEL_DIR: /app/models
@@ -49,6 +52,7 @@ services:
 
   redis:
     image: redis:8-alpine
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -57,6 +61,7 @@ services:
 
   app:
     build: .
+    restart: unless-stopped
     env_file:
       - .env
       - .env.local

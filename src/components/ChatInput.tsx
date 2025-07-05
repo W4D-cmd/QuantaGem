@@ -15,6 +15,7 @@ import Tooltip from "@/components/Tooltip";
 import {
   ArrowPathIcon,
   CheckIcon,
+  FolderOpenIcon,
   GlobeAltIcon as OutlineGlobeAltIcon,
   MicrophoneIcon,
   PaperClipIcon,
@@ -25,6 +26,7 @@ import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
 import { ProjectFile } from "@/app/page";
 import { ArrowUpIcon } from "@heroicons/react/20/solid";
 import { StopIcon } from "@heroicons/react/16/solid";
+import DropdownMenu, { DropdownItem } from "./DropdownMenu";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -48,6 +50,93 @@ export interface ChatInputHandle {
   focusInput: () => void;
 }
 
+const SOURCE_CODE_EXTENSIONS = new Set([
+  // Web Development
+  ".html",
+  ".htm",
+  ".css",
+  ".scss",
+  ".sass",
+  ".less",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".ts",
+  ".tsx",
+  ".jsx",
+  // Backend & General Purpose
+  ".py",
+  ".rb",
+  ".php",
+  ".java",
+  ".kt",
+  ".kts",
+  ".scala",
+  ".go",
+  ".rs",
+  ".cs",
+  ".fs",
+  ".fsx",
+  ".swift",
+  ".c",
+  ".cpp",
+  ".h",
+  ".hpp",
+  ".m",
+  ".mm",
+  ".dart",
+  ".lua",
+  ".pl",
+  ".pm",
+  ".t",
+  ".r",
+  ".erl",
+  ".hrl",
+  ".ex",
+  ".exs",
+  // Shell & Scripting
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".ps1",
+  ".bat",
+  ".cmd",
+  // Data & Configuration
+  ".json",
+  ".jsonc",
+  ".xml",
+  ".yaml",
+  ".yml",
+  ".toml",
+  ".ini",
+  ".cfg",
+  ".conf",
+  ".env",
+  ".dockerfile",
+  "Dockerfile",
+  ".gitignore",
+  ".gitattributes",
+  // SQL
+  ".sql",
+  ".ddl",
+  ".dml",
+  // Markup & Docs
+  ".md",
+  ".markdown",
+  ".rst",
+  ".adoc",
+  ".asciidoc",
+  // Other
+  ".gradle",
+  ".kts",
+  ".groovy",
+  ".tf",
+  ".tfvars",
+  ".hcl",
+  ".sum",
+  ".mod",
+]);
+
 const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
   (
     {
@@ -65,6 +154,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [input, setInput] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const attachButtonRef = useRef<HTMLButtonElement>(null);
+    const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
     const [selectedFiles, setSelectedFiles] = useState<UploadedFileInfo[]>([]);
     const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
     const [showFileSuggestions, setShowFileSuggestions] = useState(false);
@@ -76,6 +167,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [isTranscribing, setIsTranscribing] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
+
+    const [isScanning, setIsScanning] = useState(false);
+    const [scanStatusMessage, setScanStatusMessage] = useState<string | null>(null);
 
     useImperativeHandle(ref, () => ({
       focusInput: () => {
@@ -145,6 +239,76 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       setSelectedFiles((prev) => [...prev, ...successfulUploads]);
       setUploadingFiles((prev) => prev.filter((f) => !filesToUpload.includes(f)));
     };
+
+    const handleOpenSourceFolder = async () => {
+      if (typeof window.showDirectoryPicker !== "function") {
+        onError("Your browser does not support opening folders. Please try a modern, Chrome-based browser.");
+        return;
+      }
+
+      try {
+        const directoryHandle = await window.showDirectoryPicker();
+        const filesToUpload: File[] = [];
+        let fileCount = 0;
+
+        setIsScanning(true);
+        setScanStatusMessage("Scanning folder...");
+
+        const processDirectory = async (handle: FileSystemDirectoryHandle, path: string) => {
+          for await (const entry of handle.values()) {
+            const entryPath = `${path}/${entry.name}`;
+            if (entry.kind === "file") {
+              const extension = `.${entry.name.split(".").pop()}`;
+              if (SOURCE_CODE_EXTENSIONS.has(extension) || SOURCE_CODE_EXTENSIONS.has(entry.name)) {
+                try {
+                  const file = await entry.getFile();
+                  filesToUpload.push(file);
+                  fileCount++;
+                  setScanStatusMessage(`Scanning... Found ${fileCount} source file(s)`);
+                } catch (e) {
+                  console.warn(`Could not read file: ${entryPath}`, e);
+                }
+              }
+            } else if (entry.kind === "directory") {
+              await processDirectory(entry, entryPath);
+            }
+          }
+        };
+
+        await processDirectory(directoryHandle, directoryHandle.name);
+
+        setScanStatusMessage(`Found ${fileCount} source file(s). Preparing for upload...`);
+        await processAndUploadFiles(filesToUpload);
+        setScanStatusMessage(null);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          console.log("Folder picker was cancelled by the user.");
+        } else {
+          console.error("Error picking folder:", err);
+          onError("An error occurred while selecting the folder.");
+        }
+      } finally {
+        setIsScanning(false);
+        if (scanStatusMessage) {
+          setTimeout(() => setScanStatusMessage(null), 3000);
+        }
+      }
+    };
+
+    const attachDropdownItems: DropdownItem[] = [
+      {
+        id: "attach-files",
+        label: "Attach files",
+        icon: <PaperClipIcon className="size-4" />,
+        onClick: () => fileInputRef.current?.click(),
+      },
+      {
+        id: "open-folder",
+        label: "Open source folder",
+        icon: <FolderOpenIcon className="size-4" />,
+        onClick: handleOpenSourceFolder,
+      },
+    ];
 
     useEffect(() => {
       const ta = textareaRef.current;
@@ -257,7 +421,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     };
 
     const submit = () => {
-      if ((!input.trim() && selectedFiles.length === 0) || isLoading || isRecording || isTranscribing) return;
+      if ((!input.trim() && selectedFiles.length === 0) || isLoading || isRecording || isTranscribing || isScanning)
+        return;
       onSendMessageAction(input, selectedFiles, isSearchActive);
       setInput("");
       setSelectedFiles([]);
@@ -410,14 +575,25 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               ))}
             </div>
           )}
-          {uploadingFiles.length > 0 && (
+          {(uploadingFiles.length > 0 || scanStatusMessage) && (
             <div className="mb-2 p-2 text-sm text-neutral-500">
-              Uploading {uploadingFiles.length} file(s)...
-              {uploadingFiles.map((f) => (
-                <div key={f.name} className="text-xs">
-                  {f.name}
+              {scanStatusMessage && (
+                <div className="flex items-center gap-2">
+                  <ArrowPathIcon className="size-4 animate-spin" />
+                  <span>{scanStatusMessage}</span>
                 </div>
-              ))}
+              )}
+              {uploadingFiles.length > 0 && (
+                <div>
+                  Uploading {uploadingFiles.length} file(s)...
+                  {uploadingFiles.slice(0, 3).map((f) => (
+                    <div key={f.name} className="text-xs truncate">
+                      {f.name}
+                    </div>
+                  ))}
+                  {uploadingFiles.length > 3 && <div className="text-xs">...and {uploadingFiles.length - 3} more</div>}
+                </div>
+              )}
             </div>
           )}
           <div
@@ -441,7 +617,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   overflowY: (textareaRef.current?.scrollHeight ?? 0) > 320 ? "auto" : "hidden",
                   scrollbarGutter: "stable",
                 }}
-                disabled={isLoading || isRecording || isTranscribing}
+                disabled={isLoading || isRecording || isTranscribing || isScanning}
               />
             </div>
 
@@ -450,11 +626,12 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 justify-between items-center transition-colors duration-300 ease-in-out"
             >
               <div className="flex items-center gap-2">
-                <Tooltip text="Attach files">
+                <Tooltip text="Attach files or open folder">
                   <button
+                    ref={attachButtonRef}
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isLoading || isRecording || isTranscribing}
+                    onClick={() => setIsAttachMenuOpen((prev) => !prev)}
+                    disabled={isLoading || isRecording || isTranscribing || isScanning}
                     className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
                       border transition-colors duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100
                       dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
@@ -465,19 +642,26 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     />
                   </button>
                 </Tooltip>
+                <DropdownMenu
+                  open={isAttachMenuOpen}
+                  onCloseAction={() => setIsAttachMenuOpen(false)}
+                  anchorRef={attachButtonRef}
+                  items={attachDropdownItems}
+                  position="left"
+                />
                 <input
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileChange}
                   multiple
                   className="hidden"
-                  disabled={isLoading || isRecording || isTranscribing}
+                  disabled={isLoading || isRecording || isTranscribing || isScanning}
                 />
                 <Tooltip text="Search the web">
                   <button
                     type="button"
                     onClick={() => onToggleSearch(!isSearchActive)}
-                    disabled={isRecording || isTranscribing}
+                    disabled={isRecording || isTranscribing || isScanning}
                     className={` cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
                       transition-colors duration-300 ease-in-out ${
                         isSearchActive
@@ -503,12 +687,12 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               </div>
 
               <div className="flex items-center gap-2">
-                {!isLoading && !isTranscribing && (
+                {!isLoading && !isTranscribing && !isScanning && (
                   <Tooltip text={isRecording ? "Cancel recording" : "Dictate message"}>
                     <button
                       type="button"
                       onClick={isRecording ? cancelRecording : startRecording}
-                      disabled={isLoading || isTranscribing || uploadingFiles.length > 0}
+                      disabled={isLoading || isTranscribing || uploadingFiles.length > 0 || isScanning}
                       className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
                         border transition-colors duration-300 ease-in-out bg-white border-neutral-300
                         hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700"
@@ -532,7 +716,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         ? true
                         : isRecording
                           ? false
-                          : !input.trim() && selectedFiles.length === 0
+                          : isScanning || (!input.trim() && selectedFiles.length === 0)
                   }
                   className={`cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full flex
                     items-center justify-center transition-colors duration-300 ease-in-out ${
@@ -545,7 +729,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 >
                   {isLoading ? (
                     <StopIcon className="size-5" />
-                  ) : isTranscribing ? (
+                  ) : isTranscribing || isScanning ? (
                     <ArrowPathIcon className="size-5 animate-spin" />
                   ) : isRecording ? (
                     <CheckIcon className="size-5 text-green-500" />

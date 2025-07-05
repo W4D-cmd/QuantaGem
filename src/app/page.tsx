@@ -146,6 +146,8 @@ export default function Home() {
   const [currentChatProjectId, setCurrentChatProjectId] = useState<number | null>(null);
   const [isNewChatJustCreated, setIsNewChatJustCreated] = useState(false);
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
+  const [totalTokens, setTotalTokens] = useState<number | null>(null);
+  const [isCountingTokens, setIsCountingTokens] = useState(false);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -156,6 +158,58 @@ export default function Home() {
     const token = localStorage.getItem("__session");
     return token ? { Authorization: `Bearer ${token}` } : {};
   }, []);
+
+  const fetchTokenCount = useCallback(
+    async (
+      currentMessages: Message[],
+      currentModel: Model | null,
+      currentKeySelection: "free" | "paid",
+      currentChatId: number | null,
+    ) => {
+      if (!currentModel || !currentChatId || currentMessages.length === 0) {
+        setTotalTokens(0);
+        return;
+      }
+      setIsCountingTokens(true);
+      try {
+        const res = await fetch("/api/count-tokens", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({
+            history: currentMessages,
+            model: currentModel.name,
+            keySelection: currentKeySelection,
+            chatSessionId: currentChatId,
+          }),
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to count tokens");
+        }
+
+        const { totalTokens } = await res.json();
+        setTotalTokens(totalTokens);
+      } catch (err) {
+        console.error("Token count failed:", extractErrorMessage(err));
+        setTotalTokens(null);
+      } finally {
+        setIsCountingTokens(false);
+      }
+    },
+    [getAuthHeaders],
+  );
+
+  useEffect(() => {
+    const previousIsLoading = sessionStorage.getItem("isLoading") === "true";
+    if (previousIsLoading && !isLoading && activeChatId && messages.length > 0) {
+      fetchTokenCount(messages, selectedModel, keySelection, activeChatId);
+    }
+    sessionStorage.setItem("isLoading", isLoading.toString());
+  }, [isLoading, activeChatId, messages, selectedModel, keySelection, fetchTokenCount]);
 
   const fetchAllProjects = useCallback(async () => {
     try {
@@ -388,6 +442,7 @@ export default function Home() {
       setMessages([]);
       setEditingPromptInitialValue(null);
       setKeySelection("free");
+      setTotalTokens(null);
     }
   };
 
@@ -463,6 +518,7 @@ export default function Home() {
       setEditingPromptInitialValue(null);
       setKeySelection("free");
       setCurrentChatProjectId(projectId);
+      setTotalTokens(0);
 
       if (projectId !== null) {
         const newTitle = `Chat ${allChats.filter((chat) => chat.projectId === projectId).length + 1}`;
@@ -507,6 +563,7 @@ export default function Home() {
             setEditingPromptInitialValue(null);
             setKeySelection("free");
             setCurrentChatProjectId(null);
+            setTotalTokens(null);
           }
 
           const errorData = await res.json();
@@ -552,6 +609,7 @@ export default function Home() {
     setMessages([]);
     setEditingPromptInitialValue(null);
     setKeySelection("free");
+    setTotalTokens(null);
   }, []);
 
   const handleNewProject = useCallback(async () => {
@@ -559,6 +617,7 @@ export default function Home() {
     setMessages([]);
     setEditingPromptInitialValue(null);
     setKeySelection("free");
+    setTotalTokens(null);
     setIsLoading(true);
     try {
       const existingProjectCount = allProjects.length;
@@ -652,6 +711,7 @@ export default function Home() {
       setMessages([]);
       setEditingPromptInitialValue(null);
       setKeySelection("free");
+      setTotalTokens(null);
     }
   };
 
@@ -661,6 +721,7 @@ export default function Home() {
         setMessages([]);
         setEditingPromptInitialValue(null);
         setCurrentChatProjectId(null);
+        setTotalTokens(0);
       }
       prevActiveChatIdRef.current = null;
       prevDisplayingProjectManagementIdRef.current = null;
@@ -709,6 +770,7 @@ export default function Home() {
         setMessages([]);
         setEditingPromptInitialValue(null);
         setKeySelection("free");
+        setTotalTokens(null);
         setIsNewChatJustCreated(false);
       }
       prevDisplayingProjectManagementIdRef.current = displayingProjectManagementId;
@@ -966,6 +1028,7 @@ export default function Home() {
       setMessages([]);
       setEditingPromptInitialValue(null);
       setKeySelection("free");
+      setTotalTokens(null);
     }
   };
 
@@ -1064,6 +1127,22 @@ export default function Home() {
               <div className="flex items-center ml-4">
                 <Tooltip text="Switch between free and paid API key">
                   <ToggleApiKeyButton selectedKey={keySelection} onToggleAction={handleKeySelectionToggle} />
+                </Tooltip>
+              </div>
+              <div className="flex items-center ml-4">
+                <Tooltip text="Total tokens for this chat session">
+                  <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+                    <span>Tokens:</span>
+                    {isCountingTokens ? (
+                      <div
+                        className="w-4 h-4 border-2 border-neutral-300 border-t-neutral-500 rounded-full animate-spin"
+                      />
+                    ) : totalTokens !== null ? (
+                      <span>{totalTokens.toLocaleString()}</span>
+                    ) : (
+                      <span>N/A</span>
+                    )}
+                  </div>
                 </Tooltip>
               </div>
             </>

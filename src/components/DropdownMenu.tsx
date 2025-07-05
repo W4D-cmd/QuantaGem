@@ -35,22 +35,38 @@ export default function DropdownMenu({
   useLayoutEffect(() => {
     if (!open || !anchorRef.current || !menuRef.current) return;
 
-    const rect = anchorRef.current.getBoundingClientRect();
+    const anchorEl = anchorRef.current;
     const menuEl = menuRef.current;
+    const anchorRect = anchorEl.getBoundingClientRect();
 
     menuEl.style.width = "auto";
     const contentW = menuEl.scrollWidth;
     setMenuWidth(contentW + extraWidthPx);
 
-    const top = rect.bottom + window.scrollY;
-    const left =
-      position === "right" ? rect.right + window.scrollX - (contentW + extraWidthPx) : rect.left + window.scrollX;
+    const menuHeight = menuEl.offsetHeight;
+    const viewportHeight = window.innerHeight;
+    const menuMargin = 8;
 
-    setCoords({ top, left });
+    const spaceBelow = viewportHeight - anchorRect.bottom;
+    const spaceAbove = anchorRect.top;
+
+    let finalTop;
+    if (spaceBelow < menuHeight + menuMargin && spaceAbove > menuHeight + menuMargin) {
+      finalTop = anchorRect.top + window.scrollY - menuHeight - menuMargin;
+    } else {
+      finalTop = anchorRect.bottom + window.scrollY + menuMargin;
+    }
+
+    const finalLeft =
+      position === "right"
+        ? anchorRect.right + window.scrollX - (contentW + extraWidthPx)
+        : anchorRect.left + window.scrollX;
+
+    setCoords({ top: finalTop, left: finalLeft });
 
     const handleClickOutside = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (!menuEl.contains(t) && !anchorRef.current!.contains(t)) {
+      if (!menuEl.contains(t) && !anchorEl.contains(t)) {
         onCloseAction();
       }
     };

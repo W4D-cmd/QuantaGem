@@ -64,6 +64,7 @@ const SOURCE_CODE_EXTENSIONS = new Set([
   ".ts",
   ".tsx",
   ".jsx",
+  ".vue",
   // Backend & General Purpose
   ".py",
   ".rb",

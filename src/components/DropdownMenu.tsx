@@ -7,7 +7,7 @@ export interface DropdownItem {
   id?: string;
   icon?: ReactNode;
   label: string;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   className?: string;
 }
 
@@ -113,9 +113,9 @@ export default function DropdownMenu({
         {items.map((item) => (
           <button
             key={item.id ?? item.label}
-            onClick={() => {
+            onClick={(e) => {
               onCloseAction();
-              item.onClick();
+              item.onClick(e);
             }}
             className={`cursor-pointer w-full flex items-center px-4 py-2 text-sm text-left hover:bg-neutral-100
             dark:hover:bg-neutral-800 rounded-lg transition-colors duration-300 ease-in-out ${item.className || ""}`}

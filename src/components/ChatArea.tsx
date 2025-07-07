@@ -2,23 +2,26 @@
 
 import "katex/dist/katex.min.css";
 
-import React, { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState, useCallback } from "react";
+import React, {
+  forwardRef,
+  memo,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  useCallback,
+  KeyboardEvent,
+} from "react";
 import ReactMarkdown, { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { MessagePart } from "@/app/page";
-import { ClipboardDocumentListIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { Message } from "@/app/page";
+import { ClipboardDocumentListIcon, CheckIcon, PencilIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import Tooltip from "@/components/Tooltip";
 
 type GetAuthHeaders = () => HeadersInit;
-
-export interface Message {
-  role: "user" | "model";
-  parts: MessagePart[];
-  sources?: Array<{ title: string; uri: string }>;
-}
 
 interface ChatAreaProps {
   messages: Message[];
@@ -27,6 +30,10 @@ interface ChatAreaProps {
   onAutoScrollChange?: (isAutoScrollEnabled: boolean) => void;
   getAuthHeaders: GetAuthHeaders;
   activeChatId: number | null;
+  editingMessage: { index: number; content: string } | null;
+  setEditingMessage: React.Dispatch<React.SetStateAction<{ index: number; content: string } | null>>;
+  onEditSave: (index: number, newContent: string) => void;
+  onRegenerate: (index: number) => void;
 }
 
 export interface ChatAreaHandle {
@@ -91,7 +98,6 @@ const ProtectedImage = memo(
     }
 
     return (
-      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={imageUrl}
         alt={fileName}
@@ -205,11 +211,23 @@ export default memo(
     prev.isLoading === next.isLoading &&
     prev.streamStarted === next.streamStarted &&
     prev.onAutoScrollChange === next.onAutoScrollChange &&
-    prev.getAuthHeaders === next.getAuthHeaders,
+    prev.getAuthHeaders === next.getAuthHeaders &&
+    prev.editingMessage === next.editingMessage,
 );
 
 function ChatAreaComponent(
-  { messages, isLoading, streamStarted, onAutoScrollChange, getAuthHeaders, activeChatId }: ChatAreaProps,
+  {
+    messages,
+    isLoading,
+    streamStarted,
+    onAutoScrollChange,
+    getAuthHeaders,
+    activeChatId,
+    editingMessage,
+    setEditingMessage,
+    onEditSave,
+    onRegenerate,
+  }: ChatAreaProps,
   ref: React.Ref<ChatAreaHandle>,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -219,6 +237,15 @@ function ChatAreaComponent(
   const justManuallyDisabledRef = useRef(false);
   const lastScrollTopRef = useRef(0);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null);
+  const editingTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [editedText, setEditedText] = useState("");
+
+  useEffect(() => {
+    if (editingMessage) {
+      setEditedText(editingMessage.content);
+    }
+  }, [editingMessage]);
 
   useImperativeHandle(ref, () => ({
     scrollToBottomAndEnableAutoscroll: () => {
@@ -237,6 +264,17 @@ function ChatAreaComponent(
       }
     },
   }));
+
+  const handleCopyMessage = (msg: Message) => {
+    const textToCopy = msg.parts
+      .filter((p) => p.type === "text" && p.text)
+      .map((p) => p.text)
+      .join("\n\n");
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setCopiedMessageId(msg.id);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    });
+  };
 
   useEffect(() => {
     const el = containerRef.current;
@@ -374,13 +412,31 @@ function ChatAreaComponent(
   }, [activeChatId, isLoading, messages.length, onAutoScrollChange]);
 
   useEffect(() => {
-    if (autoScrollEnabled && containerRef.current) {
+    if (autoScrollEnabled && containerRef.current && !editingMessage) {
       containerRef.current.scrollTo({
         top: containerRef.current.scrollHeight,
         behavior: "smooth",
       });
     }
-  }, [messages, autoScrollEnabled]);
+  }, [messages, autoScrollEnabled, editingMessage]);
+
+  useEffect(() => {
+    if (editingMessage && editingTextareaRef.current) {
+      const textarea = editingTextareaRef.current;
+      textarea.style.height = "auto";
+      textarea.style.height = `${textarea.scrollHeight}px`;
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    }
+  }, [editingMessage]);
+
+  useEffect(() => {
+    if (editingMessage && editingTextareaRef.current) {
+      const textarea = editingTextareaRef.current;
+      textarea.style.height = "auto";
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [editedText, editingMessage]);
 
   const markdownComponents: Components = {
     pre: ({ className, children }) => (
@@ -390,96 +446,199 @@ function ChatAreaComponent(
     ),
   };
 
+  const handleEditKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>, index: number) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      onEditSave(index, editedText);
+    }
+    if (e.key === "Escape") {
+      setEditingMessage(null);
+    }
+  };
+
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-2 focus:outline-none" tabIndex={-1}>
       <div className="mx-auto max-w-[52rem] p-4 space-y-4">
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`p-4 rounded-3xl break-words overflow-hidden ${
-              msg.role === "user"
-                ? `max-w-xl bg-neutral-100 dark:bg-neutral-800 transition-colors duration-300 ease-in-out self-end
-                  ml-auto`
-                : "w-full self-start"
-            }`}
-          >
-            {msg.parts.map((part, j) => {
-              if (part.type === "text" && part.text) {
-                return (
-                  <div
-                    key={j}
-                    className="prose dark:prose-invert prose-neutral prose-code:font-normal prose-code:text-black dark:prose-code:text-white
-                      prose-li:text-neutral-950 dark:prose-li:text-neutral-50 prose-p:text-neutral-950 dark:prose-p:text-neutral-50
-                      prose-headings:text-black dark:prose-headings:text-white prose-pre:rounded-xl prose-code:rounded prose-pre:border
-                      prose-pre:bg-neutral-100 prose-pre:border-neutral-400/30 dark:prose-pre:bg-neutral-900
-                      dark:prose-pre:border-neutral-600/30 prose-code:bg-neutral-200 dark:prose-code:bg-neutral-700 max-w-none
-                      transition-colors duration-300 ease-in-out prose-code:before:content-none prose-code:after:content-none
-                      prose-code:py-0.5 prose-code:px-1"
-                  >
-                    <ReactMarkdown
-                      remarkPlugins={[remarkMath, remarkGfm]}
-                      rehypePlugins={[rehypeKatex, [rehypeHighlight, { detect: true }]]}
-                      components={markdownComponents}
-                    >
-                      {part.text}
-                    </ReactMarkdown>
+        {messages.map((msg, i) => {
+          const isUserMessage = msg.role === "user";
+          const isBeingEdited = editingMessage?.index === i;
+          const textContent = msg.parts.find((p) => p.type === "text")?.text || "";
+
+          return (
+            <div
+              key={msg.id}
+              className={`group/message relative flex flex-col ${
+                isUserMessage && !isBeingEdited ? "items-end" : "items-start"
+              }`}
+            >
+              <div
+                className={`break-words overflow-hidden ${
+                  isBeingEdited ? "w-full" : isUserMessage ? "max-w-xl" : "w-full"
+                }`}
+              >
+                {isBeingEdited ? (
+                  <div className="p-4 rounded-3xl bg-white dark:bg-neutral-800 border-2 border-blue-500">
+                    <textarea
+                      ref={editingTextareaRef}
+                      value={editedText}
+                      onChange={(e) => setEditedText(e.target.value)}
+                      onKeyDown={(e) => handleEditKeyDown(e, i)}
+                      rows={4}
+                      className="w-full resize-none border-none p-0 focus:outline-none bg-transparent max-h-96"
+                    />
+                    <div className="flex justify-end gap-2 mt-2">
+                      <button
+                        onClick={() => setEditingMessage(null)}
+                        className="cursor-pointer px-4 py-1.5 rounded-full text-sm font-medium transition-colors
+                          bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-700 dark:hover:bg-neutral-600"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => onEditSave(i, editedText)}
+                        className="cursor-pointer px-4 py-1.5 rounded-full text-sm font-medium transition-colors
+                          bg-blue-600 text-white hover:bg-blue-700"
+                      >
+                        Save
+                      </button>
+                    </div>
                   </div>
-                );
-              } else if (part.type === "file" && part.objectName && part.mimeType && part.fileName) {
-                if (part.mimeType.startsWith("image/")) {
-                  return (
-                    <div key={j} className="my-2">
-                      <ProtectedImage
-                        objectName={part.objectName}
-                        fileName={part.fileName}
-                        mimeType={part.mimeType}
-                        getAuthHeaders={getAuthHeaders}
-                      />
-                    </div>
-                  );
-                } else {
-                  const fileUrl = `/api/files/${part.objectName}`;
-                  return (
-                    <div key={j} className="my-2">
-                      <a
-                        href={fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600 break-all"
+                ) : (
+                  <div className={`p-4 rounded-3xl ${isUserMessage ? "bg-neutral-100 dark:bg-neutral-800" : ""}`}>
+                    {msg.parts.map((part, j) => {
+                      if (part.type === "text" && part.text) {
+                        return (
+                          <div
+                            key={j}
+                            className="prose dark:prose-invert prose-neutral prose-code:font-normal
+                              prose-code:text-black dark:prose-code:text-white prose-li:text-neutral-950
+                              dark:prose-li:text-neutral-50 prose-p:text-neutral-950 dark:prose-p:text-neutral-50
+                              prose-headings:text-black dark:prose-headings:text-white prose-pre:rounded-xl
+                              prose-code:rounded prose-pre:border prose-pre:bg-neutral-100
+                              prose-pre:border-neutral-400/30 dark:prose-pre:bg-neutral-900
+                              dark:prose-pre:border-neutral-600/30 prose-code:bg-neutral-200 dark:prose-code:bg-neutral-700
+                              max-w-none transition-colors duration-300 ease-in-out prose-code:before:content-none
+                              prose-code:after:content-none prose-code:py-0.5 prose-code:px-1"
+                          >
+                            <ReactMarkdown
+                              remarkPlugins={[remarkMath, remarkGfm]}
+                              rehypePlugins={[rehypeKatex, [rehypeHighlight, { detect: true }]]}
+                              components={markdownComponents}
+                            >
+                              {part.text}
+                            </ReactMarkdown>
+                          </div>
+                        );
+                      } else if (part.type === "file" && part.objectName && part.mimeType && part.fileName) {
+                        if (part.mimeType.startsWith("image/")) {
+                          return (
+                            <div key={j} className="my-2">
+                              <ProtectedImage
+                                objectName={part.objectName}
+                                fileName={part.fileName}
+                                mimeType={part.mimeType}
+                                getAuthHeaders={getAuthHeaders}
+                              />
+                            </div>
+                          );
+                        } else {
+                          const fileUrl = `/api/files/${part.objectName}`;
+                          return (
+                            <div key={j} className="my-2">
+                              <a
+                                href={fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600 break-all"
+                              >
+                                {part.fileName} ({part.size ? `${(part.size / 1024).toFixed(1)} KB` : ""})
+                              </a>
+                            </div>
+                          );
+                        }
+                      }
+                      return null;
+                    })}
+                    {msg.role === "model" && msg.sources && msg.sources.length > 0 && (
+                      <div
+                        className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800 text-xs
+                          text-neutral-600"
                       >
-                        {part.fileName} ({part.size ? `${(part.size / 1024).toFixed(1)} KB` : ""})
-                      </a>
-                    </div>
-                  );
-                }
-              }
-              return null;
-            })}
-            {msg.role === "model" && msg.sources && msg.sources.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-neutral-200 text-xs text-neutral-600">
-                <p className="font-semibold mb-2">Sources:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  {msg.sources.map((source, k) => (
-                    <li key={k}>
-                      <a
-                        href={source.uri}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600
-                          break-all"
-                      >
-                        {source.title || source.uri}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+                        <p className="font-semibold mb-2">Sources:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                          {msg.sources.map((source, k) => (
+                            <li key={k}>
+                              <a
+                                href={source.uri}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600
+                                  break-all"
+                              >
+                                {source.title || source.uri}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
-        {isLoading && !streamStarted && (
-          <div className="p-3 rounded-lg max-w-xl bg-transparent self-start mr-auto">
-            <div className="w-6 h-6 border-3 border-neutral-300 border-t-neutral-500 rounded-full animate-spin" />
+
+              {!isBeingEdited && (
+                <div
+                  className="flex-shrink-0 flex items-center justify-center gap-1 opacity-0
+                    group-hover/message:opacity-100 transition-opacity duration-200 h-8 mt-1"
+                >
+                  <Tooltip text={copiedMessageId === msg.id ? "Copied!" : "Copy"}>
+                    <button
+                      onClick={() => handleCopyMessage(msg)}
+                      disabled={isLoading}
+                      className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
+                        hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      {copiedMessageId === msg.id ? (
+                        <CheckIcon className="size-4 text-green-500" />
+                      ) : (
+                        <ClipboardDocumentListIcon className="size-4" />
+                      )}
+                    </button>
+                  </Tooltip>
+                  {isUserMessage && (
+                    <Tooltip text="Edit">
+                      <button
+                        onClick={() => setEditingMessage({ index: i, content: textContent })}
+                        disabled={isLoading}
+                        className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
+                          hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        <PencilIcon className="size-4" />
+                      </button>
+                    </Tooltip>
+                  )}
+                  {!isUserMessage && i > 0 && (
+                    <Tooltip text="Regenerate">
+                      <button
+                        onClick={() => onRegenerate(i)}
+                        disabled={isLoading}
+                        className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
+                          hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        <ArrowPathIcon className="size-4" />
+                      </button>
+                    </Tooltip>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {isLoading && !streamStarted && !editingMessage && (
+          <div className="flex items-start">
+            <div className="p-3 rounded-lg max-w-xl bg-transparent self-start mr-auto">
+              <div className="w-6 h-6 border-3 border-neutral-300 border-t-neutral-500 rounded-full animate-spin" />
+            </div>
           </div>
         )}
       </div>

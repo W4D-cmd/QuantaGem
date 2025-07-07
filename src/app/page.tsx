@@ -35,6 +35,8 @@ export interface MessagePart {
 }
 
 export interface Message {
+  id: number;
+  position: number;
   role: "user" | "model";
   parts: MessagePart[];
   sources?: Array<{ title: string; uri: string }>;
@@ -109,7 +111,7 @@ async function generateAndSetChatTitle(
       return;
     }
     if (!patchRes.ok) {
-      const errorData = await patchRes.json();
+      const errorData = await res.json();
       throw new Error(errorData.error || `Failed to update chat title: ${patchRes.statusText}`);
     }
 
@@ -150,6 +152,8 @@ export default function Home() {
   const [totalTokens, setTotalTokens] = useState<number | null>(null);
   const [isCountingTokens, setIsCountingTokens] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<{ index: number; content: string } | null>(null);
+
   const dragCounter = useRef(0);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
@@ -295,6 +299,7 @@ export default function Home() {
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       if (isLoading || displayingProjectManagementId !== null) return;
+      if (editingMessage) return;
 
       const activeElement = document.activeElement as HTMLElement;
       if (activeElement) {
@@ -308,6 +313,11 @@ export default function Home() {
         return;
       }
 
+      if (event.key === "Escape" && editingMessage) {
+        setEditingMessage(null);
+        return;
+      }
+
       if (event.key.length === 1) {
         chatInputRef.current?.focusInput();
       }
@@ -317,7 +327,7 @@ export default function Home() {
     return () => {
       document.removeEventListener("keydown", handleGlobalKeyDown);
     };
-  }, [isLoading, displayingProjectManagementId]);
+  }, [isLoading, displayingProjectManagementId, editingMessage]);
 
   const handleAutoScrollChange = useCallback((isEnabled: boolean) => {
     setIsAutoScrollActive(isEnabled);
@@ -564,6 +574,7 @@ export default function Home() {
       setKeySelection("free");
       setCurrentChatProjectId(projectId);
       setTotalTokens(0);
+      setEditingMessage(null);
 
       if (projectId !== null) {
         const newTitle = `Chat ${allChats.filter((chat) => chat.projectId === projectId).length + 1}`;
@@ -711,7 +722,7 @@ export default function Home() {
         const errorData = await res.json();
         throw new Error(errorData.error || `Failed to rename project: ${res.statusText}`);
       }
-      await fetchAllProjects();
+      await fetchAllChats();
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
       setError(message);
@@ -761,6 +772,7 @@ export default function Home() {
   };
 
   useEffect(() => {
+    setEditingMessage(null);
     if (activeChatId === null && displayingProjectManagementId === null) {
       if (!isLoading) {
         setMessages([]);
@@ -837,6 +849,147 @@ export default function Home() {
     setIsLoading(false);
   };
 
+  const callChatApiAndStreamResponse = useCallback(
+    async (
+      userMessageParts: MessagePart[],
+      historyForAPI: Message[],
+      currentChatId: number,
+      isSearchEnabled: boolean,
+    ) => {
+      let modelMessageIndexForStream: number;
+      setMessages((prev) => {
+        const placeholderMessage: Message = {
+          role: "model",
+          parts: [{ type: "text", text: "" }],
+          sources: [],
+          id: Date.now(),
+          position: (prev[prev.length - 1]?.position || 0) + 2,
+        };
+        modelMessageIndexForStream = prev.length;
+        return [...prev, placeholderMessage];
+      });
+
+      chatAreaRef.current?.scrollToBottomAndEnableAutoscroll();
+      setIsLoading(true);
+      setStreamStarted(false);
+
+      const ctrl = new AbortController();
+      setController(ctrl);
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({
+            history: historyForAPI.map((msg) => ({ role: msg.role, parts: msg.parts })),
+            messageParts: userMessageParts,
+            chatSessionId: currentChatId,
+            model: selectedModel?.name,
+            keySelection,
+            isSearchActive: isSearchEnabled,
+          }),
+          signal: ctrl.signal,
+        });
+
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+
+        if (!res.ok || !res.body) {
+          let errorData = { error: `API request failed with status ${res.status}` };
+          if (res.body) {
+            try {
+              errorData = await res.json();
+            } catch {}
+          }
+          throw new Error(errorData.error || `API request failed with status ${res.status}`);
+        }
+
+        const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+        let isFirstChunk = true;
+        let textAccumulator = "";
+        let streamBuffer = "";
+        const currentSources: Array<{ title: string; uri: string }> = [];
+        let modelReturnedEmptyMessage = false;
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          if (isFirstChunk) {
+            setStreamStarted(true);
+            isFirstChunk = false;
+          }
+
+          streamBuffer += value;
+          const lines = streamBuffer.split("\n");
+          streamBuffer = lines.pop() || "";
+
+          if (lines.length === 0) continue;
+
+          setMessages((prev) => {
+            const updatedMessages = [...prev];
+            const messageToUpdate = updatedMessages[modelMessageIndexForStream];
+
+            if (!messageToUpdate) return prev;
+
+            for (const line of lines) {
+              if (line.trim() === "") continue;
+
+              try {
+                const parsedChunk = JSON.parse(line);
+                if (parsedChunk.type === "text") {
+                  textAccumulator += parsedChunk.value;
+                } else if (parsedChunk.type === "grounding") {
+                  if (parsedChunk.sources && Array.isArray(parsedChunk.sources)) {
+                    parsedChunk.sources.forEach((s: { title: string; uri: string }) => {
+                      const exists = currentSources.some((existing) => existing.uri === s.uri);
+                      if (!exists) {
+                        currentSources.push(s);
+                      }
+                    });
+                  }
+                } else if (parsedChunk.type === "error" && parsedChunk.value) {
+                  modelReturnedEmptyMessage = true;
+                  setError(parsedChunk.value);
+                }
+              } catch (jsonError) {
+                console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
+              }
+            }
+            messageToUpdate.parts = [{ type: "text", text: textAccumulator }];
+            messageToUpdate.sources = [...currentSources];
+            return updatedMessages;
+          });
+        }
+
+        if (modelReturnedEmptyMessage) {
+          setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
+        } else {
+          loadChat(currentChatId);
+        }
+      } catch (error: unknown) {
+        setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
+        const msg =
+          error instanceof DOMException && error.name === "AbortError"
+            ? "Response cancelled."
+            : error instanceof Error
+              ? error.message
+              : "An unexpected error occurred.";
+        setError(msg);
+      } finally {
+        setIsLoading(false);
+        setController(null);
+        fetchAllChats();
+      }
+    },
+    [getAuthHeaders, selectedModel, keySelection, router, loadChat, fetchAllChats],
+  );
+
   const handleSendMessage = async (inputText: string, uploadedFiles: UploadedFileInfo[], sendWithSearch: boolean) => {
     if (!inputText.trim() && uploadedFiles.length === 0) return;
     if (!selectedModel) {
@@ -879,35 +1032,16 @@ export default function Home() {
       });
     });
 
+    const historyForAPI = [...messages];
+
     const newUserMessage: Message = {
       role: "user",
       parts: newUserMessageParts,
+      id: Date.now(),
+      position: (historyForAPI[historyForAPI.length - 1]?.position || 0) + 1,
     };
 
-    let modelMessageIndexForStream: number;
-
-    setMessages((prev) => {
-      const newMessages = [...prev, newUserMessage];
-      const placeholderMessage: Message = {
-        role: "model",
-        parts: [{ type: "text", text: "" }],
-        sources: [],
-      };
-      modelMessageIndexForStream = newMessages.length;
-      return [...newMessages, placeholderMessage];
-    });
-    chatAreaRef.current?.scrollToBottomAndEnableAutoscroll();
-
-    setIsLoading(true);
-    setStreamStarted(false);
-
-    const historyForAPI = messages.map((msg) => ({
-      role: msg.role,
-      parts: msg.parts,
-    }));
-
-    const ctrl = new AbortController();
-    setController(ctrl);
+    setMessages((prev) => [...prev, newUserMessage]);
 
     if (isFirstMessageForChatSession && inputText.trim()) {
       await generateAndSetChatTitle(
@@ -921,125 +1055,82 @@ export default function Home() {
       );
     }
 
+    await callChatApiAndStreamResponse(newUserMessageParts, historyForAPI, sessionId, sendWithSearch);
+  };
+
+  const handleEditSave = async (index: number, newContent: string) => {
+    if (!activeChatId || !messages[index] || isLoading) return;
+
+    const messageToEdit = messages[index];
+    if (messageToEdit.role !== "user") return;
+
+    const originalContent = messageToEdit.parts.find((p) => p.type === "text")?.text || "";
+    if (originalContent.trim() === newContent.trim()) {
+      setEditingMessage(null);
+      return;
+    }
+
+    setIsLoading(true);
+    setEditingMessage(null);
+
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify({
-          history: historyForAPI,
-          messageParts: newUserMessageParts,
-          chatSessionId: sessionId,
-          model: selectedModel.name,
-          keySelection,
-          isSearchActive: sendWithSearch,
-        }),
-        signal: ctrl.signal,
+      const deleteRes = await fetch(`/api/chats/${activeChatId}/messages?fromPosition=${messageToEdit.position}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
       });
-
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
+      if (!deleteRes.ok) {
+        const errorData = await deleteRes.json();
+        throw new Error(errorData.error || "Failed to delete subsequent messages.");
       }
 
-      if (!res.ok || !res.body) {
-        let errorData = {
-          error: `API request failed with status ${res.status}`,
-        };
-        if (res.body) {
-          try {
-            errorData = await res.json();
-          } catch {}
-        }
-        throw new Error(errorData.error || `API request failed with status ${res.status}`);
-      }
+      const historyForAPI = messages.slice(0, index);
+      const newUserMessageParts: MessagePart[] = [{ type: "text", text: newContent }];
 
-      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-      let isFirstChunk = true;
-      let textAccumulator = "";
-      let streamBuffer = "";
-      const currentSources: Array<{ title: string; uri: string }> = [];
-      let modelReturnedEmptyMessage = false;
+      const updatedUserMessage: Message = {
+        ...messageToEdit,
+        parts: newUserMessageParts,
+      };
+      setMessages([...historyForAPI, updatedUserMessage]);
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        if (isFirstChunk) {
-          setStreamStarted(true);
-          isFirstChunk = false;
-        }
-
-        streamBuffer += value;
-        const lines = streamBuffer.split("\n");
-        streamBuffer = lines.pop() || "";
-
-        if (lines.length === 0) continue;
-
-        setMessages((prev) => {
-          const updatedMessages = [...prev];
-          const messageToUpdate = updatedMessages[modelMessageIndexForStream];
-
-          if (!messageToUpdate) {
-            console.error(
-              "Attempted to update undefined message at index:",
-              modelMessageIndexForStream,
-              "Current messages state:",
-              prev,
-            );
-            return prev;
-          }
-
-          for (const line of lines) {
-            if (line.trim() === "") continue;
-
-            try {
-              const parsedChunk = JSON.parse(line);
-              if (parsedChunk.type === "text") {
-                textAccumulator += parsedChunk.value;
-              } else if (parsedChunk.type === "grounding") {
-                if (parsedChunk.sources && Array.isArray(parsedChunk.sources)) {
-                  parsedChunk.sources.forEach((s: { title: string; uri: string }) => {
-                    const exists = currentSources.some((existing) => existing.uri === s.uri);
-                    if (!exists) {
-                      currentSources.push(s);
-                    }
-                  });
-                }
-              } else if (parsedChunk.type === "error" && parsedChunk.value) {
-                modelReturnedEmptyMessage = true;
-                setError(parsedChunk.value);
-              }
-            } catch (jsonError) {
-              console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
-            }
-          }
-
-          messageToUpdate.parts = [{ type: "text", text: textAccumulator }];
-          messageToUpdate.sources = [...currentSources];
-
-          return updatedMessages;
-        });
-      }
-
-      if (modelReturnedEmptyMessage) {
-        setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
-      }
-    } catch (error: unknown) {
-      setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
-      const msg =
-        error instanceof DOMException && error.name === "AbortError"
-          ? "Response cancelled."
-          : error instanceof Error
-            ? error.message
-            : "An unexpected error occurred.";
-      setError(msg);
+      await callChatApiAndStreamResponse(newUserMessageParts, historyForAPI, activeChatId, isSearchActive);
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err));
+      loadChat(activeChatId);
     } finally {
       setIsLoading(false);
-      setController(null);
-      await fetchAllChats();
+    }
+  };
+
+  const handleRegenerateResponse = async (modelMessageIndex: number) => {
+    if (!activeChatId || isLoading) return;
+    const userMessageIndex = modelMessageIndex - 1;
+    if (userMessageIndex < 0 || messages[userMessageIndex].role !== "user") return;
+
+    const userMessageToResend = messages[userMessageIndex];
+
+    setIsLoading(true);
+    try {
+      const deleteRes = await fetch(
+        `/api/chats/${activeChatId}/messages?fromPosition=${userMessageToResend.position}`,
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        },
+      );
+      if (!deleteRes.ok) {
+        const errorData = await deleteRes.json();
+        throw new Error(errorData.error || "Failed to delete message for regeneration.");
+      }
+
+      const historyForAPI = messages.slice(0, userMessageIndex);
+      setMessages(messages.slice(0, userMessageIndex + 1));
+
+      await callChatApiAndStreamResponse(userMessageToResend.parts, historyForAPI, activeChatId, isSearchActive);
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err));
+      loadChat(activeChatId);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1261,6 +1352,10 @@ export default function Home() {
               onAutoScrollChange={handleAutoScrollChange}
               getAuthHeaders={getAuthHeaders}
               activeChatId={activeChatId}
+              editingMessage={editingMessage}
+              setEditingMessage={setEditingMessage}
+              onEditSave={handleEditSave}
+              onRegenerate={handleRegenerateResponse}
             />
 
             <div className="flex-none p-4">

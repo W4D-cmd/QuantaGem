@@ -17,6 +17,7 @@ import {
   ArrowRightStartOnRectangleIcon,
   Cog6ToothIcon,
   EllipsisVerticalIcon,
+  PaperClipIcon,
 } from "@heroicons/react/24/outline";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import ProjectManagement from "@/components/ProjectManagement";
@@ -148,6 +149,8 @@ export default function Home() {
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
   const [totalTokens, setTotalTokens] = useState<number | null>(null);
   const [isCountingTokens, setIsCountingTokens] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const dragCounter = useRef(0);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -158,6 +161,48 @@ export default function Home() {
     const token = localStorage.getItem("__session");
     return token ? { Authorization: `Bearer ${token}` } : {};
   }, []);
+
+  const handleDragEnter = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    if (displayingProjectManagementId === null && e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDraggingOver(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    dragCounter.current = 0;
+
+    if (displayingProjectManagementId !== null) {
+      return;
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files && files.length > 0) {
+      if (chatInputRef.current) {
+        chatInputRef.current.processAndUploadFiles(files);
+      }
+      e.dataTransfer.clearData();
+    }
+  };
 
   const fetchTokenCount = useCallback(
     async (
@@ -1115,7 +1160,24 @@ export default function Home() {
         expandedProjects={expandedProjects}
         onToggleProjectExpansion={setExpandedProjects}
       />
-      <main className="flex-1 flex flex-col relative">
+      <main
+        className="flex-1 flex flex-col relative"
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isDraggingOver && (
+          <div
+            className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-2xl border-2
+              border-dashed border-blue-500 bg-blue-100/50 dark:bg-blue-900/50"
+          >
+            <div className="flex flex-col items-center gap-2 text-blue-600 dark:text-blue-300">
+              <PaperClipIcon className="size-8" />
+              <p className="font-semibold">Drop files to attach</p>
+            </div>
+          </div>
+        )}
         <div
           className="flex-none sticky min-h-16 top-0 z-10 px-4 py-2 border-b border-neutral-100 dark:border-neutral-950
             transition-colors duration-300 ease-in-out flex items-center justify-between"

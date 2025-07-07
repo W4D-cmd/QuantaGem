@@ -3,7 +3,7 @@
 import React, { useState, useEffect, ChangeEvent, useCallback, useRef } from "react";
 import Toast from "./Toast";
 import { ProjectFile } from "@/app/page";
-import { ArrowUpTrayIcon, XCircleIcon } from "@heroicons/react/24/outline";
+import { ArrowUpTrayIcon, DocumentArrowDownIcon, XCircleIcon } from "@heroicons/react/24/outline";
 
 interface ProjectManagementProps {
   projectId: number;
@@ -29,6 +29,8 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const dragCounter = useRef(0);
 
   const fetchProjectDetails = useCallback(async () => {
     setIsLoading(true);
@@ -96,11 +98,8 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
     }
   };
 
-  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0) return;
-
-    const filesToUpload = Array.from(event.target.files);
-    event.target.value = "";
+  const handleFileUploads = async (filesToUpload: File[]) => {
+    if (filesToUpload.length === 0) return;
 
     setUploadingFiles((prev) => [...prev, ...filesToUpload]);
 
@@ -117,8 +116,7 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
           const errorData = await response.json();
           throw new Error(errorData.error || `Upload failed for ${file.name}`);
         }
-        const result: ProjectFile = await response.json();
-        return result;
+        return (await response.json()) as ProjectFile;
       } catch (error) {
         console.error("Upload error:", error);
         onProjectFileAction(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : String(error)}`);
@@ -131,7 +129,17 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
 
     setProjectFiles((prev) => [...prev, ...successfulUploads]);
     setUploadingFiles((prev) => prev.filter((f) => !filesToUpload.includes(f)));
-    onProjectFileAction("Files uploaded successfully.");
+
+    if (successfulUploads.length > 0) {
+      onProjectFileAction("Files uploaded successfully.");
+    }
+  };
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0) return;
+    const files = Array.from(event.target.files);
+    event.target.value = "";
+    handleFileUploads(files);
   };
 
   const handleDeleteFile = async (fileId: number, fileName: string) => {
@@ -158,6 +166,42 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
     }
   };
 
+  const handleDragEnter = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDraggingOver(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    dragCounter.current = 0;
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files && files.length > 0) {
+      handleFileUploads(files);
+      e.dataTransfer.clearData();
+    }
+  };
+
   const hasSettingsChanged = projectSystemPrompt !== initialProjectSystemPrompt;
 
   if (isLoading) {
@@ -177,7 +221,24 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 max-w-[52rem] mx-auto">
+    <div
+      className="flex-1 overflow-y-auto p-4 max-w-[52rem] mx-auto relative"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingOver && (
+        <div
+          className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-2xl border-2
+            border-dashed border-green-500 bg-green-100/50 dark:bg-green-900/50"
+        >
+          <div className="flex flex-col items-center gap-2 text-green-600 dark:text-green-300">
+            <DocumentArrowDownIcon className="size-8" />
+            <p className="font-semibold">Drop files to upload to project</p>
+          </div>
+        </div>
+      )}
       {error && <Toast message={error} onClose={() => setError(null)} />}
 
       <h2 className="text-2xl font-bold mb-4 text-neutral-900 dark:text-white">Project Settings</h2>

@@ -48,6 +48,7 @@ interface ChatInputProps {
 
 export interface ChatInputHandle {
   focusInput: () => void;
+  processAndUploadFiles: (files: File[]) => Promise<void>;
 }
 
 const SOURCE_CODE_EXTENSIONS = new Set([
@@ -172,36 +173,6 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [isScanning, setIsScanning] = useState(false);
     const [scanStatusMessage, setScanStatusMessage] = useState<string | null>(null);
 
-    useImperativeHandle(ref, () => ({
-      focusInput: () => {
-        textareaRef.current?.focus();
-      },
-    }));
-
-    useEffect(() => {
-      if (activeProjectId !== null) {
-        const fetchProjectFiles = async () => {
-          try {
-            const res = await fetch(`/api/projects/${activeProjectId}/files`, {
-              headers: getAuthHeaders(),
-            });
-            if (!res.ok) {
-              const errorData = await res.json();
-              throw new Error(errorData.error || `Failed to fetch project files.`);
-            }
-            const files: ProjectFile[] = await res.json();
-            setProjectFiles(files);
-          } catch (err: unknown) {
-            onError(err instanceof Error ? err.message : String(err));
-            setProjectFiles([]);
-          }
-        };
-        fetchProjectFiles();
-      } else {
-        setProjectFiles([]);
-      }
-    }, [activeProjectId, getAuthHeaders, onError]);
-
     const processAndUploadFiles = async (filesToUpload: File[]) => {
       if (filesToUpload.length === 0) return;
 
@@ -240,6 +211,37 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       setSelectedFiles((prev) => [...prev, ...successfulUploads]);
       setUploadingFiles((prev) => prev.filter((f) => !filesToUpload.includes(f)));
     };
+
+    useImperativeHandle(ref, () => ({
+      focusInput: () => {
+        textareaRef.current?.focus();
+      },
+      processAndUploadFiles: processAndUploadFiles,
+    }));
+
+    useEffect(() => {
+      if (activeProjectId !== null) {
+        const fetchProjectFiles = async () => {
+          try {
+            const res = await fetch(`/api/projects/${activeProjectId}/files`, {
+              headers: getAuthHeaders(),
+            });
+            if (!res.ok) {
+              const errorData = await res.json();
+              throw new Error(errorData.error || `Failed to fetch project files.`);
+            }
+            const files: ProjectFile[] = await res.json();
+            setProjectFiles(files);
+          } catch (err: unknown) {
+            onError(err instanceof Error ? err.message : String(err));
+            setProjectFiles([]);
+          }
+        };
+        fetchProjectFiles();
+      } else {
+        setProjectFiles([]);
+      }
+    }, [activeProjectId, getAuthHeaders, onError]);
 
     const handleOpenSourceFolder = async () => {
       if (typeof window.showDirectoryPicker !== "function") {

@@ -167,13 +167,17 @@ export default function Sidebar({
                             id: "settings",
                             icon: <Cog6ToothIcon className="size-4" />,
                             label: "Settings",
-                            onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
+                            onClick: (e) => {
+                              e.stopPropagation();
+                              onOpenChatSettings(chat.id, chat.systemPrompt);
+                            },
                           },
                           {
                             id: "duplicate",
                             icon: <DocumentDuplicateIcon className="size-4" />,
                             label: "Duplicate",
-                            onClick: () => {
+                            onClick: (e) => {
+                              e.stopPropagation();
                               onDuplicateChat(chat.id);
                             },
                           },
@@ -181,7 +185,8 @@ export default function Sidebar({
                             id: "rename",
                             icon: <PencilIcon className="size-4" />,
                             label: "Rename",
-                            onClick: () => {
+                            onClick: (e) => {
+                              e.stopPropagation();
                               const newTitle = prompt("New title", chat.title);
                               if (newTitle) onRenameChat(chat.id, newTitle);
                             },
@@ -190,7 +195,8 @@ export default function Sidebar({
                             id: "delete",
                             icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
                             label: "Delete",
-                            onClick: () => {
+                            onClick: (e) => {
+                              e.stopPropagation();
                               if (confirm("Are you sure you want to delete this chat?")) onDeleteChat(chat.id);
                             },
                             className: "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
@@ -260,7 +266,8 @@ export default function Sidebar({
                               id: "rename",
                               icon: <PencilIcon className="size-4" />,
                               label: "Rename Project",
-                              onClick: () => {
+                              onClick: (e) => {
+                                e.stopPropagation();
                                 const newTitle = prompt("New project title", project.title);
                                 if (newTitle) onRenameProject(project.id, newTitle);
                               },
@@ -269,13 +276,19 @@ export default function Sidebar({
                               id: "new-chat",
                               icon: <PencilSquareIcon className="size-4" />,
                               label: "New Chat in Project",
-                              onClick: () => onNewChat(project.id),
+                              onClick: (e) => {
+                                e.stopPropagation();
+                                onNewChat(project.id);
+                              },
                             },
                             {
                               id: "delete",
                               icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
                               label: "Delete Project",
-                              onClick: () => onDeleteProject(project.id),
+                              onClick: (e) => {
+                                e.stopPropagation();
+                                onDeleteProject(project.id);
+                              },
                               className: "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
                             },
                           ]}
@@ -324,13 +337,17 @@ export default function Sidebar({
                                       id: "settings",
                                       icon: <Cog6ToothIcon className="size-4" />,
                                       label: "Settings",
-                                      onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
+                                      onClick: (e) => {
+                                        e.stopPropagation();
+                                        onOpenChatSettings(chat.id, chat.systemPrompt);
+                                      },
                                     },
                                     {
                                       id: "duplicate",
                                       icon: <PencilSquareIcon className="size-4" />,
                                       label: "Duplicate",
-                                      onClick: () => {
+                                      onClick: (e) => {
+                                        e.stopPropagation();
                                         onDuplicateChat(chat.id);
                                       },
                                     },
@@ -338,7 +355,8 @@ export default function Sidebar({
                                       id: "rename",
                                       icon: <PencilIcon className="size-4" />,
                                       label: "Rename",
-                                      onClick: () => {
+                                      onClick: (e) => {
+                                        e.stopPropagation();
                                         const newTitle = prompt("New title", chat.title);
                                         if (newTitle) onRenameChat(chat.id, newTitle);
                                       },
@@ -347,7 +365,8 @@ export default function Sidebar({
                                       id: "delete",
                                       icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
                                       label: "Delete",
-                                      onClick: () => {
+                                      onClick: (e) => {
+                                        e.stopPropagation();
                                         if (confirm("Are you sure you want to delete this chat?"))
                                           onDeleteChat(chat.id);
                                       },

@@ -36,6 +36,46 @@ interface SidebarProps {
   onToggleProjectExpansion: React.Dispatch<React.SetStateAction<Set<number>>>;
 }
 
+const groupChatsByDate = (chats: ChatListItem[]) => {
+  const groups: { [key: string]: ChatListItem[] } = {
+    Today: [],
+    Yesterday: [],
+    "Previous 7 Days": [],
+    "Previous 30 Days": [],
+    Older: [],
+  };
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const sevenDaysAgo = new Date(today);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  chats.forEach((chat) => {
+    const chatDate = new Date(chat.updatedAt);
+    const chatDay = new Date(chatDate.getFullYear(), chatDate.getMonth(), chatDate.getDate());
+
+    if (chatDay.getTime() === today.getTime()) {
+      groups.Today.push(chat);
+    } else if (chatDay.getTime() === yesterday.getTime()) {
+      groups.Yesterday.push(chat);
+    } else if (chatDate >= sevenDaysAgo) {
+      groups["Previous 7 Days"].push(chat);
+    } else if (chatDate >= thirtyDaysAgo) {
+      groups["Previous 30 Days"].push(chat);
+    } else {
+      groups.Older.push(chat);
+    }
+  });
+
+  return Object.entries(groups)
+    .map(([label, chats]) => ({ label, chats }))
+    .filter((group) => group.chats.length > 0);
+};
+
 export default function Sidebar({
   chats,
   projects,
@@ -73,8 +113,12 @@ export default function Sidebar({
   };
 
   const globalChats = chats.filter((chat) => chat.projectId === null);
+  const groupedGlobalChats = groupChatsByDate(globalChats);
+
   const getChatsForProject = (projectId: number) =>
-    chats.filter((chat) => chat.projectId === projectId).sort((a, b) => b.id - a.id);
+    chats
+      .filter((chat) => chat.projectId === projectId)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
   return (
     <div
@@ -124,11 +168,13 @@ export default function Sidebar({
       </div>
 
       <div className="flex-grow overflow-y-auto">
-        {globalChats.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2">Chats</h3>
+        {groupedGlobalChats.map((group) => (
+          <div key={group.label} className="mb-4">
+            <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2 pr-3">
+              {group.label}
+            </h3>
             <ul>
-              {globalChats.map((chat) => (
+              {group.chats.map((chat) => (
                 <li key={chat.id} className="mb-0.5 relative group">
                   <button
                     onClick={() => onSelectChat(chat.id)}
@@ -209,11 +255,13 @@ export default function Sidebar({
               ))}
             </ul>
           </div>
-        )}
+        ))}
 
         {projects.length > 0 && (
           <div className="mb-4">
-            <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2">Projects</h3>
+            <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2 pr-3">
+              Projects
+            </h3>
             <ul>
               {projects.map((project) => (
                 <li key={project.id} className="mb-0.5">

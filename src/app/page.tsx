@@ -49,6 +49,7 @@ export interface ChatListItem {
   systemPrompt: string;
   keySelection: "free" | "paid";
   projectId: number | null;
+  updatedAt: string;
 }
 
 export interface ProjectListItem {

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { ChatListItem, ProjectListItem } from "@/app/page";
 import DropdownMenu from "@/components/DropdownMenu";
 import Tooltip from "@/components/Tooltip";
@@ -76,6 +76,74 @@ const groupChatsByDate = (chats: ChatListItem[]) => {
     .filter((group) => group.chats.length > 0);
 };
 
+const EditableItem: React.FC<{
+  item: { id: number; title: string };
+  isActive: boolean;
+  isEditing: boolean;
+  onSelect: () => void;
+  onStartEdit: () => void;
+  onSaveEdit: (newTitle: string) => void;
+  onCancelEdit: () => void;
+  children: React.ReactNode;
+}> = ({ item, isActive, isEditing, onSelect, onSaveEdit, onCancelEdit, children }) => {
+  const [editText, setEditText] = useState(item.title);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing) {
+      setEditText(item.title);
+      setTimeout(() => inputRef.current?.select(), 0);
+    }
+  }, [isEditing, item.title]);
+
+  const handleSave = () => {
+    if (editText.trim() && editText.trim() !== item.title) {
+      onSaveEdit(editText.trim());
+    }
+    onCancelEdit();
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      onCancelEdit();
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="p-2 w-full">
+        <input
+          ref={inputRef}
+          type="text"
+          value={editText}
+          onChange={(e) => setEditText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleSave}
+          className="w-full text-sm p-1 rounded-md bg-white dark:bg-neutral-950 border-2 border-blue-500 focus:outline-none"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={onSelect}
+      className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none text-neutral-900
+        dark:text-white transition-colors duration-300 ease-in-out flex items-center justify-between ${
+          isActive
+            ? "font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700 hover:dark:bg-neutral-700"
+            : "hover:bg-neutral-200 dark:hover:bg-neutral-800"
+        }`}
+    >
+      {children}
+    </button>
+  );
+};
+
 export default function Sidebar({
   chats,
   projects,
@@ -96,8 +164,8 @@ export default function Sidebar({
   expandedProjects,
   onToggleProjectExpansion,
 }: SidebarProps) {
-  const [openMenuChatId, setOpenMenuChatId] = useState<number | null>(null);
-  const [openMenuProjectId, setOpenMenuProjectId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<{ type: "chat" | "project"; id: number } | null>(null);
   const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const toggleProjectExpansion = (projectId: number) => {
@@ -119,6 +187,24 @@ export default function Sidebar({
     chats
       .filter((chat) => chat.projectId === projectId)
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+  const handleStartEdit = (type: "chat" | "project", id: number) => {
+    setEditingItem({ type, id });
+    setOpenMenuId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingItem(null);
+  };
+
+  const handleSaveEdit = (type: "chat" | "project", id: number, newTitle: string) => {
+    if (type === "chat") {
+      onRenameChat(id, newTitle);
+    } else {
+      onRenameProject(id, newTitle);
+    }
+    handleCancelEdit();
+  };
 
   return (
     <div
@@ -176,27 +262,24 @@ export default function Sidebar({
             <ul>
               {group.chats.map((chat) => (
                 <li key={chat.id} className="mb-0.5 relative group">
-                  <button
-                    onClick={() => onSelectChat(chat.id)}
-                    className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none
-                    text-neutral-900 dark:text-white transition-colors duration-300 ease-in-out flex items-center
-                    justify-between ${
-                      chat.id === activeChatId
-                        ? `font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700
-                          hover:dark:bg-neutral-700`
-                        : "hover:bg-neutral-200 dark:hover:bg-neutral-800"
-                    }`}
+                  <EditableItem
+                    item={chat}
+                    isActive={chat.id === activeChatId}
+                    isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
+                    onSelect={() => onSelectChat(chat.id)}
+                    onStartEdit={() => handleStartEdit("chat", chat.id)}
+                    onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
+                    onCancelEdit={handleCancelEdit}
                   >
                     <span className="truncate">{chat.title}</span>
                     <div className="relative inline-block opacity-0 group-hover:opacity-100 duration-150">
                       <button
-                        ref={(el: HTMLButtonElement | null) => {
+                        ref={(el) => {
                           menuButtonRefs.current[`chat-${chat.id}`] = el;
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setOpenMenuChatId(openMenuChatId === chat.id ? null : chat.id);
-                          setOpenMenuProjectId(null);
+                          setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
                         }}
                         className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
                       >
@@ -204,53 +287,40 @@ export default function Sidebar({
                       </button>
 
                       <DropdownMenu
-                        open={openMenuChatId === chat.id}
+                        open={openMenuId === `chat-${chat.id}`}
                         anchorRef={{ current: menuButtonRefs.current[`chat-${chat.id}`] }}
-                        onCloseAction={() => setOpenMenuChatId(null)}
+                        onCloseAction={() => setOpenMenuId(null)}
                         position="left"
                         items={[
                           {
-                            id: "settings",
-                            icon: <Cog6ToothIcon className="size-4" />,
-                            label: "Settings",
-                            onClick: (e) => {
-                              e.stopPropagation();
-                              onOpenChatSettings(chat.id, chat.systemPrompt);
-                            },
+                            id: "rename",
+                            icon: <PencilIcon className="size-4" />,
+                            label: "Rename",
+                            onClick: () => handleStartEdit("chat", chat.id),
                           },
                           {
                             id: "duplicate",
                             icon: <DocumentDuplicateIcon className="size-4" />,
                             label: "Duplicate",
-                            onClick: (e) => {
-                              e.stopPropagation();
-                              onDuplicateChat(chat.id);
-                            },
+                            onClick: () => onDuplicateChat(chat.id),
                           },
                           {
-                            id: "rename",
-                            icon: <PencilIcon className="size-4" />,
-                            label: "Rename",
-                            onClick: (e) => {
-                              e.stopPropagation();
-                              const newTitle = prompt("New title", chat.title);
-                              if (newTitle) onRenameChat(chat.id, newTitle);
-                            },
+                            id: "settings",
+                            icon: <Cog6ToothIcon className="size-4" />,
+                            label: "Settings",
+                            onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
                           },
                           {
                             id: "delete",
                             icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
                             label: "Delete",
-                            onClick: (e) => {
-                              e.stopPropagation();
-                              if (confirm("Are you sure you want to delete this chat?")) onDeleteChat(chat.id);
-                            },
+                            onClick: () => onDeleteChat(chat.id),
                             className: "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
                           },
                         ]}
                       />
                     </div>
-                  </button>
+                  </EditableItem>
                 </li>
               ))}
             </ul>
@@ -276,155 +346,125 @@ export default function Sidebar({
                         <ChevronRightIcon className="size-4 stroke-2" />
                       )}
                     </button>
-                    <button
-                      onClick={() => onSelectProject(project.id)}
-                      className={`cursor-pointer flex-1 text-sm text-left p-2 rounded-lg focus:outline-none
-                      text-neutral-900 dark:text-white + transition-colors duration-300 ease-in-out flex items-center
-                      justify-between ${
-                        project.id === activeProjectId
-                          ? `font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700
-                            hover:dark:bg-neutral-700`
-                          : "hover:bg-neutral-200 dark:hover:bg-neutral-800"
-                      }`}
+                    <EditableItem
+                      item={project}
+                      isActive={project.id === activeProjectId}
+                      isEditing={editingItem?.type === "project" && editingItem.id === project.id}
+                      onSelect={() => onSelectProject(project.id)}
+                      onStartEdit={() => handleStartEdit("project", project.id)}
+                      onSaveEdit={(newTitle) => handleSaveEdit("project", project.id, newTitle)}
+                      onCancelEdit={handleCancelEdit}
                     >
                       <span className="truncate flex items-center gap-2">
                         <FolderOpenIcon className="size-5" /> {project.title}
                       </span>
                       <div className="relative inline-block opacity-0 group-hover:opacity-100 duration-150">
                         <button
-                          ref={(el: HTMLButtonElement | null) => {
+                          ref={(el) => {
                             menuButtonRefs.current[`project-${project.id}`] = el;
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setOpenMenuProjectId(openMenuProjectId === project.id ? null : project.id);
-                            setOpenMenuChatId(null);
+                            setOpenMenuId(openMenuId === `project-${project.id}` ? null : `project-${project.id}`);
                           }}
                           className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
                         >
                           <EllipsisHorizontalIcon className="size-5" />
                         </button>
                         <DropdownMenu
-                          open={openMenuProjectId === project.id}
+                          open={openMenuId === `project-${project.id}`}
                           anchorRef={{ current: menuButtonRefs.current[`project-${project.id}`] }}
-                          onCloseAction={() => setOpenMenuProjectId(null)}
+                          onCloseAction={() => setOpenMenuId(null)}
                           position="left"
                           items={[
                             {
                               id: "rename",
                               icon: <PencilIcon className="size-4" />,
                               label: "Rename Project",
-                              onClick: (e) => {
-                                e.stopPropagation();
-                                const newTitle = prompt("New project title", project.title);
-                                if (newTitle) onRenameProject(project.id, newTitle);
-                              },
+                              onClick: () => handleStartEdit("project", project.id),
                             },
                             {
                               id: "new-chat",
                               icon: <PencilSquareIcon className="size-4" />,
                               label: "New Chat in Project",
-                              onClick: (e) => {
-                                e.stopPropagation();
-                                onNewChat(project.id);
-                              },
+                              onClick: () => onNewChat(project.id),
                             },
                             {
                               id: "delete",
                               icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
                               label: "Delete Project",
-                              onClick: (e) => {
-                                e.stopPropagation();
-                                onDeleteProject(project.id);
-                              },
+                              onClick: () => onDeleteProject(project.id),
                               className: "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
                             },
                           ]}
                         />
                       </div>
-                    </button>
+                    </EditableItem>
                   </div>
                   {expandedProjects.has(project.id) && (
                     <ul className="ms-6 border-l border-neutral-300 dark:border-neutral-700 mt-1 ps-2">
                       {getChatsForProject(project.id).length > 0 ? (
                         getChatsForProject(project.id).map((chat) => (
                           <li key={chat.id} className="mb-0.5 relative group">
-                            <button
-                              onClick={() => onSelectChat(chat.id)}
-                              className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none
-                                text-neutral-900 dark:text-white + transition-colors duration-300 ease-in-out flex
-                                items-center justify-between ${
-                                  chat.id === activeChatId
-                                    ? `font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700
-                                      hover:dark:bg-neutral-700`
-                                    : "hover:bg-neutral-200 dark:hover:bg-neutral-800"
-                                }`}
+                            <EditableItem
+                              item={chat}
+                              isActive={chat.id === activeChatId}
+                              isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
+                              onSelect={() => onSelectChat(chat.id)}
+                              onStartEdit={() => handleStartEdit("chat", chat.id)}
+                              onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
+                              onCancelEdit={handleCancelEdit}
                             >
                               <span className="truncate">{chat.title}</span>
                               <div className="relative inline-block opacity-0 group-hover:opacity-100 duration-150">
                                 <button
-                                  ref={(el: HTMLButtonElement | null) => {
+                                  ref={(el) => {
                                     menuButtonRefs.current[`chat-${chat.id}`] = el;
                                   }}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setOpenMenuChatId(openMenuChatId === chat.id ? null : chat.id);
-                                    setOpenMenuProjectId(null);
+                                    setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
                                   }}
                                   className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
                                 >
                                   <EllipsisHorizontalIcon className="size-5" />
                                 </button>
                                 <DropdownMenu
-                                  open={openMenuChatId === chat.id}
+                                  open={openMenuId === `chat-${chat.id}`}
                                   anchorRef={{ current: menuButtonRefs.current[`chat-${chat.id}`] }}
-                                  onCloseAction={() => setOpenMenuChatId(null)}
+                                  onCloseAction={() => setOpenMenuId(null)}
                                   position="left"
                                   items={[
-                                    {
-                                      id: "settings",
-                                      icon: <Cog6ToothIcon className="size-4" />,
-                                      label: "Settings",
-                                      onClick: (e) => {
-                                        e.stopPropagation();
-                                        onOpenChatSettings(chat.id, chat.systemPrompt);
-                                      },
-                                    },
-                                    {
-                                      id: "duplicate",
-                                      icon: <PencilSquareIcon className="size-4" />,
-                                      label: "Duplicate",
-                                      onClick: (e) => {
-                                        e.stopPropagation();
-                                        onDuplicateChat(chat.id);
-                                      },
-                                    },
                                     {
                                       id: "rename",
                                       icon: <PencilIcon className="size-4" />,
                                       label: "Rename",
-                                      onClick: (e) => {
-                                        e.stopPropagation();
-                                        const newTitle = prompt("New title", chat.title);
-                                        if (newTitle) onRenameChat(chat.id, newTitle);
-                                      },
+                                      onClick: () => handleStartEdit("chat", chat.id),
+                                    },
+                                    {
+                                      id: "duplicate",
+                                      icon: <DocumentDuplicateIcon className="size-4" />,
+                                      label: "Duplicate",
+                                      onClick: () => onDuplicateChat(chat.id),
+                                    },
+                                    {
+                                      id: "settings",
+                                      icon: <Cog6ToothIcon className="size-4" />,
+                                      label: "Settings",
+                                      onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
                                     },
                                     {
                                       id: "delete",
                                       icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
                                       label: "Delete",
-                                      onClick: (e) => {
-                                        e.stopPropagation();
-                                        if (confirm("Are you sure you want to delete this chat?"))
-                                          onDeleteChat(chat.id);
-                                      },
+                                      onClick: () => onDeleteChat(chat.id),
                                       className:
                                         "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
                                     },
                                   ]}
                                 />
                               </div>
-                            </button>
+                            </EditableItem>
                           </li>
                         ))
                       ) : (

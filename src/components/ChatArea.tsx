@@ -20,6 +20,7 @@ import rehypeKatex from "rehype-katex";
 import { Message } from "@/app/page";
 import { ClipboardDocumentListIcon, CheckIcon, PencilIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import Tooltip from "@/components/Tooltip";
+import MessageSkeleton from "./MessageSkeleton";
 
 type GetAuthHeaders = () => HeadersInit;
 
@@ -634,13 +635,7 @@ function ChatAreaComponent(
             </div>
           );
         })}
-        {isLoading && !streamStarted && !editingMessage && (
-          <div className="flex items-start">
-            <div className="p-3 rounded-lg max-w-xl bg-transparent self-start mr-auto">
-              <div className="w-6 h-6 border-3 border-neutral-300 border-t-neutral-500 rounded-full animate-spin" />
-            </div>
-          </div>
-        )}
+        {isLoading && !streamStarted && !editingMessage && <MessageSkeleton />}
       </div>
     </div>
   );

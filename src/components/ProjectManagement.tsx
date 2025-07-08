@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, ChangeEvent, useCallback, useRef } from "react";
-import Toast from "./Toast";
+import { ToastProps } from "./Toast";
 import { ProjectFile } from "@/app/page";
 import { ArrowUpTrayIcon, DocumentArrowDownIcon, XCircleIcon } from "@heroicons/react/24/outline";
 
@@ -9,7 +9,10 @@ interface ProjectManagementProps {
   projectId: number;
   getAuthHeaders: () => HeadersInit;
   onProjectUpdated: () => void;
-  onProjectFileAction: (message: string) => void;
+  showToast: (message: string, type?: ToastProps["type"]) => void;
+  openConfirmationModal: React.Dispatch<
+    React.SetStateAction<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>
+  >;
   onProjectSystemPromptUpdated: () => void;
 }
 
@@ -17,7 +20,8 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
   projectId,
   getAuthHeaders,
   onProjectUpdated,
-  onProjectFileAction,
+  showToast,
+  openConfirmationModal,
   onProjectSystemPromptUpdated,
 }) => {
   const [projectTitle, setProjectTitle] = useState("");
@@ -26,15 +30,13 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<{ file: File; id: string; progress: number }[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const dragCounter = useRef(0);
 
   const fetchProjectDetails = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         headers: getAuthHeaders(),
@@ -49,11 +51,11 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
       setInitialProjectSystemPrompt(data.systemPrompt || "");
       setProjectFiles(data.files || []);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      showToast(err instanceof Error ? err.message : String(err), "error");
     } finally {
       setIsLoading(false);
     }
-  }, [projectId, getAuthHeaders]);
+  }, [projectId, getAuthHeaders, showToast]);
 
   useEffect(() => {
     if (projectId) {
@@ -61,17 +63,12 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
     }
   }, [projectId, fetchProjectDetails]);
 
-  const handleTitleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setProjectTitle(e.target.value);
-  };
-
   const handleSystemPromptChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setProjectSystemPrompt(e.target.value);
   };
 
   const handleSaveProjectSettings = async () => {
     setIsSaving(true);
-    setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
@@ -80,7 +77,6 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
           ...getAuthHeaders(),
         },
         body: JSON.stringify({
-          title: projectTitle,
           systemPrompt: projectSystemPrompt,
         }),
       });
@@ -91,47 +87,76 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
       setInitialProjectSystemPrompt(projectSystemPrompt);
       onProjectUpdated();
       onProjectSystemPromptUpdated();
+      showToast("Project settings saved successfully.", "success");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      showToast(err instanceof Error ? err.message : String(err), "error");
     } finally {
       setIsSaving(false);
     }
   };
 
+  const uploadFileWithProgress = (uploadingFile: { file: File; id: string; progress: number }) => {
+    return new Promise<ProjectFile | null>((resolve) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append("file", uploadingFile.file);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          setUploadingFiles((prevFiles) =>
+            prevFiles.map((f) => (f.id === uploadingFile.id ? { ...f, progress: percentComplete } : f)),
+          );
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch (e) {
+            console.log(e);
+            resolve(null);
+          }
+        } else {
+          resolve(null);
+        }
+      };
+      xhr.onerror = () => resolve(null);
+      xhr.ontimeout = () => resolve(null);
+
+      xhr.open("POST", `/api/projects/${projectId}/files`, true);
+      const headers = getAuthHeaders();
+      for (const key in headers) {
+        if (Object.prototype.hasOwnProperty.call(headers, key)) {
+          xhr.setRequestHeader(key, (headers as Record<string, string>)[key]);
+        }
+      }
+      xhr.send(formData);
+    });
+  };
+
   const handleFileUploads = async (filesToUpload: File[]) => {
     if (filesToUpload.length === 0) return;
 
-    setUploadingFiles((prev) => [...prev, ...filesToUpload]);
+    const newUploadingFiles = filesToUpload.map((file) => ({
+      file,
+      id: `${file.name}-${file.lastModified}-${Math.random()}`,
+      progress: 0,
+    }));
+    setUploadingFiles((prev) => [...prev, ...newUploadingFiles]);
 
-    const uploadPromises = filesToUpload.map(async (file) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      try {
-        const response = await fetch(`/api/projects/${projectId}/files`, {
-          method: "POST",
-          body: formData,
-          headers: getAuthHeaders(),
-        });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Upload failed for ${file.name}`);
-        }
-        return (await response.json()) as ProjectFile;
-      } catch (error) {
-        console.error("Upload error:", error);
-        onProjectFileAction(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : String(error)}`);
-        return null;
-      }
-    });
-
-    const results = await Promise.all(uploadPromises);
+    const results = await Promise.all(newUploadingFiles.map(uploadFileWithProgress));
     const successfulUploads = results.filter((result): result is ProjectFile => result !== null);
 
     setProjectFiles((prev) => [...prev, ...successfulUploads]);
-    setUploadingFiles((prev) => prev.filter((f) => !filesToUpload.includes(f)));
+    setUploadingFiles((prev) => prev.filter((uf) => !newUploadingFiles.some((nuf) => nuf.id === uf.id)));
 
     if (successfulUploads.length > 0) {
-      onProjectFileAction("Files uploaded successfully.");
+      showToast(`${successfulUploads.length} file(s) uploaded successfully.`, "success");
+    }
+    if (results.length > successfulUploads.length) {
+      showToast(`${results.length - successfulUploads.length} file(s) failed to upload.`, "error");
     }
   };
 
@@ -142,12 +167,17 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
     handleFileUploads(files);
   };
 
+  const confirmDeleteFile = (fileId: number, fileName: string) => {
+    openConfirmationModal({
+      isOpen: true,
+      title: "Delete File",
+      message: `Are you sure you want to delete "${fileName}"? This action cannot be undone.`,
+      onConfirm: () => handleDeleteFile(fileId, fileName),
+    });
+  };
+
   const handleDeleteFile = async (fileId: number, fileName: string) => {
-    if (!confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
-      return;
-    }
     setIsSaving(true);
-    setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/files/${fileId}`, {
         method: "DELETE",
@@ -158,9 +188,9 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
         throw new Error(errorData.error || `Failed to delete file: ${res.statusText}`);
       }
       setProjectFiles((prev) => prev.filter((file) => file.id !== fileId));
-      onProjectFileAction(`File "${fileName}" deleted successfully.`);
+      showToast(`File "${fileName}" deleted successfully.`, "success");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      showToast(err instanceof Error ? err.message : String(err), "error");
     } finally {
       setIsSaving(false);
     }
@@ -212,10 +242,10 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
     );
   }
 
-  if (error && !projectTitle) {
+  if (!projectTitle) {
     return (
       <div className="flex-1 flex items-center justify-center text-red-500 dark:text-red-400 text-center p-4">
-        Error loading project: {error}. Please try again later.
+        Error loading project. Please try again later.
       </div>
     );
   }
@@ -239,40 +269,16 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
           </div>
         </div>
       )}
-      {error && <Toast message={error} onClose={() => setError(null)} />}
 
-      <h2 className="text-2xl font-bold mb-4 text-neutral-900 dark:text-white">Project Settings</h2>
+      <h2 className="text-2xl font-bold mb-4 text-neutral-900 dark:text-white">{projectTitle}</h2>
 
       <div
         className="bg-white dark:bg-neutral-900 p-6 rounded-2xl shadow-lg border border-neutral-200
           dark:border-neutral-800 mb-6"
       >
-        <h3 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-white">Project Information</h3>
+        <h3 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-white">Project System Prompt</h3>
+
         <div className="mb-4">
-          <label
-            htmlFor="project-title"
-            className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1"
-          >
-            Project Title
-          </label>
-          <input
-            id="project-title"
-            type="text"
-            value={projectTitle}
-            onChange={handleTitleChange}
-            className="w-full p-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-neutral-50
-              dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-2
-              focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out"
-            disabled={isSaving}
-          />
-        </div>
-        <div className="mb-4">
-          <label
-            htmlFor="project-system-prompt"
-            className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1"
-          >
-            Project System Prompt
-          </label>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">
             Define the default behavior and persona for the AI in chats within this project. This will override the
             global system prompt. Individual chats can further override this.
@@ -296,7 +302,7 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
             className="cursor-pointer px-6 py-2 rounded-full bg-black text-white text-sm font-medium
               hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {isSaving ? "Saving..." : "Save Settings"}
+            {isSaving ? "Saving..." : "Save Prompt"}
           </button>
         </div>
       </div>
@@ -323,7 +329,7 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
                   {file.fileName} ({`${(file.size / 1024).toFixed(1)} KB`})
                 </span>
                 <button
-                  onClick={() => handleDeleteFile(file.id, file.fileName)}
+                  onClick={() => confirmDeleteFile(file.id, file.fileName)}
                   disabled={isSaving}
                   className="p-1 rounded-full text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50
                     disabled:opacity-50 disabled:cursor-not-allowed"
@@ -342,9 +348,17 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
               text-blue-700 dark:text-blue-200"
           >
             <p className="font-semibold text-sm mb-1">Uploading...</p>
-            <ul className="list-disc list-inside text-xs">
-              {uploadingFiles.map((f, index) => (
-                <li key={f.name + index}>{f.name}</li>
+            <ul className="space-y-1 text-xs">
+              {uploadingFiles.map((upload) => (
+                <li key={upload.id} className="relative overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/50">
+                  <div
+                    className="absolute top-0 left-0 h-full bg-blue-200 dark:bg-blue-800 transition-all duration-150"
+                    style={{ width: `${upload.progress}%` }}
+                  ></div>
+                  <div className="relative z-10 flex items-center gap-2 px-3 py-1.5">
+                    <span className="truncate">{upload.file.name}</span>
+                  </div>
+                </li>
               ))}
             </ul>
           </div>
@@ -361,7 +375,7 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={isSaving}
+            disabled={isSaving || uploadingFiles.length > 0}
             className="cursor-pointer px-6 py-2 rounded-full bg-blue-600 dark:bg-blue-600 text-white text-sm font-medium
               hover:bg-blue-700 dark:hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors
               flex items-center gap-2"

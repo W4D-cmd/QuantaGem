@@ -8,7 +8,7 @@ import ModelSelector from "@/components/ModelSelector";
 import ToggleApiKeyButton from "@/components/ToggleApiKeyButton";
 import { Model } from "@google/genai";
 import Tooltip from "@/components/Tooltip";
-import Toast from "@/components/Toast";
+import Toast, { ToastProps } from "@/components/Toast";
 import DropdownMenu, { DropdownItem } from "@/components/DropdownMenu";
 import SettingsModal from "@/components/SettingsModal";
 import { useRouter } from "next/navigation";
@@ -22,6 +22,7 @@ import {
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import ProjectManagement from "@/components/ProjectManagement";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import ConfirmationModal from "@/components/ConfirmationModal";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
 
@@ -68,13 +69,20 @@ export interface ProjectFile {
   size: number;
 }
 
+interface ConfirmationModalState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+}
+
 async function generateAndSetChatTitle(
   chatSessionId: number,
   userMessageContent: string,
   keySelection: "free" | "paid",
   getAuthHeaders: () => HeadersInit,
   router: AppRouterInstance,
-  setError: (msg: string | null) => void,
+  showToast: (message: string, type?: ToastProps["type"]) => void,
   fetchAllChats: () => Promise<void>,
 ) {
   try {
@@ -118,7 +126,7 @@ async function generateAndSetChatTitle(
 
     await fetchAllChats();
   } catch (err: unknown) {
-    setError(extractErrorMessage(err));
+    showToast(extractErrorMessage(err), "error");
   }
 }
 
@@ -137,7 +145,7 @@ export default function Home() {
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
   const [keySelection, setKeySelection] = useState<"free" | "paid">("free");
-  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<Omit<ToastProps, "onClose"> | null>(null);
   const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [editingChatId, setEditingChatId] = useState<number | null>(null);
@@ -154,6 +162,12 @@ export default function Home() {
   const [isCountingTokens, setIsCountingTokens] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [editingMessage, setEditingMessage] = useState<{ index: number; content: string } | null>(null);
+  const [confirmationModal, setConfirmationModal] = useState<ConfirmationModalState>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   const dragCounter = useRef(0);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -161,6 +175,10 @@ export default function Home() {
   const chatInputRef = useRef<ChatInputHandle>(null);
   const prevActiveChatIdRef = useRef<number | null>(null);
   const prevDisplayingProjectManagementIdRef = useRef<number | null>(null);
+
+  const showToast = useCallback((message: string, type: ToastProps["type"] = "error") => {
+    setToast({ message, type });
+  }, []);
 
   const getAuthHeaders = useCallback((): HeadersInit => {
     const token = localStorage.getItem("__session");
@@ -272,9 +290,9 @@ export default function Home() {
       const list: ProjectListItem[] = await res.json();
       setAllProjects(list);
     } catch (err: unknown) {
-      setError(extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
     }
-  }, [getAuthHeaders, router]);
+  }, [getAuthHeaders, router, showToast]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -290,12 +308,12 @@ export default function Home() {
         const data = await res.json();
         setUserEmail(data.email);
       } catch (err: unknown) {
-        setError(extractErrorMessage(err));
+        showToast(extractErrorMessage(err), "error");
         router.replace("/login");
       }
     };
     fetchUser();
-  }, [router, getAuthHeaders]);
+  }, [router, getAuthHeaders, showToast]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
@@ -345,9 +363,9 @@ export default function Home() {
       const list: ChatListItem[] = await res.json();
       setAllChats(list);
     } catch (err: unknown) {
-      setError(extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
     }
-  }, [getAuthHeaders, router]);
+  }, [getAuthHeaders, router, showToast]);
 
   useEffect(() => {
     if (userEmail) {
@@ -373,7 +391,7 @@ export default function Home() {
           ...getAuthHeaders(),
         },
         body: JSON.stringify({ lastModel: modelName }),
-      }).catch((err) => setError(extractErrorMessage(err)));
+      }).catch((err) => showToast(extractErrorMessage(err), "error"));
     }
   };
 
@@ -394,11 +412,11 @@ export default function Home() {
           body: JSON.stringify({ keySelection: newSelection }),
         })
           .then(() => fetchAllChats())
-          .catch((err) => setError(extractErrorMessage(err)));
+          .catch((err) => showToast(extractErrorMessage(err), "error"));
       }
       return newSelection;
     });
-  }, [activeChatId, fetchAllChats, getAuthHeaders]);
+  }, [activeChatId, fetchAllChats, getAuthHeaders, showToast]);
 
   useEffect(() => {
     if (!userEmail) return;
@@ -436,14 +454,14 @@ export default function Home() {
         });
       })
       .catch((err) => {
-        setError(extractErrorMessage(err));
+        showToast(extractErrorMessage(err), "error");
         if (err.message.includes("Unauthorized")) {
         } else {
           setModels([]);
           setSelectedModel(null);
         }
       });
-  }, [keySelection, getAuthHeaders, router, userEmail]);
+  }, [keySelection, getAuthHeaders, router, userEmail, showToast]);
 
   const handleRenameChat = async (chatId: number, newTitle: string) => {
     try {
@@ -464,12 +482,22 @@ export default function Home() {
         throw new Error(errorData.error || `Failed to rename chat: ${res.statusText}`);
       }
       await fetchAllChats();
+      showToast("Chat renamed.", "success");
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
-      setError(message);
+      showToast(message, "error");
       return;
     }
     setAllChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, title: newTitle } : c)));
+  };
+
+  const confirmDeleteChat = (chatId: number) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: "Delete Chat",
+      message: "Are you sure you want to delete this chat? This action cannot be undone.",
+      onConfirm: () => handleDeleteChat(chatId),
+    });
   };
 
   const handleDeleteChat = async (chatId: number) => {
@@ -488,7 +516,7 @@ export default function Home() {
       }
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
-      setError(message);
+      showToast(message, "error");
       return;
     }
 
@@ -500,6 +528,7 @@ export default function Home() {
       setKeySelection("free");
       setTotalTokens(null);
     }
+    showToast("Chat deleted.", "success");
   };
 
   const handleDuplicateChat = useCallback(
@@ -525,11 +554,12 @@ export default function Home() {
         await fetchAllChats();
         setActiveChatId(newChat.id);
         setDisplayingProjectManagementId(null);
+        showToast("Chat duplicated successfully.", "success");
       } catch (err: unknown) {
-        setError(extractErrorMessage(err));
+        showToast(extractErrorMessage(err), "error");
       }
     },
-    [getAuthHeaders, router, fetchAllChats, setActiveChatId, setDisplayingProjectManagementId],
+    [getAuthHeaders, router, fetchAllChats, setActiveChatId, setDisplayingProjectManagementId, showToast],
   );
 
   const createChat = useCallback(
@@ -561,11 +591,11 @@ export default function Home() {
         setIsNewChatJustCreated(true);
         return newChat.id;
       } catch (err) {
-        setError(extractErrorMessage(err));
+        showToast(extractErrorMessage(err), "error");
         return null;
       }
     },
-    [getAuthHeaders, router, setAllChats, setActiveChatId, setError, setIsNewChatJustCreated],
+    [getAuthHeaders, router, setAllChats, setActiveChatId, showToast, setIsNewChatJustCreated],
   );
 
   const handleNewChat = useCallback(
@@ -638,7 +668,7 @@ export default function Home() {
         setCurrentChatProjectId(data.projectId);
       } catch (err: unknown) {
         const message = extractErrorMessage(err);
-        setError(message);
+        showToast(message, "error");
       } finally {
         setIsLoading(false);
       }
@@ -651,6 +681,7 @@ export default function Home() {
       setEditingPromptInitialValue,
       setKeySelection,
       setCurrentChatProjectId,
+      showToast,
     ],
   );
 
@@ -698,12 +729,13 @@ export default function Home() {
       setAllProjects((prev) => [newProject, ...prev]);
       setDisplayingProjectManagementId(newProject.id);
       setCurrentChatProjectId(null);
+      showToast("New project created.", "success");
     } catch (err) {
-      setError(extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
     } finally {
       setIsLoading(false);
     }
-  }, [allProjects, getAuthHeaders, router]);
+  }, [allProjects, getAuthHeaders, router, showToast]);
 
   const handleRenameProject = async (projectId: number, newTitle: string) => {
     try {
@@ -724,22 +756,26 @@ export default function Home() {
         throw new Error(errorData.error || `Failed to rename project: ${res.statusText}`);
       }
       await fetchAllChats();
+      showToast("Project renamed.", "success");
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
-      setError(message);
+      showToast(message, "error");
       return;
     }
     setAllProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, title: newTitle } : p)));
   };
 
-  const handleDeleteProject = async (projectId: number) => {
-    if (
-      !confirm(
+  const confirmDeleteProject = (projectId: number) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: "Delete Project",
+      message:
         "Are you sure you want to delete this project and all its chats and files? This action cannot be undone.",
-      )
-    ) {
-      return;
-    }
+      onConfirm: () => handleDeleteProject(projectId),
+    });
+  };
+
+  const handleDeleteProject = async (projectId: number) => {
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: "DELETE",
@@ -755,7 +791,7 @@ export default function Home() {
       }
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
-      setError(message);
+      showToast(message, "error");
       return;
     }
 
@@ -770,6 +806,7 @@ export default function Home() {
       setKeySelection("free");
       setTotalTokens(null);
     }
+    showToast("Project deleted.", "success");
   };
 
   useEffect(() => {
@@ -956,7 +993,7 @@ export default function Home() {
                   }
                 } else if (parsedChunk.type === "error" && parsedChunk.value) {
                   modelReturnedEmptyMessage = true;
-                  setError(parsedChunk.value);
+                  showToast(parsedChunk.value, "error");
                 }
               } catch (jsonError) {
                 console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
@@ -981,20 +1018,20 @@ export default function Home() {
             : error instanceof Error
               ? error.message
               : "An unexpected error occurred.";
-        setError(msg);
+        showToast(msg, "error");
       } finally {
         setIsLoading(false);
         setController(null);
         fetchAllChats();
       }
     },
-    [getAuthHeaders, selectedModel, keySelection, router, loadChat, fetchAllChats],
+    [getAuthHeaders, selectedModel, keySelection, router, loadChat, fetchAllChats, showToast],
   );
 
   const handleSendMessage = async (inputText: string, uploadedFiles: UploadedFileInfo[], sendWithSearch: boolean) => {
     if (!inputText.trim() && uploadedFiles.length === 0) return;
     if (!selectedModel) {
-      setError("No model selected or available. Please check model list or API key.");
+      showToast("No model selected or available. Please check model list or API key.", "error");
       return;
     }
 
@@ -1051,7 +1088,7 @@ export default function Home() {
         keySelection,
         getAuthHeaders,
         router,
-        setError,
+        showToast,
         fetchAllChats,
       );
     }
@@ -1095,7 +1132,7 @@ export default function Home() {
 
       await callChatApiAndStreamResponse(newUserMessageParts, historyForAPI, activeChatId, isSearchActive);
     } catch (err: unknown) {
-      setError(extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
       loadChat(activeChatId);
     } finally {
       setIsLoading(false);
@@ -1128,18 +1165,23 @@ export default function Home() {
 
       await callChatApiAndStreamResponse(userMessageToResend.parts, historyForAPI, activeChatId, isSearchActive);
     } catch (err: unknown) {
-      setError(extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
       loadChat(activeChatId);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDeleteAllGlobalChats = async () => {
-    if (!confirm("Are you sure you want to delete ALL your global chats? This action cannot be undone.")) {
-      return;
-    }
+  const confirmDeleteAllGlobalChats = () => {
+    setConfirmationModal({
+      isOpen: true,
+      title: "Delete All Global Chats",
+      message: "Are you sure you want to delete ALL your global chats? This action cannot be undone.",
+      onConfirm: handleDeleteAllGlobalChats,
+    });
+  };
 
+  const handleDeleteAllGlobalChats = async () => {
     try {
       const res = await fetch("/api/chats", {
         method: "DELETE",
@@ -1155,7 +1197,7 @@ export default function Home() {
       }
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
-      setError(message);
+      showToast(message, "error");
       return;
     }
 
@@ -1167,6 +1209,7 @@ export default function Home() {
       setKeySelection("free");
       setTotalTokens(null);
     }
+    showToast("All global chats deleted.", "success");
   };
 
   const openGlobalSettingsModal = () => {
@@ -1194,7 +1237,8 @@ export default function Home() {
       await loadChat(activeChatId);
     }
     closeSettingsModal();
-  }, [activeChatId, fetchAllChats, fetchAllProjects, loadChat]);
+    showToast("Settings saved successfully.", "success");
+  }, [activeChatId, fetchAllChats, fetchAllProjects, loadChat, showToast]);
 
   const toggleThreeDotMenu = () => {
     setIsThreeDotMenuOpen((prev) => !prev);
@@ -1209,7 +1253,7 @@ export default function Home() {
       localStorage.removeItem("__session");
       router.push("/login");
     } catch (err: unknown) {
-      setError(extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
     }
   };
 
@@ -1231,7 +1275,11 @@ export default function Home() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {error && <Toast message={error} onClose={() => setError(null)} />}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmationModal
+        {...confirmationModal}
+        onClose={() => setConfirmationModal((prev) => ({ ...prev, isOpen: false }))}
+      />
       <Sidebar
         chats={allChats}
         projects={allProjects}
@@ -1240,13 +1288,13 @@ export default function Home() {
         onNewChat={handleNewChat}
         onSelectChat={handleSelectChat}
         onRenameChat={handleRenameChat}
-        onDeleteChat={handleDeleteChat}
-        onDeleteAllGlobalChats={handleDeleteAllGlobalChats}
+        onDeleteChat={confirmDeleteChat}
+        onDeleteAllGlobalChats={confirmDeleteAllGlobalChats}
         onOpenChatSettings={openChatSettingsModal}
         onNewProject={handleNewProject}
         onSelectProject={handleSelectProject}
         onRenameProject={handleRenameProject}
-        onDeleteProject={handleDeleteProject}
+        onDeleteProject={confirmDeleteProject}
         onDuplicateChat={handleDuplicateChat}
         userEmail={userEmail}
         expandedProjects={expandedProjects}
@@ -1335,7 +1383,8 @@ export default function Home() {
             projectId={displayingProjectManagementId}
             getAuthHeaders={getAuthHeaders}
             onProjectUpdated={fetchAllProjects}
-            onProjectFileAction={setError}
+            showToast={showToast}
+            openConfirmationModal={setConfirmationModal}
             onProjectSystemPromptUpdated={async () => {
               await fetchAllProjects();
               if (activeChatId) {
@@ -1387,7 +1436,7 @@ export default function Home() {
                   onToggleSearch={setIsSearchActive}
                   getAuthHeaders={getAuthHeaders}
                   activeProjectId={currentChatProjectId}
-                  onError={(msg) => setError(msg)}
+                  showToast={showToast}
                 />
               </div>
             </div>
@@ -1402,6 +1451,7 @@ export default function Home() {
         initialSystemPromptValue={editingPromptInitialValue}
         onSettingsSaved={handleSettingsSaved}
         getAuthHeaders={getAuthHeaders}
+        showToast={showToast}
       />
     </div>
   );

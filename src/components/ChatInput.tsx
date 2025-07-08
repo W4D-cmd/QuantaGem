@@ -27,6 +27,7 @@ import { ProjectFile } from "@/app/page";
 import { ArrowUpIcon } from "@heroicons/react/20/solid";
 import { StopIcon } from "@heroicons/react/16/solid";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
+import { ToastProps } from "./Toast";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -43,7 +44,7 @@ interface ChatInputProps {
   onToggleSearch: (isActive: boolean) => void;
   getAuthHeaders: () => HeadersInit;
   activeProjectId: number | null;
-  onError: (message: string | null) => void;
+  showToast: (message: string, type?: ToastProps["type"]) => void;
 }
 
 export interface ChatInputHandle {
@@ -149,7 +150,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onToggleSearch,
       getAuthHeaders,
       activeProjectId,
-      onError,
+      showToast,
     },
     ref,
   ) => {
@@ -159,7 +160,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const attachButtonRef = useRef<HTMLButtonElement>(null);
     const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
     const [selectedFiles, setSelectedFiles] = useState<UploadedFileInfo[]>([]);
-    const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
+    const [uploadingFiles, setUploadingFiles] = useState<
+      { file: File; id: string; progress: number; error?: string }[]
+    >([]);
     const [showFileSuggestions, setShowFileSuggestions] = useState(false);
     const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
     const [filteredProjectFiles, setFilteredProjectFiles] = useState<ProjectFile[]>([]);
@@ -173,43 +176,85 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [isScanning, setIsScanning] = useState(false);
     const [scanStatusMessage, setScanStatusMessage] = useState<string | null>(null);
 
+    const uploadFileWithProgress = (uploadingFile: { file: File; id: string; progress: number }) => {
+      return new Promise<UploadedFileInfo | null>((resolve) => {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append("file", uploadingFile.file);
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = (event.loaded / event.total) * 100;
+            setUploadingFiles((prevFiles) =>
+              prevFiles.map((f) => (f.id === uploadingFile.id ? { ...f, progress: percentComplete } : f)),
+            );
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const result: UploadedFileInfo = JSON.parse(xhr.responseText);
+              resolve(result);
+            } catch (e) {
+              console.error("Error parsing upload response:", e);
+              showToast(`Upload failed for ${uploadingFile.file.name}: Invalid server response`, "error");
+              resolve(null);
+            }
+          } else {
+            let errorMsg = `Upload failed: ${xhr.statusText}`;
+            try {
+              const errorData = JSON.parse(xhr.responseText);
+              errorMsg = errorData.error || errorMsg;
+            } catch {}
+            showToast(errorMsg, "error");
+            resolve(null);
+          }
+        };
+
+        xhr.onerror = () => {
+          showToast(`Upload failed for ${uploadingFile.file.name}: Network error`, "error");
+          resolve(null);
+        };
+
+        const uploadEndpoint =
+          activeProjectId !== null ? `/api/projects/${activeProjectId}/files` : "/api/files/upload";
+        xhr.open("POST", uploadEndpoint, true);
+
+        const headers = getAuthHeaders();
+        for (const key in headers) {
+          if (Object.prototype.hasOwnProperty.call(headers, key)) {
+            xhr.setRequestHeader(key, (headers as Record<string, string>)[key]);
+          }
+        }
+
+        xhr.send(formData);
+      });
+    };
+
     const processAndUploadFiles = async (filesToUpload: File[]) => {
       if (filesToUpload.length === 0) return;
 
-      setUploadingFiles((prev) => [...prev, ...filesToUpload]);
+      const newUploadingFiles = filesToUpload.map((file) => ({
+        file,
+        id: `${file.name}-${file.lastModified}-${Math.random()}`,
+        progress: 0,
+      }));
+      setUploadingFiles((prev) => [...prev, ...newUploadingFiles]);
 
-      const uploadPromises = filesToUpload.map(async (file) => {
-        const formData = new FormData();
-        formData.append("file", file);
-        try {
-          const uploadEndpoint =
-            activeProjectId !== null ? `/api/projects/${activeProjectId}/files` : "/api/files/upload";
-          const response = await fetch(uploadEndpoint, {
-            method: "POST",
-            body: formData,
-            headers: getAuthHeaders(),
-          });
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Upload failed for ${file.name}`);
-          }
-          const result: UploadedFileInfo = await response.json();
-          if (activeProjectId !== null) {
-            setProjectFiles((prev) => [...prev, result as ProjectFile]);
-          }
-          return result;
-        } catch (error) {
-          console.error("Upload error:", error);
-          onError(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : String(error)}`);
-          return null;
-        }
-      });
+      const uploadPromises = newUploadingFiles.map(uploadFileWithProgress);
 
       const results = await Promise.all(uploadPromises);
       const successfulUploads = results.filter((result): result is UploadedFileInfo => result !== null);
 
+      setUploadingFiles((prev) => prev.filter((uf) => !newUploadingFiles.some((nuf) => nuf.id === uf.id)));
+      if (successfulUploads.length > 0) {
+        showToast(
+          `${successfulUploads.length} file${successfulUploads.length > 1 ? "s" : ""} uploaded successfully.`,
+          "success",
+        );
+      }
       setSelectedFiles((prev) => [...prev, ...successfulUploads]);
-      setUploadingFiles((prev) => prev.filter((f) => !filesToUpload.includes(f)));
     };
 
     useImperativeHandle(ref, () => ({
@@ -233,7 +278,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             const files: ProjectFile[] = await res.json();
             setProjectFiles(files);
           } catch (err: unknown) {
-            onError(err instanceof Error ? err.message : String(err));
+            showToast(err instanceof Error ? err.message : String(err), "error");
             setProjectFiles([]);
           }
         };
@@ -241,11 +286,11 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       } else {
         setProjectFiles([]);
       }
-    }, [activeProjectId, getAuthHeaders, onError]);
+    }, [activeProjectId, getAuthHeaders, showToast]);
 
     const handleOpenSourceFolder = async () => {
       if (typeof window.showDirectoryPicker !== "function") {
-        onError("Your browser does not support opening folders. Please try a modern, Chrome-based browser.");
+        showToast("Your browser does not support opening folders. Please try a modern, Chrome-based browser.", "error");
         return;
       }
 
@@ -288,7 +333,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           console.log("Folder picker was cancelled by the user.");
         } else {
           console.error("Error picking folder:", err);
-          onError("An error occurred while selecting the folder.");
+          showToast("An error occurred while selecting the folder.", "error");
         }
       } finally {
         setIsScanning(false);
@@ -465,7 +510,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         mediaRecorderRef.current.start();
         setIsRecording(true);
       } catch (err) {
-        onError(`Microphone access denied or error: ${err instanceof Error ? err.message : String(err)}`);
+        showToast(`Microphone access denied or error: ${err instanceof Error ? err.message : String(err)}`, "error");
         console.error("Error accessing microphone:", err);
       }
     };
@@ -489,7 +534,6 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     };
 
     const transcribeAudio = async (audioBlob: Blob) => {
-      onError(null);
       setIsTranscribing(true);
 
       try {
@@ -513,7 +557,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         setInput((prev) => (prev ? prev + " " : "") + transcription);
         textareaRef.current?.focus();
       } catch (err) {
-        onError(`Transcription error: ${err instanceof Error ? err.message : String(err)}`);
+        showToast(`Transcription error: ${err instanceof Error ? err.message : String(err)}`, "error");
         setInput("");
         console.error("Error during transcription:", err);
       } finally {
@@ -556,7 +600,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               </ul>
             </div>
           )}
-          {selectedFiles.length > 0 && (
+          {(selectedFiles.length > 0 || uploadingFiles.length > 0) && (
             <div
               className="mb-2 p-2 border border-neutral-100 dark:border-neutral-900 rounded-xl flex flex-wrap gap-2
                 transition-colors duration-300 ease-in-out"
@@ -576,29 +620,32 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   )}
                 </div>
               ))}
+              {uploadingFiles.map((upload) => (
+                <div
+                  key={upload.id}
+                  className="relative overflow-hidden bg-blue-100 dark:bg-blue-900/50 rounded-full text-sm flex
+                    items-center transition-colors duration-300 ease-in-out"
+                >
+                  <div
+                    className="absolute top-0 left-0 h-full bg-blue-200 dark:bg-blue-800 transition-all duration-150"
+                    style={{ width: `${upload.progress}%` }}
+                  ></div>
+                  <div className="relative z-10 flex items-center gap-2 px-3 py-1 text-blue-700 dark:text-blue-300">
+                    <ArrowPathIcon className="size-4 animate-spin" />
+                    <span className="truncate max-w-xs">{upload.file.name}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-          {(uploadingFiles.length > 0 || scanStatusMessage) && (
-            <div className="mb-2 p-2 text-sm text-neutral-500">
-              {scanStatusMessage && (
-                <div className="flex items-center gap-2">
-                  <ArrowPathIcon className="size-4 animate-spin" />
-                  <span>{scanStatusMessage}</span>
-                </div>
-              )}
-              {uploadingFiles.length > 0 && (
-                <div>
-                  Uploading {uploadingFiles.length} file(s)...
-                  {uploadingFiles.slice(0, 3).map((f) => (
-                    <div key={f.name} className="text-xs truncate">
-                      {f.name}
-                    </div>
-                  ))}
-                  {uploadingFiles.length > 3 && <div className="text-xs">...and {uploadingFiles.length - 3} more</div>}
-                </div>
-              )}
+
+          {scanStatusMessage && (
+            <div className="mb-2 p-2 text-sm text-neutral-500 flex items-center gap-2">
+              <ArrowPathIcon className="size-4 animate-spin" />
+              <span>{scanStatusMessage}</span>
             </div>
           )}
+
           <div
             className="relative flex flex-col rounded-3xl border border-neutral-300 dark:border-neutral-900
               overflow-hidden shadow-lg transition duration-300 ease-in-out focus-within:border-blue-500
@@ -634,10 +681,11 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     ref={attachButtonRef}
                     type="button"
                     onClick={() => setIsAttachMenuOpen((prev) => !prev)}
-                    disabled={isLoading || isRecording || isTranscribing || isScanning}
+                    disabled={isLoading || isRecording || isTranscribing || isScanning || uploadingFiles.length > 0}
                     className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
                       border transition-colors duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100
-                      dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                      dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700
+                      disabled:opacity-50"
                   >
                     <PaperClipIcon
                       className="size-5 text-neutral-500 dark:text-neutral-300 transition-colors duration-300
@@ -719,7 +767,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         ? true
                         : isRecording
                           ? false
-                          : isScanning || (!input.trim() && selectedFiles.length === 0)
+                          : isScanning || uploadingFiles.length > 0 || (!input.trim() && selectedFiles.length === 0)
                   }
                   className={`cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full flex
                     items-center justify-center transition-colors duration-300 ease-in-out ${

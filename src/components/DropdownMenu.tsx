@@ -114,6 +114,7 @@ export default function DropdownMenu({
           <button
             key={item.id ?? item.label}
             onClick={(e) => {
+              e.stopPropagation();
               onCloseAction();
               item.onClick(e);
             }}

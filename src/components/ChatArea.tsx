@@ -586,7 +586,7 @@ function ChatAreaComponent(
                 )}
               </div>
 
-              {!isBeingEdited && (
+              {!isBeingEdited && !(isLoading && !streamStarted && i === messages.length - 1) && (
                 <div
                   className="flex-shrink-0 flex items-center justify-center gap-1 opacity-0
                     group-hover/message:opacity-100 transition-opacity duration-200 h-8 mt-1"

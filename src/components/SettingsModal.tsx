@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, ChangeEvent } from "react";
 import Modal from "./Modal";
-import Toast from "./Toast";
+import { ToastProps } from "./Toast";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -11,6 +11,7 @@ interface SettingsModalProps {
   initialSystemPromptValue: string | null;
   onSettingsSaved: () => void;
   getAuthHeaders: () => HeadersInit;
+  showToast: (message: string, type?: ToastProps["type"]) => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -20,17 +21,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   initialSystemPromptValue,
   onSettingsSaved,
   getAuthHeaders,
+  showToast,
 }) => {
   const [systemPrompt, setSystemPrompt] = useState<string>("");
   const [currentInitialSystemPrompt, setCurrentInitialSystemPrompt] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showToast, setShowToast] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen) {
       setIsLoading(true);
-      setError(null);
       if (chatId !== null) {
         if (initialSystemPromptValue !== null) {
           setSystemPrompt(initialSystemPromptValue);
@@ -53,8 +52,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               setCurrentInitialSystemPrompt(prompt);
             })
             .catch((err) => {
-              setError(err.message);
-              setShowToast(true);
+              showToast(err.message, "error");
             })
             .finally(() => {
               setIsLoading(false);
@@ -77,15 +75,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             setCurrentInitialSystemPrompt(prompt);
           })
           .catch((err) => {
-            setError(err.message);
-            setShowToast(true);
+            showToast(err.message, "error");
           })
           .finally(() => {
             setIsLoading(false);
           });
       }
     }
-  }, [isOpen, chatId, initialSystemPromptValue, getAuthHeaders]);
+  }, [isOpen, chatId, initialSystemPromptValue, getAuthHeaders, showToast]);
 
   const handleInputChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setSystemPrompt(event.target.value);
@@ -93,7 +90,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSave = async () => {
     setIsLoading(true);
-    setError(null);
     try {
       let response;
       if (chatId !== null) {
@@ -125,14 +121,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       setCurrentInitialSystemPrompt(systemPrompt);
       onSettingsSaved();
     } catch (err: unknown) {
-      let errorMessage = "An unexpected error occurred.";
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === "string") {
-        errorMessage = err;
-      }
-      setError(errorMessage);
-      setShowToast(true);
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
+      showToast(errorMessage, "error");
     } finally {
       setIsLoading(false);
     }
@@ -147,76 +137,64 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const modalTitle = chatId !== null ? "Chat Settings" : "Global Settings";
   const promptDescription =
     chatId !== null
-      ? "Define the behavior and persona for the AI in this specific chat. If not set, the global system prompt will be used."
+      ? "Define the behavior and persona for the AI in this specific chat. If not set, the project or global system prompt will be used."
       : "Define the default behavior and persona for the AI in all new chats.";
 
   return (
-    <>
-      {showToast && error && (
-        <Toast
-          message={error}
-          onClose={() => {
-            setShowToast(false);
-            setError(null);
-          }}
-        />
-      )}
-      <Modal isOpen={isOpen} onClose={handleCancel} title={modalTitle} size="lg">
-        <div className="space-y-6">
-          <div>
-            <label htmlFor="system-prompt" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-              System Prompt
-            </label>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 mt-1">{promptDescription}</p>
-            {isLoading && !systemPrompt && !currentInitialSystemPrompt ? (
-              <div
-                className="w-full h-32 bg-neutral-100 dark:bg-neutral-800 rounded-lg animate-pulse transition-colors
-                  duration-300 ease-in-out"
-              ></div>
-            ) : (
-              <textarea
-                id="system-prompt"
-                name="system-prompt"
-                rows={8}
-                className="w-full resize-none p-3 border border-neutral-300 dark:border-neutral-700 rounded-xl shadow-sm
-                  text-sm bg-white dark:bg-neutral-950 text-black dark:text-white placeholder-neutral-400
-                  dark:placeholder-neutral-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500
-                  focus:ring-opacity-50 transition-all duration-300 ease-in-out"
-                value={systemPrompt}
-                onChange={handleInputChange}
-                placeholder="e.g., You are a helpful assistant that speaks like a pirate."
-                disabled={isLoading}
-              />
-            )}
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-2">
-            <button
-              type="button"
-              onClick={handleCancel}
+    <Modal isOpen={isOpen} onClose={handleCancel} title={modalTitle} size="lg">
+      <div className="space-y-6">
+        <div>
+          <label htmlFor="system-prompt" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            System Prompt
+          </label>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 mt-1">{promptDescription}</p>
+          {isLoading && !systemPrompt && !currentInitialSystemPrompt ? (
+            <div
+              className="w-full h-32 bg-neutral-100 dark:bg-neutral-800 rounded-lg animate-pulse transition-colors
+                duration-300 ease-in-out"
+            ></div>
+          ) : (
+            <textarea
+              id="system-prompt"
+              name="system-prompt"
+              rows={8}
+              className="w-full resize-none p-3 border border-neutral-300 dark:border-neutral-700 rounded-xl shadow-sm
+                text-sm bg-white dark:bg-neutral-950 text-black dark:text-white placeholder-neutral-400
+                dark:placeholder-neutral-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500
+                focus:ring-opacity-50 transition-all duration-300 ease-in-out"
+              value={systemPrompt}
+              onChange={handleInputChange}
+              placeholder="e.g., You are a helpful assistant that speaks like a pirate."
               disabled={isLoading}
-              className="cursor-pointer h-9 px-4 rounded-full text-sm font-medium transition-colors duration-300
-                ease-in-out bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800
-                hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-300 focus:outline-none
-                disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isLoading || !hasChanges}
-              className="cursor-pointer disabled:cursor-not-allowed h-9 px-4 rounded-full text-sm font-medium
-                transition-colors duration-300 ease-in-out bg-black dark:bg-blue-600 text-white border
-                border-transparent shadow-sm hover:bg-neutral-600 dark:hover:bg-blue-700 focus:outline-none
-                disabled:opacity-50"
-            >
-              {isLoading ? "Saving..." : "Save"}
-            </button>
-          </div>
+            />
+          )}
         </div>
-      </Modal>
-    </>
+
+        <div className="flex justify-end space-x-3 pt-2">
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={isLoading}
+            className="cursor-pointer h-9 px-4 rounded-full text-sm font-medium transition-colors duration-300
+              ease-in-out bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800
+              hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-300 focus:outline-none
+              disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isLoading || !hasChanges}
+            className="cursor-pointer disabled:cursor-not-allowed h-9 px-4 rounded-full text-sm font-medium
+              transition-colors duration-300 ease-in-out bg-black dark:bg-blue-600 text-white border border-transparent
+              shadow-sm hover:bg-neutral-600 dark:hover:bg-blue-700 focus:outline-none disabled:opacity-50"
+          >
+            {isLoading ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 };
 

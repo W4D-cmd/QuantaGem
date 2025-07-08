@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
            , system_prompt AS "systemPrompt"
            , key_selection AS "keySelection"
            , project_id AS "projectId"
+           , updated_at AS "updatedAt"
       FROM chat_sessions
       WHERE user_id = $1
       ORDER BY updated_at DESC
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
   const { rows } = await pool.query(
     `INSERT INTO chat_sessions (user_id, title, last_model, key_selection, project_id)
      VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection", project_id AS "projectId"`,
+       RETURNING id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection", project_id AS "projectId", updated_at as "updatedAt"`,
     [userId, title, "", actualKeySelection, projectId],
   );
   return NextResponse.json(rows[0]);

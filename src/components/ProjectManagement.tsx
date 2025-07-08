@@ -261,7 +261,7 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
       {isDraggingOver && (
         <div
           className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-2xl border-2
-            border-dashed border-green-500 bg-green-100/50 dark:bg-green-900/50"
+            border-dashed border-green-500 bg-green-100/50 dark:bg-green-900/50 backdrop-blur-sm"
         >
           <div className="flex flex-col items-center gap-2 text-green-600 dark:text-green-300">
             <DocumentArrowDownIcon className="size-8" />

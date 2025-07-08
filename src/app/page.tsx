@@ -1310,7 +1310,7 @@ export default function Home() {
         {isDraggingOver && (
           <div
             className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-2xl border-2
-              border-dashed border-blue-500 bg-blue-100/50 dark:bg-blue-900/50"
+              border-dashed border-blue-500 bg-blue-100/50 dark:bg-blue-900/50 backdrop-blur-sm"
           >
             <div className="flex flex-col items-center gap-2 text-blue-600 dark:text-blue-300">
               <PaperClipIcon className="size-8" />

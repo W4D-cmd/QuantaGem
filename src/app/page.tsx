@@ -161,7 +161,7 @@ export default function Home() {
   const [totalTokens, setTotalTokens] = useState<number | null>(null);
   const [isCountingTokens, setIsCountingTokens] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const [editingMessage, setEditingMessage] = useState<{ index: number; content: string } | null>(null);
+  const [editingMessage, setEditingMessage] = useState<{ index: number; message: Message } | null>(null);
   const [confirmationModal, setConfirmationModal] = useState<ConfirmationModalState>({
     isOpen: false,
     title: "",
@@ -1102,14 +1102,20 @@ export default function Home() {
     await callChatApiAndStreamResponse(newUserMessageParts, historyForAPI, sessionId, sendWithSearch);
   };
 
-  const handleEditSave = async (index: number, newContent: string) => {
+  const handleEditSave = async (index: number, newParts: MessagePart[]) => {
     if (!activeChatId || !messages[index] || isLoading) return;
 
     const messageToEdit = messages[index];
     if (messageToEdit.role !== "user") return;
 
-    const originalContent = messageToEdit.parts.find((p) => p.type === "text")?.text || "";
-    if (originalContent.trim() === newContent.trim()) {
+    const originalPartsJSON = JSON.stringify(
+      [...messageToEdit.parts].sort((a, b) => (a.text ?? a.fileName ?? "").localeCompare(b.text ?? b.fileName ?? "")),
+    );
+    const newPartsJSON = JSON.stringify(
+      [...newParts].sort((a, b) => (a.text ?? a.fileName ?? "").localeCompare(b.text ?? b.fileName ?? "")),
+    );
+
+    if (originalPartsJSON === newPartsJSON) {
       setEditingMessage(null);
       return;
     }
@@ -1118,6 +1124,22 @@ export default function Home() {
     setEditingMessage(null);
 
     try {
+      const newUserMessageParts = newParts;
+
+      const patchRes = await fetch(`/api/chats/${activeChatId}/messages`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({
+          messageId: messageToEdit.id,
+          newParts: newUserMessageParts,
+        }),
+      });
+
+      if (!patchRes.ok) {
+        const errorData = await patchRes.json();
+        throw new Error(errorData.error || "Failed to save edited message.");
+      }
+
       const modelMessagePosition = messageToEdit.position + 1;
       const deleteRes = await fetch(`/api/chats/${activeChatId}/messages?fromPosition=${modelMessagePosition}`, {
         method: "DELETE",
@@ -1130,7 +1152,6 @@ export default function Home() {
       }
 
       const historyForAPI = messages.slice(0, index);
-      const newUserMessageParts: MessagePart[] = [{ type: "text", text: newContent }];
 
       const updatedUserMessage: Message = {
         ...messageToEdit,

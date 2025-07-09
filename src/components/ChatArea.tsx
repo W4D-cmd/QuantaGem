@@ -17,8 +17,14 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { Message } from "@/app/page";
-import { ClipboardDocumentListIcon, CheckIcon, PencilIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import { Message, MessagePart } from "@/app/page";
+import {
+  ClipboardDocumentListIcon,
+  CheckIcon,
+  PencilIcon,
+  ArrowPathIcon,
+  XCircleIcon,
+} from "@heroicons/react/24/outline";
 import Tooltip from "@/components/Tooltip";
 import MessageSkeleton from "./MessageSkeleton";
 import rehypeRaw from "rehype-raw";
@@ -32,9 +38,9 @@ interface ChatAreaProps {
   onAutoScrollChange?: (isAutoScrollEnabled: boolean) => void;
   getAuthHeaders: GetAuthHeaders;
   activeChatId: number | null;
-  editingMessage: { index: number; content: string } | null;
-  setEditingMessage: React.Dispatch<React.SetStateAction<{ index: number; content: string } | null>>;
-  onEditSave: (index: number, newContent: string) => void;
+  editingMessage: { index: number; message: Message } | null;
+  setEditingMessage: React.Dispatch<React.SetStateAction<{ index: number; message: Message } | null>>;
+  onEditSave: (index: number, newParts: MessagePart[]) => void;
   onRegenerate: (index: number) => void;
 }
 
@@ -242,11 +248,16 @@ function ChatAreaComponent(
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null);
   const editingTextareaRef = useRef<HTMLTextAreaElement>(null);
+
   const [editedText, setEditedText] = useState("");
+  const [editedFileParts, setEditedFileParts] = useState<MessagePart[]>([]);
 
   useEffect(() => {
     if (editingMessage) {
-      setEditedText(editingMessage.content);
+      const textPart = editingMessage.message.parts.find((p) => p.type === "text");
+      const fileParts = editingMessage.message.parts.filter((p) => p.type === "file");
+      setEditedText(textPart?.text || "");
+      setEditedFileParts(fileParts);
     }
   }, [editingMessage]);
 
@@ -431,7 +442,7 @@ function ChatAreaComponent(
       textarea.focus();
       textarea.setSelectionRange(textarea.value.length, textarea.value.length);
     }
-  }, [editingMessage]);
+  }, [editingMessage, editedFileParts]);
 
   useEffect(() => {
     if (editingMessage && editingTextareaRef.current) {
@@ -441,6 +452,32 @@ function ChatAreaComponent(
     }
   }, [editedText, editingMessage]);
 
+  const handleRemoveFilePart = (objectNameToRemove: string) => {
+    setEditedFileParts((prev) => prev.filter((p) => p.objectName !== objectNameToRemove));
+  };
+
+  const handleSaveClick = (index: number) => {
+    const finalParts: MessagePart[] = [...editedFileParts];
+    if (editedText.trim()) {
+      finalParts.push({ type: "text", text: editedText.trim() });
+    }
+
+    if (finalParts.length === 0) {
+      return;
+    }
+    onEditSave(index, finalParts);
+  };
+
+  const handleEditKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>, index: number) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSaveClick(index);
+    }
+    if (e.key === "Escape") {
+      setEditingMessage(null);
+    }
+  };
+
   const markdownComponents: Components = {
     pre: ({ className, children }) => (
       <CodeBlockWithCopy chatAreaContainerRef={containerRef} className={className}>
@@ -449,23 +486,12 @@ function ChatAreaComponent(
     ),
   };
 
-  const handleEditKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>, index: number) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      onEditSave(index, editedText);
-    }
-    if (e.key === "Escape") {
-      setEditingMessage(null);
-    }
-  };
-
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-2 focus:outline-none" tabIndex={-1}>
       <div className="mx-auto max-w-[52rem] p-4 space-y-4">
         {messages.map((msg, i) => {
           const isUserMessage = msg.role === "user";
           const isBeingEdited = editingMessage?.index === i;
-          const textContent = msg.parts.find((p) => p.type === "text")?.text || "";
 
           return (
             <div
@@ -481,6 +507,25 @@ function ChatAreaComponent(
               >
                 {isBeingEdited ? (
                   <div className="p-4 rounded-3xl bg-white dark:bg-neutral-800 border-2 border-blue-500">
+                    {editedFileParts.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {editedFileParts.map((part) => (
+                          <div
+                            key={part.objectName}
+                            className="bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200 px-3
+                              py-1.5 rounded-full text-sm flex items-center gap-2"
+                          >
+                            <span>{part.fileName}</span>
+                            <button
+                              onClick={() => handleRemoveFilePart(part.objectName!)}
+                              className="text-neutral-500 hover:text-red-500 dark:hover:text-red-400"
+                            >
+                              <XCircleIcon className="size-5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <textarea
                       ref={editingTextareaRef}
                       value={editedText}
@@ -498,9 +543,10 @@ function ChatAreaComponent(
                         Cancel
                       </button>
                       <button
-                        onClick={() => onEditSave(i, editedText)}
+                        onClick={() => handleSaveClick(i)}
+                        disabled={!editedText.trim() && editedFileParts.length === 0}
                         className="cursor-pointer px-4 py-1.5 rounded-full text-sm font-medium transition-colors
-                          bg-blue-600 text-white hover:bg-blue-700"
+                          bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                       >
                         Save
                       </button>
@@ -613,7 +659,7 @@ function ChatAreaComponent(
                   {isUserMessage && (
                     <Tooltip text="Edit">
                       <button
-                        onClick={() => setEditingMessage({ index: i, content: textContent })}
+                        onClick={() => setEditingMessage({ index: i, message: msg })}
                         disabled={isLoading}
                         className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
                           hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"

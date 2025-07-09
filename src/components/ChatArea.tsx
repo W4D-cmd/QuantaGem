@@ -21,6 +21,7 @@ import { Message } from "@/app/page";
 import { ClipboardDocumentListIcon, CheckIcon, PencilIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import Tooltip from "@/components/Tooltip";
 import MessageSkeleton from "./MessageSkeleton";
+import rehypeRaw from "rehype-raw";
 
 type GetAuthHeaders = () => HeadersInit;
 
@@ -90,7 +91,8 @@ const ProtectedImage = memo(
     if (!imageUrl) {
       return (
         <div
-          className="max-w-full h-auto rounded-lg border border-neutral-200 bg-neutral-100 flex items-center justify-center"
+          className="max-w-full h-auto rounded-lg border border-neutral-200 bg-neutral-100 flex items-center
+            justify-center"
           style={{ maxHeight: "400px", minHeight: "100px" }}
         >
           Loading Image...
@@ -517,13 +519,14 @@ function ChatAreaComponent(
                               prose-headings:text-black dark:prose-headings:text-white prose-pre:rounded-xl
                               prose-code:rounded prose-pre:border prose-pre:bg-neutral-100
                               prose-pre:border-neutral-400/30 dark:prose-pre:bg-neutral-900
-                              dark:prose-pre:border-neutral-600/30 prose-code:bg-neutral-200 dark:prose-code:bg-neutral-700
-                              max-w-none transition-colors duration-300 ease-in-out prose-code:before:content-none
-                              prose-code:after:content-none prose-code:py-0.5 prose-code:px-1"
+                              dark:prose-pre:border-neutral-600/30 prose-code:bg-neutral-200
+                              dark:prose-code:bg-neutral-700 max-w-none transition-colors duration-300 ease-in-out
+                              prose-code:before:content-none prose-code:after:content-none prose-code:py-0.5
+                              prose-code:px-1"
                           >
                             <ReactMarkdown
                               remarkPlugins={[remarkMath, remarkGfm]}
-                              rehypePlugins={[rehypeKatex, [rehypeHighlight, { detect: true }]]}
+                              rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeHighlight, { detect: true }]]}
                               components={markdownComponents}
                             >
                               {part.text}
@@ -550,7 +553,8 @@ function ChatAreaComponent(
                                 href={fileUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600 break-all"
+                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600
+                                  break-all"
                               >
                                 {part.fileName} ({part.size ? `${(part.size / 1024).toFixed(1)} KB` : ""})
                               </a>

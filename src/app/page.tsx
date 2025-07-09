@@ -3,7 +3,7 @@
 import Sidebar from "@/components/Sidebar";
 import ChatArea, { ChatAreaHandle } from "@/components/ChatArea";
 import ChatInput, { ChatInputHandle, UploadedFileInfo } from "@/components/ChatInput";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import ModelSelector from "@/components/ModelSelector";
 import ToggleApiKeyButton from "@/components/ToggleApiKeyButton";
 import { Model } from "@google/genai";
@@ -178,6 +178,10 @@ export default function Home() {
 
   const showToast = useCallback((message: string, type: ToastProps["type"] = "error") => {
     setToast({ message, type });
+  }, []);
+
+  const handleCloseToast = useCallback(() => {
+    setToast(null);
   }, []);
 
   const getAuthHeaders = useCallback((): HeadersInit => {
@@ -1275,7 +1279,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={handleCloseToast} />}
       <ConfirmationModal
         {...confirmationModal}
         onClose={() => setConfirmationModal((prev) => ({ ...prev, isOpen: false }))}

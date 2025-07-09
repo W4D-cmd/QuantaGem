@@ -123,7 +123,8 @@ const EditableItem: React.FC<{
           onChange={(e) => setEditText(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleSave}
-          className="w-full text-sm p-1 rounded-md bg-white dark:bg-neutral-950 border-2 border-blue-500 focus:outline-none"
+          className="w-full text-sm p-1 rounded-md bg-white dark:bg-neutral-950 border-2 border-blue-500
+            focus:outline-none"
         />
       </div>
     );

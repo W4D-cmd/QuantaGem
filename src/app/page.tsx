@@ -897,6 +897,7 @@ export default function Home() {
       historyForAPI: Message[],
       currentChatId: number,
       isSearchEnabled: boolean,
+      isRegeneration = false,
     ) => {
       let modelMessageIndexForStream: number;
       setMessages((prev) => {
@@ -932,6 +933,7 @@ export default function Home() {
             model: selectedModel?.name,
             keySelection,
             isSearchActive: isSearchEnabled,
+            isRegeneration,
           }),
           signal: ctrl.signal,
         });
@@ -1116,10 +1118,12 @@ export default function Home() {
     setEditingMessage(null);
 
     try {
-      const deleteRes = await fetch(`/api/chats/${activeChatId}/messages?fromPosition=${messageToEdit.position}`, {
+      const modelMessagePosition = messageToEdit.position + 1;
+      const deleteRes = await fetch(`/api/chats/${activeChatId}/messages?fromPosition=${modelMessagePosition}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
       });
+
       if (!deleteRes.ok) {
         const errorData = await deleteRes.json();
         throw new Error(errorData.error || "Failed to delete subsequent messages.");
@@ -1134,7 +1138,7 @@ export default function Home() {
       };
       setMessages([...historyForAPI, updatedUserMessage]);
 
-      await callChatApiAndStreamResponse(newUserMessageParts, historyForAPI, activeChatId, isSearchActive);
+      await callChatApiAndStreamResponse(newUserMessageParts, historyForAPI, activeChatId, isSearchActive, true);
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");
       loadChat(activeChatId);
@@ -1149,16 +1153,18 @@ export default function Home() {
     if (userMessageIndex < 0 || messages[userMessageIndex].role !== "user") return;
 
     const userMessageToResend = messages[userMessageIndex];
+    const modelMessageToReplace = messages[modelMessageIndex];
 
     setIsLoading(true);
     try {
       const deleteRes = await fetch(
-        `/api/chats/${activeChatId}/messages?fromPosition=${userMessageToResend.position}`,
+        `/api/chats/${activeChatId}/messages?fromPosition=${modelMessageToReplace.position}`,
         {
           method: "DELETE",
           headers: getAuthHeaders(),
         },
       );
+
       if (!deleteRes.ok) {
         const errorData = await deleteRes.json();
         throw new Error(errorData.error || "Failed to delete message for regeneration.");
@@ -1167,7 +1173,7 @@ export default function Home() {
       const historyForAPI = messages.slice(0, userMessageIndex);
       setMessages(messages.slice(0, userMessageIndex + 1));
 
-      await callChatApiAndStreamResponse(userMessageToResend.parts, historyForAPI, activeChatId, isSearchActive);
+      await callChatApiAndStreamResponse(userMessageToResend.parts, historyForAPI, activeChatId, isSearchActive, true);
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");
       loadChat(activeChatId);

@@ -12,6 +12,7 @@ interface ChatRequest {
   model: string;
   keySelection: "free" | "paid";
   isSearchActive?: boolean;
+  isRegeneration?: boolean;
 }
 
 const SUPPORTED_GEMINI_MIME_TYPES = [
@@ -169,6 +170,7 @@ export async function POST(request: NextRequest) {
     model,
     keySelection,
     isSearchActive,
+    isRegeneration,
   } = (await request.json()) as ChatRequest;
 
   const apiKey = keySelection === "paid" ? process.env.PAID_GOOGLE_API_KEY : process.env.FREE_GOOGLE_API_KEY;
@@ -267,13 +269,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await pool.query(
-      `INSERT INTO messages (chat_session_id, role, content, parts, position, sources)
-       SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5
-       FROM messages
-       WHERE chat_session_id = $1`,
-      [chatSessionId, "user", combinedUserTextForDB, JSON.stringify(newMessageAppParts), JSON.stringify([])],
-    );
+    if (!isRegeneration) {
+      await pool.query(
+        `INSERT INTO messages (chat_session_id, role, content, parts, position, sources)
+         SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5
+         FROM messages
+         WHERE chat_session_id = $1`,
+        [chatSessionId, "user", combinedUserTextForDB, JSON.stringify(newMessageAppParts), JSON.stringify([])],
+      );
+    }
 
     const historyGeminiContents: Content[] = [];
     if (clientHistoryWithAppParts) {

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { getUserFromToken } from "@/lib/auth";
 import { ChatListItem, MessagePart } from "@/app/page";
+import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
+import { randomUUID } from "crypto";
 
 interface DbMessage {
   role: "user" | "model";
@@ -9,6 +11,36 @@ interface DbMessage {
   parts: MessagePart[];
   position: number;
   sources: Array<{ title: string; uri: string }>;
+}
+
+async function duplicateFile(originalObjectName: string): Promise<string | null> {
+  try {
+    const originalFileStream = await minioClient.getObject(MINIO_BUCKET_NAME, originalObjectName);
+    const chunks: Buffer[] = [];
+    for await (const chunk of originalFileStream) {
+      chunks.push(chunk as Buffer);
+    }
+    const fileBuffer = Buffer.concat(chunks);
+
+    const stat = await minioClient.statObject(MINIO_BUCKET_NAME, originalObjectName);
+    const originalMimeType = stat.metaData?.["content-type"] || "application/octet-stream";
+    const originalSize = stat.size;
+
+    const fileExtension = originalObjectName.split(".").pop() || "";
+    const baseName = originalObjectName
+      .substring(originalObjectName.indexOf("_") + 1, originalObjectName.lastIndexOf("."))
+      .replace(/[^a-zA-Z0-9_.-]/g, "_");
+    const newObjectName = `${randomUUID()}_${baseName}.${fileExtension}`;
+
+    await minioClient.putObject(MINIO_BUCKET_NAME, newObjectName, fileBuffer, originalSize, {
+      "Content-Type": originalMimeType,
+    });
+
+    return newObjectName;
+  } catch (error) {
+    console.error(`Failed to duplicate file ${originalObjectName}:`, error);
+    return null;
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -50,7 +82,7 @@ export async function POST(request: NextRequest) {
     const newChatResult = await client.query(
       `INSERT INTO chat_sessions (user_id, title, last_model, system_prompt, key_selection, project_id, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-       RETURNING id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection", project_id AS "projectId"`,
+         RETURNING id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection", project_id AS "projectId"`,
       [
         userId,
         newChatTitle,
@@ -75,10 +107,33 @@ export async function POST(request: NextRequest) {
     const originalMessages = originalMessagesResult.rows;
 
     for (const msg of originalMessages) {
+      const newParts: MessagePart[] = [];
+      let hasFileParts = false;
+
+      for (const part of msg.parts) {
+        if (part.type === "file" && part.objectName) {
+          hasFileParts = true;
+          const newObjectName = await duplicateFile(part.objectName);
+          if (newObjectName) {
+            newParts.push({ ...part, objectName: newObjectName });
+          } else {
+          }
+        } else {
+          newParts.push(part);
+        }
+      }
+
       await client.query(
         `INSERT INTO messages (chat_session_id, role, content, parts, position, sources)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [newChatSessionId, msg.role, msg.content, JSON.stringify(msg.parts), msg.position, JSON.stringify(msg.sources)],
+        [
+          newChatSessionId,
+          msg.role,
+          msg.content,
+          hasFileParts ? JSON.stringify(newParts) : JSON.stringify(msg.parts),
+          msg.position,
+          JSON.stringify(msg.sources),
+        ],
       );
     }
 

@@ -113,10 +113,13 @@ export async function POST(request: NextRequest) {
       for (const part of msg.parts) {
         if (part.type === "file" && part.objectName) {
           hasFileParts = true;
-          const newObjectName = await duplicateFile(part.objectName);
-          if (newObjectName) {
-            newParts.push({ ...part, objectName: newObjectName });
+          if (part.isProjectFile) {
+            newParts.push(part);
           } else {
+            const newObjectName = await duplicateFile(part.objectName);
+            if (newObjectName) {
+              newParts.push({ ...part, objectName: newObjectName });
+            }
           }
         } else {
           newParts.push(part);

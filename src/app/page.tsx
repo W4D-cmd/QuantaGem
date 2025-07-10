@@ -33,6 +33,8 @@ export interface MessagePart {
   mimeType?: string;
   objectName?: string;
   size?: number;
+  isProjectFile?: boolean;
+  projectFileId?: number;
 }
 
 export interface Message {
@@ -1067,13 +1069,7 @@ export default function Home() {
     }
 
     uploadedFiles.forEach((file) => {
-      newUserMessageParts.push({
-        type: "file",
-        fileName: file.fileName,
-        mimeType: file.mimeType,
-        objectName: file.objectName,
-        size: file.size,
-      });
+      newUserMessageParts.push({ type: "file", ...file });
     });
 
     const historyForAPI = [...messages];

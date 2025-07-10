@@ -165,7 +165,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       messagesResult.rows.forEach((message) => {
         if (message.parts && Array.isArray(message.parts)) {
           message.parts.forEach((part: MessagePart) => {
-            if (part.type === "file" && part.objectName) {
+            if (part.type === "file" && part.objectName && !part.isProjectFile) {
               objectNamesToDelete.push(part.objectName);
             }
           });

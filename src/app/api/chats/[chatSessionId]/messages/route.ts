@@ -132,7 +132,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     messagesToDeleteResult.rows.forEach((msg) => {
       if (msg.parts && Array.isArray(msg.parts)) {
         msg.parts.forEach((part) => {
-          if (part.type === "file" && part.objectName) {
+          if (part.type === "file" && part.objectName && !part.isProjectFile) {
             objectNamesToDelete.push(part.objectName);
           }
         });

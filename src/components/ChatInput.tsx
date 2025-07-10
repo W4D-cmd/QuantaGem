@@ -34,6 +34,7 @@ export interface UploadedFileInfo {
   fileName: string;
   mimeType: string;
   size: number;
+  isProjectFile?: boolean;
 }
 
 interface ChatInputProps {
@@ -217,8 +218,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           resolve(null);
         };
 
-        const uploadEndpoint =
-          activeProjectId !== null ? `/api/projects/${activeProjectId}/files` : "/api/files/upload";
+        const uploadEndpoint = "/api/files/upload";
         xhr.open("POST", uploadEndpoint, true);
 
         const headers = getAuthHeaders();
@@ -428,18 +428,18 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       const hashIndex = input.lastIndexOf("#");
       if (hashIndex !== -1) {
         const prefix = input.substring(0, hashIndex);
-        setInput(prefix);
         setSelectedFiles((prev) => {
           if (!prev.some((sf) => sf.objectName === file.objectName)) {
-            return [
-              ...prev,
-              {
-                objectName: file.objectName,
-                fileName: file.fileName,
-                mimeType: file.mimeType,
-                size: file.size,
-              },
-            ];
+            const newFilePart = {
+              objectName: file.objectName,
+              fileName: file.fileName,
+              mimeType: file.mimeType,
+              size: file.size,
+              isProjectFile: true,
+              projectFileId: file.id,
+            };
+            setInput(prefix);
+            return [...prev, newFilePart];
           }
           return prev;
         });
@@ -611,7 +611,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   className="bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-400 px-3 py-1
                     rounded-full text-sm flex items-center gap-2 transition-colors duration-300 ease-in-out"
                 >
-                  <span>{file.fileName}</span>
+                  <span className={file.isProjectFile ? "font-semibold" : ""}>{file.fileName}</span>
                   {!isLoading && (
                     <XCircleIcon
                       className="size-4 text-neutral-500 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"

@@ -18,6 +18,7 @@ import {
   Cog6ToothIcon,
   EllipsisVerticalIcon,
   PaperClipIcon,
+  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import ProjectManagement from "@/components/ProjectManagement";
@@ -170,6 +171,8 @@ export default function Home() {
     message: "",
     onConfirm: () => {},
   });
+  const [isLiveSessionActive, setIsLiveSessionActive] = useState(false);
+  const [liveInterimText, setLiveInterimText] = useState("");
 
   const dragCounter = useRef(0);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1334,7 +1337,7 @@ export default function Home() {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {isDraggingOver && (
+        {isDraggingOver && !isLiveSessionActive && (
           <div
             className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-2xl border-2
               border-dashed border-blue-500 bg-blue-100/50 dark:bg-blue-900/50 backdrop-blur-sm"
@@ -1436,7 +1439,21 @@ export default function Home() {
             />
 
             <div className="flex-none p-4">
-              <div className="mx-auto max-w-[52rem]">
+              <div className="mx-auto max-w-[52rem] relative">
+                {isLiveSessionActive && (
+                  <div
+                    className="absolute bottom-full mb-4 w-full bg-neutral-100/80 dark:bg-neutral-900/80
+                      backdrop-blur-sm p-4 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 flex
+                      items-center gap-3 transition-opacity duration-300"
+                  >
+                    <ChatBubbleLeftRightIcon
+                      className="size-6 flex-shrink-0 text-blue-500 dark:text-blue-400 animate-pulse"
+                    />
+                    <p className="text-sm text-neutral-800 dark:text-neutral-200 flex-1 min-h-[1.25rem]">
+                      {liveInterimText || "Listening..."}
+                    </p>
+                  </div>
+                )}
                 <div className="relative h-0">
                   <div
                     className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300
@@ -1464,6 +1481,9 @@ export default function Home() {
                   getAuthHeaders={getAuthHeaders}
                   activeProjectId={currentChatProjectId}
                   showToast={showToast}
+                  keySelection={keySelection}
+                  onLiveSessionStateChange={setIsLiveSessionActive}
+                  onLiveInterimText={setLiveInterimText}
                 />
               </div>
             </div>

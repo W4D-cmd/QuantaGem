@@ -21,6 +21,7 @@ import {
   PaperClipIcon,
   XCircleIcon,
   XMarkIcon,
+  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
 import { ProjectFile } from "@/app/page";
@@ -28,6 +29,7 @@ import { ArrowUpIcon } from "@heroicons/react/20/solid";
 import { StopIcon } from "@heroicons/react/16/solid";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
 import { ToastProps } from "./Toast";
+import { useLiveSession } from "@/hooks/useLiveSession";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -46,6 +48,9 @@ interface ChatInputProps {
   getAuthHeaders: () => HeadersInit;
   activeProjectId: number | null;
   showToast: (message: string, type?: ToastProps["type"]) => void;
+  keySelection: "free" | "paid";
+  onLiveSessionStateChange: (isActive: boolean) => void;
+  onLiveInterimText: (text: string) => void;
 }
 
 export interface ChatInputHandle {
@@ -152,6 +157,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       getAuthHeaders,
       activeProjectId,
       showToast,
+      keySelection,
+      onLiveSessionStateChange,
+      onLiveInterimText,
     },
     ref,
   ) => {
@@ -176,6 +184,19 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const [isScanning, setIsScanning] = useState(false);
     const [scanStatusMessage, setScanStatusMessage] = useState<string | null>(null);
+
+    const {
+      isConnecting: isLiveConnecting,
+      isSessionActive: isLiveSessionActive,
+      startSession,
+      stopSession,
+    } = useLiveSession({
+      getAuthHeaders,
+      keySelection,
+      showToast,
+      onStateChange: onLiveSessionStateChange,
+      onInterimText: onLiveInterimText,
+    });
 
     const uploadFileWithProgress = (uploadingFile: { file: File; id: string; progress: number }) => {
       return new Promise<UploadedFileInfo | null>((resolve) => {
@@ -469,7 +490,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     };
 
     const submit = () => {
-      if ((!input.trim() && selectedFiles.length === 0) || isLoading || isRecording || isTranscribing || isScanning)
+      if (
+        (!input.trim() && selectedFiles.length === 0) ||
+        isLoading ||
+        isRecording ||
+        isTranscribing ||
+        isScanning ||
+        isLiveSessionActive
+      )
         return;
       onSendMessageAction(input, selectedFiles, isSearchActive);
       setInput("");
@@ -600,7 +628,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               </ul>
             </div>
           )}
-          {(selectedFiles.length > 0 || uploadingFiles.length > 0) && (
+          {(selectedFiles.length > 0 || uploadingFiles.length > 0) && !isLiveSessionActive && (
             <div
               className="mb-2 p-2 border border-neutral-100 dark:border-neutral-900 rounded-xl flex flex-wrap gap-2
                 transition-colors duration-300 ease-in-out"
@@ -647,9 +675,12 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           )}
 
           <div
-            className="relative flex flex-col rounded-3xl border border-neutral-300 dark:border-neutral-900
-              overflow-hidden shadow-lg transition duration-300 ease-in-out focus-within:border-blue-500
-              focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-opacity-50"
+            className={`relative flex flex-col rounded-3xl border dark:border-neutral-900 overflow-hidden shadow-lg
+              transition duration-300 ease-in-out focus-within:ring-2 focus-within:ring-opacity-50 ${
+                isLiveSessionActive
+                  ? "border-blue-500 focus-within:border-blue-500 focus-within:ring-blue-500"
+                  : "border-neutral-300 focus-within:border-blue-500 focus-within:ring-blue-500"
+              }`}
           >
             <div className="p-4 bg-white dark:bg-neutral-900 transition-colors duration-300 ease-in-out">
               <textarea
@@ -658,7 +689,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 onChange={handleInputChange}
                 onKeyDown={onKeyDown}
                 onPaste={handlePaste}
-                placeholder="Send a message..."
+                placeholder={isLiveSessionActive ? "Live session is active..." : "Send a message..."}
                 rows={1}
                 className="w-full resize-none border-none p-0 focus:outline-none bg-white dark:bg-neutral-900
                   transition-colors duration-300 ease-in-out placeholder-neutral-500 dark:placeholder-neutral-400"
@@ -667,7 +698,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   overflowY: (textareaRef.current?.scrollHeight ?? 0) > 320 ? "auto" : "hidden",
                   scrollbarGutter: "stable",
                 }}
-                disabled={isLoading || isRecording || isTranscribing || isScanning}
+                disabled={
+                  isLoading || isRecording || isTranscribing || isScanning || isLiveSessionActive || isLiveConnecting
+                }
               />
             </div>
 
@@ -681,7 +714,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     ref={attachButtonRef}
                     type="button"
                     onClick={() => setIsAttachMenuOpen((prev) => !prev)}
-                    disabled={isLoading || isRecording || isTranscribing || isScanning || uploadingFiles.length > 0}
+                    disabled={
+                      isLoading ||
+                      isRecording ||
+                      isTranscribing ||
+                      isScanning ||
+                      uploadingFiles.length > 0 ||
+                      isLiveSessionActive
+                    }
                     className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
                       border transition-colors duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100
                       dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700
@@ -706,20 +746,20 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   onChange={handleFileChange}
                   multiple
                   className="hidden"
-                  disabled={isLoading || isRecording || isTranscribing || isScanning}
+                  disabled={isLoading || isRecording || isTranscribing || isScanning || isLiveSessionActive}
                 />
                 <Tooltip text="Search the web">
                   <button
                     type="button"
                     onClick={() => onToggleSearch(!isSearchActive)}
-                    disabled={isRecording || isTranscribing || isScanning}
+                    disabled={isRecording || isTranscribing || isScanning || isLiveSessionActive}
                     className={` cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
                       transition-colors duration-300 ease-in-out ${
                         isSearchActive
                           ? `bg-black text-white border hover:bg-neutral-600 dark:bg-white dark:text-neutral-900
                             dark:border-neutral-200 dark:hover:bg-neutral-400 dark:hover:border-neutral-400`
                           : `bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500
-                            dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700`
+                            dark:bg-neutral-950 dark:border-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-700`
                       } `}
                   >
                     {isSearchActive ? (
@@ -739,26 +779,56 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
               <div className="flex items-center gap-2">
                 {!isLoading && !isTranscribing && !isScanning && (
-                  <Tooltip text={isRecording ? "Cancel recording" : "Dictate message"}>
-                    <button
-                      type="button"
-                      onClick={isRecording ? cancelRecording : startRecording}
-                      disabled={isLoading || isTranscribing || uploadingFiles.length > 0 || isScanning}
-                      className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
-                        border transition-colors duration-300 ease-in-out bg-white border-neutral-300
-                        hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700"
-                    >
-                      {isRecording ? (
-                        <XMarkIcon className="size-5 text-red-500" />
-                      ) : (
-                        <MicrophoneIcon className="size-5 text-neutral-500 dark:text-neutral-300" />
-                      )}
-                    </button>
-                  </Tooltip>
+                  <>
+                    <Tooltip text={isLiveSessionActive ? "Stop Live Chat" : "Start Live Chat"}>
+                      <button
+                        type="button"
+                        onClick={isLiveSessionActive ? stopSession : startSession}
+                        disabled={isLoading || isRecording || isTranscribing || isScanning || isLiveConnecting}
+                        className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
+                        font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
+                        hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700
+                        ${isLiveSessionActive ? "border-blue-500 animate-pulse" : ""}`}
+                      >
+                        {isLiveConnecting ? (
+                          <div
+                            className="w-4 h-4 border-2 border-neutral-300 border-t-blue-500 rounded-full animate-spin"
+                          />
+                        ) : (
+                          <ChatBubbleLeftRightIcon
+                            className={`size-5 transition-colors ${
+                              isLiveSessionActive
+                                ? "text-blue-500 dark:text-blue-400"
+                                : "text-neutral-500 dark:text-neutral-300"
+                              }`}
+                          />
+                        )}
+                      </button>
+                    </Tooltip>
+                    <Tooltip text={isRecording ? "Cancel recording" : "Dictate message"}>
+                      <button
+                        type="button"
+                        onClick={isRecording ? cancelRecording : startRecording}
+                        disabled={
+                          isLoading || isTranscribing || uploadingFiles.length > 0 || isScanning || isLiveSessionActive
+                        }
+                        className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
+                          font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
+                          hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700
+                          disabled:opacity-50"
+                      >
+                        {isRecording ? (
+                          <XMarkIcon className="size-5 text-red-500" />
+                        ) : (
+                          <MicrophoneIcon className="size-5 text-neutral-500 dark:text-neutral-300" />
+                        )}
+                      </button>
+                    </Tooltip>
+                  </>
                 )}
 
                 <button
-                  type={isLoading || isRecording || isTranscribing ? "button" : "submit"}
+                  type={isLoading || isRecording || isTranscribing || isLiveSessionActive ? "button" : "submit"}
                   onClick={getMainButtonAction()}
                   disabled={
                     isLoading
@@ -767,7 +837,10 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         ? true
                         : isRecording
                           ? false
-                          : isScanning || uploadingFiles.length > 0 || (!input.trim() && selectedFiles.length === 0)
+                          : isScanning ||
+                            uploadingFiles.length > 0 ||
+                            isLiveSessionActive ||
+                            (!input.trim() && selectedFiles.length === 0)
                   }
                   className={`cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full flex
                     items-center justify-center transition-colors duration-300 ease-in-out ${
@@ -780,7 +853,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 >
                   {isLoading ? (
                     <StopIcon className="size-5" />
-                  ) : isTranscribing || isScanning ? (
+                  ) : isTranscribing || isScanning || isLiveConnecting ? (
                     <ArrowPathIcon className="size-5 animate-spin" />
                   ) : isRecording ? (
                     <CheckIcon className="size-5 text-green-500" />

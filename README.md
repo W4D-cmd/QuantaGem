@@ -47,6 +47,51 @@ You can generate a suitable value using `node -e "console.log(require('crypto').
 JWT_SECRET="your_jwt_secret"
 ```
 
+### 3. Customizing the Speech-to-Text (STT) Model
+
+The application uses the `medium` as the default model for Speech-to-Text transcription. You can change this to any other model from the Faster Whisper family to balance performance and accuracy according to your hardware and needs.
+
+To change the model, you need to edit the model identifier string in the STT service's source code.
+
+1.  Open the file `stt-service/main.py`.
+2.  Locate the `model_size` variable at the top of the file.
+
+    ```python
+    model_size = "medium"
+    compute_type = "int8"
+    ```
+
+3.  Replace the string value of `model_size` (e.g., `"medium"`) with the name of your desired model from the list below (e.g., `"distil-large-v3"`).
+4.  Save the file and rebuild the Docker container using `docker compose up --build` for the changes to take effect.
+
+<details>
+<summary><b>Available Faster Whisper Models</b></summary>
+
+Here is a list of available models, grouped by type. Larger models are more accurate but slower and require more resources.
+
+#### Standard Models (Multilingual)
+*   `tiny`
+*   `base`
+*   `small`
+*   `medium`
+*   `large-v1`
+*   `large-v2`
+*   `large-v3`
+
+#### English-Only Models (.en)
+*   `tiny.en`
+*   `base.en`
+*   `small.en`
+*   `medium.en`
+
+#### Distilled Models (distil)
+*   `distil-small.en`
+*   `distil-medium.en`
+*   `distil-large-v2`
+*   `distil-large-v3`
+
+</details>
+
 ## Running the Application
 
 Inside the cloned repository execute the following command to start up the docker environment including the database and the Next.js app:

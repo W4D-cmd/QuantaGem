@@ -12,7 +12,7 @@ import time
 
 app = FastAPI()
 
-model_size = "small"
+model_size = "medium"
 compute_type = "int8"
 
 model: Optional[WhisperModel] = None

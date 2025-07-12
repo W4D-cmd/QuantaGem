@@ -1,8 +1,10 @@
-import { useState, useRef, useCallback } from "react";
-import { GoogleGenAI, Session, Modality, Content, LiveConnectConfig } from "@google/genai";
+import { useCallback, useRef, useState } from "react";
+import { Blob as GenaiBlob, Content, GoogleGenAI, LiveConnectConfig, Modality, Session } from "@google/genai";
 
 const MODEL_NAME = "gemini-live-2.5-flash-preview";
 const TARGET_SAMPLE_RATE = 16000;
+const OUTPUT_SAMPLE_RATE = 24000;
+const VIDEO_FRAME_RATE = 1; // 1 frame per second
 
 interface UseLiveSessionProps {
   getAuthHeaders: () => HeadersInit;
@@ -10,7 +12,43 @@ interface UseLiveSessionProps {
   showToast: (message: string, type?: "success" | "error") => void;
   onStateChange: (isActive: boolean) => void;
   onInterimText: (text: string) => void;
+  onTurnComplete: (text: string, audioBlob: Blob | null) => void;
+  onVideoStream: (stream: MediaStream | null) => void;
 }
+
+const createWavBlob = (audioChunks: ArrayBuffer[]): Blob => {
+  const totalLength = audioChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+  const buffer = new ArrayBuffer(44 + totalLength);
+  const view = new DataView(buffer);
+
+  // RIFF header
+  view.setUint32(0, 0x52494646, false); // "RIFF"
+  view.setUint32(4, 36 + totalLength, true);
+  view.setUint32(8, 0x57415645, false); // "WAVE"
+
+  // "fmt " sub-chunk
+  view.setUint32(12, 0x666d7420, false); // "fmt "
+  view.setUint32(16, 16, true); // Sub-chunk size
+  view.setUint16(20, 1, true); // Audio format (1 = PCM)
+  view.setUint16(22, 1, true); // Number of channels
+  view.setUint32(24, OUTPUT_SAMPLE_RATE, true); // Sample rate
+  view.setUint32(28, OUTPUT_SAMPLE_RATE * 2, true); // Byte rate (SampleRate * NumChannels * BitsPerSample/8)
+  view.setUint16(32, 2, true); // Block align (NumChannels * BitsPerSample/8)
+  view.setUint16(34, 16, true); // Bits per sample
+
+  // "data" sub-chunk
+  view.setUint32(36, 0x64617461, false); // "data"
+  view.setUint32(40, totalLength, true);
+
+  const audioData = new Uint8Array(buffer, 44);
+  let offset = 0;
+  for (const chunk of audioChunks) {
+    audioData.set(new Uint8Array(chunk), offset);
+    offset += chunk.byteLength;
+  }
+
+  return new Blob([view], { type: "audio/wav" });
+};
 
 export const useLiveSession = ({
   getAuthHeaders,
@@ -18,6 +56,8 @@ export const useLiveSession = ({
   showToast,
   onStateChange,
   onInterimText,
+  onTurnComplete,
+  onVideoStream,
 }: UseLiveSessionProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const sessionRef = useRef<Session | null>(null);
@@ -29,6 +69,11 @@ export const useLiveSession = ({
   const playbackQueueRef = useRef<Float32Array[]>([]);
   const isPlayingRef = useRef(false);
   const nextPlayTimeRef = useRef(0);
+
+  const videoStreamRef = useRef<MediaStream | null>(null);
+  const videoFrameIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const accumulatedTextRef = useRef("");
+  const audioBufferChunksRef = useRef<ArrayBuffer[]>([]);
 
   const stopAudioProcessing = useCallback(() => {
     microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -51,15 +96,28 @@ export const useLiveSession = ({
     playbackAudioContextRef.current = null;
   }, []);
 
+  const stopVideoProcessing = useCallback(() => {
+    if (videoFrameIntervalRef.current) {
+      clearInterval(videoFrameIntervalRef.current);
+      videoFrameIntervalRef.current = null;
+    }
+    videoStreamRef.current?.getTracks().forEach((track) => track.stop());
+    videoStreamRef.current = null;
+    onVideoStream(null);
+  }, [onVideoStream]);
+
   const stopSession = useCallback(() => {
     if (sessionRef.current) {
       sessionRef.current.close();
       sessionRef.current = null;
     }
     stopAudioProcessing();
+    stopVideoProcessing();
     onStateChange(false);
     onInterimText("");
-  }, [stopAudioProcessing, onStateChange, onInterimText]);
+    accumulatedTextRef.current = "";
+    audioBufferChunksRef.current = [];
+  }, [stopAudioProcessing, stopVideoProcessing, onStateChange, onInterimText]);
 
   const processAndPlayAudio = useCallback(() => {
     if (isPlayingRef.current || playbackQueueRef.current.length === 0 || !playbackAudioContextRef.current) {
@@ -88,11 +146,13 @@ export const useLiveSession = ({
     };
   }, []);
 
-  const startSession = async (history: Content[]) => {
+  const startSession = async (history: Content[], options: { streamVideo: boolean }) => {
     if (sessionRef.current || isConnecting) {
       return;
     }
     setIsConnecting(true);
+    accumulatedTextRef.current = "";
+    audioBufferChunksRef.current = [];
 
     try {
       const tokenRes = await fetch("/api/live/token", {
@@ -108,8 +168,14 @@ export const useLiveSession = ({
         httpOptions: { apiVersion: "v1alpha" },
       });
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      microphoneStreamRef.current = stream;
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      microphoneStreamRef.current = audioStream;
+
+      if (options.streamVideo) {
+        const videoStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        videoStreamRef.current = videoStream;
+        onVideoStream(videoStream);
+      }
 
       const config: LiveConnectConfig = {
         responseModalities: [Modality.AUDIO, Modality.TEXT],
@@ -135,11 +201,12 @@ export const useLiveSession = ({
             if (message.serverContent?.modelTurn?.parts) {
               const part = message.serverContent.modelTurn.parts[0];
               if (part.text) {
-                onInterimText(part.text);
+                accumulatedTextRef.current += part.text;
+                onInterimText(accumulatedTextRef.current);
               }
               if (part.inlineData?.data) {
                 if (!playbackAudioContextRef.current) {
-                  playbackAudioContextRef.current = new window.AudioContext({ sampleRate: 24000 });
+                  playbackAudioContextRef.current = new window.AudioContext({ sampleRate: OUTPUT_SAMPLE_RATE });
                   nextPlayTimeRef.current = playbackAudioContextRef.current.currentTime;
                 }
                 const raw = window.atob(part.inlineData.data);
@@ -149,6 +216,7 @@ export const useLiveSession = ({
                   array[i] = raw.charCodeAt(i);
                 }
                 const int16Array = new Int16Array(array.buffer);
+                audioBufferChunksRef.current.push(int16Array.buffer);
                 const float32Array = new Float32Array(int16Array.length);
                 for (let i = 0; i < int16Array.length; i++) {
                   float32Array[i] = int16Array[i] / 32767.0;
@@ -157,6 +225,11 @@ export const useLiveSession = ({
                 processAndPlayAudio();
               }
             } else if (message.serverContent?.turnComplete) {
+              const audioBlob =
+                audioBufferChunksRef.current.length > 0 ? createWavBlob(audioBufferChunksRef.current) : null;
+              onTurnComplete(accumulatedTextRef.current, audioBlob);
+              accumulatedTextRef.current = "";
+              audioBufferChunksRef.current = [];
               onInterimText("");
             }
           },
@@ -191,7 +264,7 @@ export const useLiveSession = ({
       }
 
       audioContextRef.current = new window.AudioContext();
-      const source = audioContextRef.current.createMediaStreamSource(stream);
+      const source = audioContextRef.current.createMediaStreamSource(audioStream);
       scriptProcessorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
 
       scriptProcessorRef.current.onaudioprocess = (e) => {
@@ -220,13 +293,33 @@ export const useLiveSession = ({
 
         const pcmBuffer = Buffer.from(result.buffer);
         const base64Audio = pcmBuffer.toString("base64");
-        sessionRef.current.sendRealtimeInput({
-          audio: { data: base64Audio, mimeType: `audio/pcm;rate=${TARGET_SAMPLE_RATE}` },
-        });
+        const media: GenaiBlob = { data: base64Audio, mimeType: `audio/pcm;rate=${TARGET_SAMPLE_RATE}` };
+        sessionRef.current.sendRealtimeInput({ media });
       };
 
       source.connect(scriptProcessorRef.current);
       scriptProcessorRef.current.connect(audioContextRef.current.destination);
+
+      if (options.streamVideo && videoStreamRef.current) {
+        const video = document.createElement("video");
+        video.srcObject = videoStreamRef.current;
+        video.muted = true;
+        video.play();
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        videoFrameIntervalRef.current = setInterval(() => {
+          if (!sessionRef.current || !ctx) return;
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+          const base64Data = dataUrl.split(",")[1];
+          const media: GenaiBlob = { data: base64Data, mimeType: "image/jpeg" };
+          sessionRef.current.sendRealtimeInput({ media });
+        }, 1000 / VIDEO_FRAME_RATE);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       showToast(message, "error");

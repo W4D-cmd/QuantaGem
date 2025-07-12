@@ -1084,7 +1084,7 @@ export default function Home() {
     setMessages((prev) => [...prev, newUserMessage]);
 
     if (isFirstMessageForChatSession && inputText.trim()) {
-      await generateAndSetChatTitle(
+      generateAndSetChatTitle(
         sessionId,
         inputText.trim(),
         keySelection,

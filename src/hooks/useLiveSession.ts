@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Blob as GenaiBlob, Content, GoogleGenAI, LiveConnectConfig, Modality, Session } from "@google/genai";
 
-const MODEL_NAME = "gemini-live-2.5-flash-preview";
+const MODEL_NAME = "gemini-2.5-flash-preview-native-audio-dialog";
 const TARGET_SAMPLE_RATE = 16000;
 const OUTPUT_SAMPLE_RATE = 24000;
 const VIDEO_FRAME_RATE = 1; // 1 frame per second
@@ -165,7 +165,7 @@ export const useLiveSession = ({
 
       const ai = new GoogleGenAI({
         apiKey: token,
-        httpOptions: { apiVersion: "v1alpha" },
+        apiVersion: "v1alpha",
       });
 
       const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -178,15 +178,8 @@ export const useLiveSession = ({
       }
 
       const config: LiveConnectConfig = {
-        responseModalities: [Modality.AUDIO, Modality.TEXT],
-        speechConfig: {
-          languageCode: "de-DE",
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: "Leda",
-            },
-          },
-        },
+        responseModalities: [Modality.AUDIO],
+        enableAffectiveDialog: true,
       };
 
       const liveSession = await ai.live.connect({

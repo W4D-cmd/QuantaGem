@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getUserFromToken } from "@/lib/auth";
 
-const MODEL_NAME = "gemini-live-2.5-flash-preview";
-
 export async function POST(request: NextRequest) {
   const user = await getUserFromToken(request);
   if (!user) {
@@ -18,16 +16,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const genAI = new GoogleGenAI({ apiKey });
+    const genAI = new GoogleGenAI({ apiKey: apiKey, apiVersion: "v1alpha" });
 
     const token = await genAI.authTokens.create({
       config: {
-        liveConnectConstraints: {
-          model: MODEL_NAME,
-        },
-        httpOptions: {
-          apiVersion: "v1alpha",
-        },
+        httpOptions: { apiVersion: "v1alpha" },
       },
     });
 

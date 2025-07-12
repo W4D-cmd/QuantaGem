@@ -119,6 +119,48 @@ const ProtectedImage = memo(
 
 ProtectedImage.displayName = "ProtectedImage";
 
+const ProtectedAudio = memo(
+  ({ objectName, getAuthHeaders }: { objectName: string; getAuthHeaders: () => HeadersInit }) => {
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+      let objectUrl: string | null = null;
+      const fetchAudio = async () => {
+        try {
+          const res = await fetch(`/api/files/${objectName}`, {
+            headers: getAuthHeaders(),
+          });
+          if (!res.ok) {
+            console.error(`Failed to fetch audio ${objectName}: ${res.statusText}`);
+            return;
+          }
+          const blob = await res.blob();
+          objectUrl = URL.createObjectURL(blob);
+          setAudioUrl(objectUrl);
+        } catch (error) {
+          console.error(`Error loading audio ${objectName}:`, error);
+        }
+      };
+
+      fetchAudio();
+
+      return () => {
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+        }
+      };
+    }, [objectName, getAuthHeaders]);
+
+    if (!audioUrl) {
+      return <div className="text-sm text-neutral-500">Loading audio...</div>;
+    }
+
+    return <audio controls src={audioUrl} className="w-full" />;
+  },
+);
+
+ProtectedAudio.displayName = "ProtectedAudio";
+
 interface CodeBlockWithCopyProps {
   children: React.ReactNode;
   chatAreaContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -589,6 +631,12 @@ function ChatAreaComponent(
                                 mimeType={part.mimeType}
                                 getAuthHeaders={getAuthHeaders}
                               />
+                            </div>
+                          );
+                        } else if (part.mimeType.startsWith("audio/")) {
+                          return (
+                            <div key={j} className="my-2">
+                              <ProtectedAudio objectName={part.objectName} getAuthHeaders={getAuthHeaders} />
                             </div>
                           );
                         } else {

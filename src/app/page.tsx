@@ -173,6 +173,7 @@ export default function Home() {
   });
   const [isLiveSessionActive, setIsLiveSessionActive] = useState(false);
   const [liveInterimText, setLiveInterimText] = useState("");
+  const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
 
   const dragCounter = useRef(0);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1101,6 +1102,53 @@ export default function Home() {
     await callChatApiAndStreamResponse(newUserMessageParts, historyForAPI, sessionId, sendWithSearch);
   };
 
+  const handleLiveSessionTurnComplete = async (text: string, audioBlob: Blob | null) => {
+    if (!text.trim() && !audioBlob) return;
+
+    const newParts: MessagePart[] = [];
+    if (text.trim()) {
+      newParts.push({ type: "text", text: text.trim() });
+    }
+
+    if (audioBlob) {
+      try {
+        const formData = new FormData();
+        formData.append("file", audioBlob, "live-session-audio.wav");
+        const res = await fetch("/api/files/upload", {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: formData,
+        });
+        if (!res.ok) {
+          throw new Error("Failed to upload live audio.");
+        }
+        const audioInfo: UploadedFileInfo = await res.json();
+        newParts.push({
+          type: "file",
+          fileName: "Live Audio Response",
+          mimeType: audioInfo.mimeType,
+          objectName: audioInfo.objectName,
+          size: audioInfo.size,
+        });
+      } catch (err) {
+        showToast(extractErrorMessage(err), "error");
+      }
+    }
+
+    if (newParts.length > 0) {
+      setMessages((prevMessages) => {
+        const lastMessage = prevMessages[prevMessages.length - 1];
+        const newModelMessage: Message = {
+          role: "model",
+          parts: newParts,
+          id: Date.now(),
+          position: (lastMessage?.position || 0) + 1,
+        };
+        return [...prevMessages, newModelMessage];
+      });
+    }
+  };
+
   const handleEditSave = async (index: number, newParts: MessagePart[]) => {
     if (!activeChatId || !messages[index] || isLoading) return;
 
@@ -1485,12 +1533,33 @@ export default function Home() {
                   keySelection={keySelection}
                   onLiveSessionStateChange={setIsLiveSessionActive}
                   onLiveInterimText={setLiveInterimText}
+                  onTurnComplete={handleLiveSessionTurnComplete}
+                  onVideoStream={setLocalVideoStream}
                 />
               </div>
             </div>
           </>
         )}
       </main>
+
+      {localVideoStream && (
+        <div
+          className="fixed bottom-24 right-4 w-48 h-auto bg-black border-2 border-blue-500 rounded-lg shadow-2xl z-50
+            animate-pulse"
+        >
+          <video
+            ref={(el) => {
+              if (el) el.srcObject = localVideoStream;
+            }}
+            autoPlay
+            muted
+            className="w-full h-full rounded-lg"
+          />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs font-bold">
+            SCREEN SHARING
+          </div>
+        </div>
+      )}
 
       <SettingsModal
         isOpen={isSettingsModalOpen}

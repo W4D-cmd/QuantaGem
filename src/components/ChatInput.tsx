@@ -22,6 +22,7 @@ import {
   XCircleIcon,
   XMarkIcon,
   ChatBubbleLeftRightIcon,
+  VideoCameraIcon,
 } from "@heroicons/react/24/outline";
 import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
 import { Message, ProjectFile } from "@/app/page";
@@ -53,6 +54,8 @@ interface ChatInputProps {
   keySelection: "free" | "paid";
   onLiveSessionStateChange: (isActive: boolean) => void;
   onLiveInterimText: (text: string) => void;
+  onTurnComplete: (text: string, audioBlob: Blob | null) => void;
+  onVideoStream: (stream: MediaStream | null) => void;
 }
 
 export interface ChatInputHandle {
@@ -163,6 +166,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       keySelection,
       onLiveSessionStateChange,
       onLiveInterimText,
+      onTurnComplete,
+      onVideoStream,
     },
     ref,
   ) => {
@@ -199,9 +204,11 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       showToast,
       onStateChange: onLiveSessionStateChange,
       onInterimText: onLiveInterimText,
+      onTurnComplete: onTurnComplete,
+      onVideoStream: onVideoStream,
     });
 
-    const handleStartLiveSession = () => {
+    const handleStartLiveSession = (withVideo: boolean) => {
       const historyForLive: Content[] = messages.map((msg) => ({
         role: msg.role,
         parts: msg.parts.reduce<Part[]>((acc, part) => {
@@ -211,7 +218,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           return acc;
         }, []),
       }));
-      startSession(historyForLive);
+      startSession(historyForLive, { streamVideo: withVideo });
     };
 
     const uploadFileWithProgress = (uploadingFile: { file: File; id: string; progress: number }) => {
@@ -796,17 +803,42 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               <div className="flex items-center gap-2">
                 {!isLoading && !isTranscribing && !isScanning && (
                   <>
-                    <Tooltip text={isLiveSessionActive ? "Stop Live Chat" : "Start Live Chat"}>
+                    <Tooltip text={isLiveSessionActive ? "Stop Live Chat" : "Start Live Chat + Screen"}>
                       <button
                         type="button"
-                        onClick={isLiveSessionActive ? stopSession : handleStartLiveSession}
+                        onClick={isLiveSessionActive ? stopSession : () => handleStartLiveSession(true)}
                         disabled={isLoading || isRecording || isTranscribing || isScanning || isLiveConnecting}
                         className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
                         font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
                         hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700
                         ${isLiveSessionActive ? "border-blue-500 animate-pulse" : ""}`}
                       >
-                        {isLiveConnecting ? (
+                        {isLiveConnecting && !isLiveSessionActive ? (
+                          <div
+                            className="w-4 h-4 border-2 border-neutral-300 border-t-blue-500 rounded-full animate-spin"
+                          />
+                        ) : (
+                          <VideoCameraIcon
+                            className={`size-5 transition-colors ${
+                              isLiveSessionActive
+                                ? "text-blue-500 dark:text-blue-400"
+                                : "text-neutral-500 dark:text-neutral-300"
+                              }`}
+                          />
+                        )}
+                      </button>
+                    </Tooltip>
+                    <Tooltip text={isLiveSessionActive ? "Stop Live Chat" : "Start Live Chat (Audio Only)"}>
+                      <button
+                        type="button"
+                        onClick={isLiveSessionActive ? stopSession : () => handleStartLiveSession(false)}
+                        disabled={isLoading || isRecording || isTranscribing || isScanning || isLiveConnecting}
+                        className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
+                        font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
+                        hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700
+                        ${isLiveSessionActive ? "border-blue-500 animate-pulse" : ""}`}
+                      >
+                        {isLiveConnecting && !isLiveSessionActive ? (
                           <div
                             className="w-4 h-4 border-2 border-neutral-300 border-t-blue-500 rounded-full animate-spin"
                           />

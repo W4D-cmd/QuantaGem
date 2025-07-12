@@ -1087,7 +1087,7 @@ export default function Home() {
     setMessages((prev) => [...prev, newUserMessage]);
 
     if (isFirstMessageForChatSession && inputText.trim()) {
-      generateAndSetChatTitle(
+      await generateAndSetChatTitle(
         sessionId,
         inputText.trim(),
         keySelection,
@@ -1476,6 +1476,7 @@ export default function Home() {
                   onSendMessageAction={handleSendMessage}
                   onCancelAction={handleCancel}
                   isLoading={isLoading}
+                  messages={messages}
                   isSearchActive={isSearchActive}
                   onToggleSearch={setIsSearchActive}
                   getAuthHeaders={getAuthHeaders}

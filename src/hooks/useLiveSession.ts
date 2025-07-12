@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { GoogleGenAI, Session, Modality } from "@google/genai";
+import { GoogleGenAI, Session, Modality, Content, LiveConnectConfig } from "@google/genai";
 
 const MODEL_NAME = "gemini-live-2.5-flash-preview";
 const TARGET_SAMPLE_RATE = 16000;
@@ -88,7 +88,7 @@ export const useLiveSession = ({
     };
   }, []);
 
-  const startSession = async () => {
+  const startSession = async (history: Content[]) => {
     if (sessionRef.current || isConnecting) {
       return;
     }
@@ -111,20 +111,21 @@ export const useLiveSession = ({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       microphoneStreamRef.current = stream;
 
-      const liveSession = await ai.live.connect({
-        model: MODEL_NAME,
-        config: {
-          responseModalities: [Modality.AUDIO, Modality.TEXT],
-          sessionResumption: {},
-          speechConfig: {
-            languageCode: "de-DE",
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: "Leda",
-              },
+      const config: LiveConnectConfig = {
+        responseModalities: [Modality.AUDIO, Modality.TEXT],
+        speechConfig: {
+          languageCode: "de-DE",
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: "Leda",
             },
           },
         },
+      };
+
+      const liveSession = await ai.live.connect({
+        model: MODEL_NAME,
+        config: config,
         callbacks: {
           onopen: () => {
             onStateChange(true);
@@ -171,6 +172,23 @@ export const useLiveSession = ({
       });
 
       sessionRef.current = liveSession;
+
+      if (history && history.length > 0) {
+        const historyString = history
+          .map((c) => {
+            const partsText = c.parts?.map((p) => p.text || "").join(" ") || "";
+            return `${c.role}: ${partsText.trim()}`;
+          })
+          .join("\n");
+
+        const contextPrompt = `Here is our conversation history so far. Use this as context for my next live audio input. Do not respond to this message, just wait for my voice.\n\n--- HISTORY ---\n${historyString}\n--- END HISTORY ---`;
+
+        console.log("Sending context to Live Session:", contextPrompt);
+
+        sessionRef.current.sendClientContent({
+          turns: contextPrompt,
+        });
+      }
 
       audioContextRef.current = new window.AudioContext();
       const source = audioContextRef.current.createMediaStreamSource(stream);

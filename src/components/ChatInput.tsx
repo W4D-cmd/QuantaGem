@@ -24,12 +24,13 @@ import {
   ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
-import { ProjectFile } from "@/app/page";
+import { Message, ProjectFile } from "@/app/page";
 import { ArrowUpIcon } from "@heroicons/react/20/solid";
 import { StopIcon } from "@heroicons/react/16/solid";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
 import { ToastProps } from "./Toast";
 import { useLiveSession } from "@/hooks/useLiveSession";
+import { Content, Part } from "@google/genai";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -43,6 +44,7 @@ interface ChatInputProps {
   onSendMessageAction: (inputText: string, files: UploadedFileInfo[], isSearchActive: boolean) => void;
   onCancelAction: () => void;
   isLoading: boolean;
+  messages: Message[];
   isSearchActive: boolean;
   onToggleSearch: (isActive: boolean) => void;
   getAuthHeaders: () => HeadersInit;
@@ -152,6 +154,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onSendMessageAction,
       onCancelAction,
       isLoading,
+      messages,
       isSearchActive,
       onToggleSearch,
       getAuthHeaders,
@@ -197,6 +200,19 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onStateChange: onLiveSessionStateChange,
       onInterimText: onLiveInterimText,
     });
+
+    const handleStartLiveSession = () => {
+      const historyForLive: Content[] = messages.map((msg) => ({
+        role: msg.role,
+        parts: msg.parts.reduce<Part[]>((acc, part) => {
+          if (part.type === "text" && part.text) {
+            acc.push({ text: part.text });
+          }
+          return acc;
+        }, []),
+      }));
+      startSession(historyForLive);
+    };
 
     const uploadFileWithProgress = (uploadingFile: { file: File; id: string; progress: number }) => {
       return new Promise<UploadedFileInfo | null>((resolve) => {
@@ -783,7 +799,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     <Tooltip text={isLiveSessionActive ? "Stop Live Chat" : "Start Live Chat"}>
                       <button
                         type="button"
-                        onClick={isLiveSessionActive ? stopSession : startSession}
+                        onClick={isLiveSessionActive ? stopSession : handleStartLiveSession}
                         disabled={isLoading || isRecording || isTranscribing || isScanning || isLiveConnecting}
                         className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
                         font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300

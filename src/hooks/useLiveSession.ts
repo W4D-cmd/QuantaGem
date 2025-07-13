@@ -67,21 +67,21 @@ const createWavBlob = (audioChunks: ArrayBuffer[], sampleRate: number): Blob => 
   const buffer = new ArrayBuffer(44 + totalLength);
   const view = new DataView(buffer);
 
-  view.setUint32(0, 0x52494646, false); // "RIFF"
-  view.setUint32(4, 36 + totalLength, true); // file size - 8
-  view.setUint32(8, 0x57415645, false); // "WAVE"
+  view.setUint32(0, 0x52494646, false);
+  view.setUint32(4, 36 + totalLength, true);
+  view.setUint32(8, 0x57415645, false);
 
-  view.setUint32(12, 0x666d7420, false); // "fmt "
-  view.setUint32(16, 16, true); // PCM chunk size
-  view.setUint16(20, 1, true); // PCM format
-  view.setUint16(22, 1, true); // mono
-  view.setUint32(24, sampleRate, true); // sample rate
-  view.setUint32(28, sampleRate * 2, true); // byte rate
-  view.setUint16(32, 2, true); // block align
-  view.setUint16(34, 16, true); // bits per sample
+  view.setUint32(12, 0x666d7420, false);
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
 
-  view.setUint32(36, 0x64617461, false); // "data"
-  view.setUint32(40, totalLength, true); // data chunk size
+  view.setUint32(36, 0x64617461, false);
+  view.setUint32(40, totalLength, true);
 
   const audioData = new Uint8Array(buffer, 44);
   let offset = 0;
@@ -112,12 +112,32 @@ export const useLiveSession = ({
   const playbackQueueRef = useRef<Float32Array[]>([]);
   const isPlayingRef = useRef(false);
   const nextPlayTimeRef = useRef(0);
+  const activePlaybackSourcesRef = useRef<AudioBufferSourceNode[]>([]);
 
   const videoStreamRef = useRef<MediaStream | null>(null);
   const videoFrameIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const accumulatedTextRef = useRef("");
   const audioBufferChunksRef = useRef<ArrayBuffer[]>([]);
   const lastPlaybackSampleRateRef = useRef(OUTPUT_SAMPLE_RATE);
+  const isModelSpeakingRef = useRef(false);
+
+  const stopCurrentPlayback = useCallback(() => {
+    activePlaybackSourcesRef.current.forEach((source) => {
+      try {
+        source.stop();
+      } catch (e) {
+        console.log(e);
+      }
+      source.disconnect();
+    });
+    activePlaybackSourcesRef.current = [];
+    playbackQueueRef.current = [];
+    isPlayingRef.current = false;
+    isModelSpeakingRef.current = false;
+    if (playbackAudioContextRef.current) {
+      nextPlayTimeRef.current = playbackAudioContextRef.current.currentTime;
+    }
+  }, []);
 
   const stopAudioProcessing = useCallback(() => {
     microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -133,13 +153,12 @@ export const useLiveSession = ({
     }
     audioContextRef.current = null;
 
-    isPlayingRef.current = false;
-    playbackQueueRef.current = [];
+    stopCurrentPlayback();
     if (playbackAudioContextRef.current && playbackAudioContextRef.current.state !== "closed") {
       playbackAudioContextRef.current.close();
     }
     playbackAudioContextRef.current = null;
-  }, []);
+  }, [stopCurrentPlayback]);
 
   const stopVideoProcessing = useCallback(() => {
     if (videoFrameIntervalRef.current) {
@@ -170,6 +189,7 @@ export const useLiveSession = ({
     }
 
     isPlayingRef.current = true;
+    isModelSpeakingRef.current = true;
 
     const totalLength = playbackQueueRef.current.reduce((acc, chunk) => acc + chunk.length, 0);
     const mergedAudio = new Float32Array(totalLength);
@@ -187,6 +207,7 @@ export const useLiveSession = ({
     const source = audioContext.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(audioContext.destination);
+    activePlaybackSourcesRef.current.push(source);
 
     const startTime = Math.max(audioContext.currentTime, nextPlayTimeRef.current);
     source.start(startTime);
@@ -194,8 +215,14 @@ export const useLiveSession = ({
     nextPlayTimeRef.current = startTime + audioBuffer.duration;
 
     source.onended = () => {
-      isPlayingRef.current = false;
-      processAndPlayAudio();
+      activePlaybackSourcesRef.current = activePlaybackSourcesRef.current.filter((s) => s !== source);
+      if (activePlaybackSourcesRef.current.length === 0) {
+        isPlayingRef.current = false;
+        if (playbackQueueRef.current.length === 0) {
+          isModelSpeakingRef.current = false;
+        }
+        processAndPlayAudio();
+      }
     };
   }, []);
 
@@ -232,6 +259,7 @@ export const useLiveSession = ({
 
       const config: LiveConnectConfig = {
         responseModalities: [Modality.AUDIO],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Sulafat" } } },
         enableAffectiveDialog: true,
       };
 
@@ -244,6 +272,10 @@ export const useLiveSession = ({
             setIsConnecting(false);
           },
           onmessage: (message) => {
+            if (message.serverContent?.interrupted) {
+              console.log("Model playback was interrupted by the server.");
+              stopCurrentPlayback();
+            }
             if (message.serverContent?.modelTurn?.parts) {
               const part = message.serverContent.modelTurn.parts[0];
               if (part.text) {
@@ -280,7 +312,7 @@ export const useLiveSession = ({
                   float32Array[i] = int16Array[i] / 32767.0;
                 }
 
-                if (playbackQueueRef.current.length === 0) {
+                if (playbackQueueRef.current.length === 0 && !isPlayingRef.current) {
                   nextPlayTimeRef.current = playbackAudioContextRef.current.currentTime;
                 }
 
@@ -342,8 +374,8 @@ export const useLiveSession = ({
 
       workletNode.port.onmessage = (event) => {
         if (!sessionRef.current) return;
-        const pcm16Buffer = event.data;
 
+        const pcm16Buffer = event.data;
         let binary = "";
         const bytes = new Uint8Array(pcm16Buffer);
         const len = bytes.byteLength;
@@ -385,7 +417,6 @@ export const useLiveSession = ({
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       showToast(message, "error");
-      console.error("Failed to start live session:", err);
       stopSession();
       setIsConnecting(false);
     }

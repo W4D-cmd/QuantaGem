@@ -1,13 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import {
-  Blob as GenaiBlob,
-  Content,
-  GoogleGenAI,
-  LiveConnectConfig,
-  MediaResolution,
-  Modality,
-  Session,
-} from "@google/genai";
+import { Blob as GenaiBlob, Content, GoogleGenAI, LiveConnectConfig, Modality, Session } from "@google/genai";
 
 const MODEL_NAME = "gemini-2.5-flash-preview-native-audio-dialog";
 const TARGET_SAMPLE_RATE = 16000;
@@ -133,7 +125,6 @@ export const useLiveSession = ({
 
   const sessionHandleRef = useRef<string | null>(null);
   const lastHistoryRef = useRef<Content[]>([]);
-  const lastOptionsRef = useRef<{ streamVideo: boolean }>({ streamVideo: false });
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const manualStopRef = useRef(false);
 
@@ -239,7 +230,7 @@ export const useLiveSession = ({
   }, []);
 
   const connectToGemini = useCallback(
-    async (history: Content[], options: { streamVideo: boolean }) => {
+    async (history: Content[]) => {
       if (sessionRef.current) {
         sessionRef.current.close();
         sessionRef.current = null;
@@ -260,9 +251,9 @@ export const useLiveSession = ({
 
         const config: LiveConnectConfig = {
           responseModalities: [Modality.AUDIO],
-          mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Sulafat" } } },
           enableAffectiveDialog: true,
+          proactivity: { proactiveAudio: true },
           sessionResumption: { handle: sessionHandleRef.current ?? undefined },
           contextWindowCompression: { slidingWindow: {} },
         };
@@ -285,7 +276,7 @@ export const useLiveSession = ({
                 sessionRef.current = null;
                 if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
                 reconnectTimeoutRef.current = setTimeout(() => {
-                  connectToGemini(lastHistoryRef.current, lastOptionsRef.current);
+                  connectToGemini(lastHistoryRef.current);
                 }, 1000);
               }
               if (message.serverContent?.interrupted) {
@@ -346,7 +337,7 @@ export const useLiveSession = ({
               if (!manualStopRef.current && sessionHandleRef.current) {
                 if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
                 reconnectTimeoutRef.current = setTimeout(() => {
-                  connectToGemini(lastHistoryRef.current, lastOptionsRef.current);
+                  connectToGemini(lastHistoryRef.current);
                 }, 1000);
               }
             },
@@ -364,25 +355,6 @@ export const useLiveSession = ({
             .join("\n");
           const contextPrompt = `Here is our conversation history so far. Use this as context for my next live audio input. Do not respond to this message, just wait for my voice.\n\n--- HISTORY ---\n${historyString}\n--- END HISTORY ---`;
           sessionRef.current.sendClientContent({ turns: contextPrompt });
-        }
-
-        if (options.streamVideo && videoStreamRef.current) {
-          const video = document.createElement("video");
-          video.srcObject = videoStreamRef.current;
-          video.muted = true;
-          video.play();
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          videoFrameIntervalRef.current = setInterval(() => {
-            if (!sessionRef.current || !ctx) return;
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-            const base64Data = dataUrl.split(",")[1];
-            const media: GenaiBlob = { data: base64Data, mimeType: "image/jpeg" };
-            sessionRef.current.sendRealtimeInput({ media });
-          }, 1000 / VIDEO_FRAME_RATE);
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -446,7 +418,26 @@ export const useLiveSession = ({
         workletNode.connect(gainNode);
         gainNode.connect(audioContextRef.current.destination);
 
-        await connectToGemini(history, options);
+        if (options.streamVideo && videoStreamRef.current) {
+          const video = document.createElement("video");
+          video.srcObject = videoStreamRef.current;
+          video.muted = true;
+          video.play();
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          videoFrameIntervalRef.current = setInterval(() => {
+            if (!sessionRef.current || !ctx) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+            const base64Data = dataUrl.split(",")[1];
+            const media: GenaiBlob = { data: base64Data, mimeType: "image/jpeg" };
+            sessionRef.current.sendRealtimeInput({ media });
+          }, 1000 / VIDEO_FRAME_RATE);
+        }
+
+        await connectToGemini(history);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         showToast(message, "error");

@@ -125,6 +125,7 @@ export const useLiveSession = ({
   const lastHistoryRef = useRef<Content[]>([]);
   const lastOptionsRef = useRef<{ streamVideo: boolean }>({ streamVideo: false });
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const manualStopRef = useRef(false);
 
   const stopCurrentPlayback = useCallback(() => {
     activePlaybackSourcesRef.current.forEach((source) => {
@@ -176,6 +177,7 @@ export const useLiveSession = ({
   }, [onVideoStream]);
 
   const stopSession = useCallback(() => {
+    manualStopRef.current = true;
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
@@ -241,6 +243,7 @@ export const useLiveSession = ({
       if (sessionRef.current || isConnecting) {
         return;
       }
+      manualStopRef.current = false;
       setIsConnecting(true);
       accumulatedTextRef.current = "";
       audioBufferChunksRef.current = [];
@@ -365,13 +368,14 @@ export const useLiveSession = ({
             },
             onclose: (e) => {
               console.log("Live session closed:", e.code, e.reason);
-              if (sessionHandleRef.current) {
-                console.log("Attempting to reconnect...");
+              if (!manualStopRef.current && sessionHandleRef.current) {
+                console.log("Connection closed unexpectedly. Attempting to reconnect...");
                 if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
                 reconnectTimeoutRef.current = setTimeout(() => {
                   startSession(lastHistoryRef.current, lastOptionsRef.current);
                 }, 1000);
               } else {
+                console.log("Manual stop or unrecoverable error. Not reconnecting.");
                 stopSession();
               }
             },
@@ -464,11 +468,11 @@ export const useLiveSession = ({
       keySelection,
       onVideoStream,
       onStateChange,
-      stopCurrentPlayback,
       onInterimText,
-      processAndPlayAudio,
       onTurnComplete,
+      processAndPlayAudio,
       showToast,
+      stopCurrentPlayback,
       stopSession,
     ],
   );

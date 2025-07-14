@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Blob as GenaiBlob, Content, GoogleGenAI, Session } from "@google/genai";
 import { getLiveConnectConfig, LiveModel } from "@/lib/live-models";
 
@@ -60,6 +60,7 @@ interface UseLiveSessionProps {
   onInterimText: (text: string) => void;
   onTurnComplete: (text: string, audioBlob: Blob | null) => void;
   onVideoStream: (stream: MediaStream | null) => void;
+  isAutoMuteEnabled: boolean;
 }
 
 const createWavBlob = (audioChunks: ArrayBuffer[], sampleRate: number): Blob => {
@@ -101,9 +102,11 @@ export const useLiveSession = ({
   onInterimText,
   onTurnComplete,
   onVideoStream,
+  isAutoMuteEnabled,
 }: UseLiveSessionProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isModelSpeaking, setIsModelSpeaking] = useState(false);
 
   const sessionRef = useRef<Session | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -121,12 +124,23 @@ export const useLiveSession = ({
   const accumulatedTextRef = useRef("");
   const audioBufferChunksRef = useRef<ArrayBuffer[]>([]);
   const lastPlaybackSampleRateRef = useRef(OUTPUT_SAMPLE_RATE);
-  const isModelSpeakingRef = useRef(false);
 
   const sessionHandleRef = useRef<string | null>(null);
   const lastHistoryRef = useRef<Content[]>([]);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const manualStopRef = useRef(false);
+
+  useEffect(() => {
+    if (!microphoneStreamRef.current) return;
+    const audioTrack = microphoneStreamRef.current.getAudioTracks()[0];
+    if (!audioTrack) return;
+
+    if (isAutoMuteEnabled && isModelSpeaking) {
+      audioTrack.enabled = false;
+    } else {
+      audioTrack.enabled = true;
+    }
+  }, [isAutoMuteEnabled, isModelSpeaking]);
 
   const stopCurrentPlayback = useCallback(() => {
     activePlaybackSourcesRef.current.forEach((source) => {
@@ -140,7 +154,7 @@ export const useLiveSession = ({
     activePlaybackSourcesRef.current = [];
     playbackQueueRef.current = [];
     isPlayingRef.current = false;
-    isModelSpeakingRef.current = false;
+    setIsModelSpeaking(false);
 
     if (playbackAudioContextRef.current && playbackAudioContextRef.current.state !== "closed") {
       playbackAudioContextRef.current.close();
@@ -185,6 +199,7 @@ export const useLiveSession = ({
     }
     cleanupResources();
     setIsSessionActive(false);
+    setIsModelSpeaking(false);
     onStateChange(false);
     onInterimText("");
     accumulatedTextRef.current = "";
@@ -197,7 +212,7 @@ export const useLiveSession = ({
       return;
     }
     isPlayingRef.current = true;
-    isModelSpeakingRef.current = true;
+    setIsModelSpeaking(true);
     const totalLength = playbackQueueRef.current.reduce((acc, chunk) => acc + chunk.length, 0);
     const mergedAudio = new Float32Array(totalLength);
     let offset = 0;
@@ -221,7 +236,7 @@ export const useLiveSession = ({
       if (activePlaybackSourcesRef.current.length === 0) {
         isPlayingRef.current = false;
         if (playbackQueueRef.current.length === 0) {
-          isModelSpeakingRef.current = false;
+          setIsModelSpeaking(false);
         }
         processAndPlayAudio();
       }

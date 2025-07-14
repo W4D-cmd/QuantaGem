@@ -57,12 +57,13 @@ export const languageCodes = [
 export function getLiveConnectConfig(
   model: LiveModel,
   languageCode: string,
+  voiceName: string,
   sessionHandle: string | null,
 ): LiveConnectConfig {
   if (model.configType === "dialog") {
     return {
       responseModalities: [Modality.AUDIO],
-      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Sulafat" } } },
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } } },
       enableAffectiveDialog: true,
       proactivity: { proactiveAudio: true },
       sessionResumption: { handle: sessionHandle ?? undefined },
@@ -75,7 +76,7 @@ export function getLiveConnectConfig(
         languageCode: languageCode,
         voiceConfig: {
           prebuiltVoiceConfig: {
-            voiceName: "Orus",
+            voiceName: voiceName,
           },
         },
       },

@@ -414,7 +414,7 @@ export const useLiveSession = ({
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+            const dataUrl = canvas.toDataURL("image/jpeg", 1.0);
             const base64Data = dataUrl.split(",")[1];
             const media: GenaiBlob = { data: base64Data, mimeType: "image/jpeg" };
             sessionRef.current.sendRealtimeInput({ media });

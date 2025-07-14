@@ -28,7 +28,7 @@ const SubMenu: React.FC<SubMenuProps> = ({ items, onSelect, title, onMouseEnter 
   >
     <div className="p-2">
       <h4 className="px-3 py-1 text-xs font-semibold text-neutral-500 dark:text-neutral-400">{title}</h4>
-      <div className="max-h-64 overflow-y-auto space-y-1 mt-1">
+      <div className="max-h-36 overflow-y-auto space-y-1 mt-1">
         {items.map((item) => (
           <Tooltip key={item.id} text={item.secondaryLabel || ""}>
             <button

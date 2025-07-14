@@ -230,7 +230,13 @@ export const useLiveSession = ({
   }, []);
 
   const startSession = useCallback(
-    async (history: Content[], liveModel: LiveModel, languageCode: string, options: { streamVideo: boolean }) => {
+    async (
+      history: Content[],
+      liveModel: LiveModel,
+      languageCode: string,
+      voiceName: string,
+      options: { streamVideo: boolean },
+    ) => {
       if (isConnecting || isSessionActive) return;
       manualStopRef.current = false;
       lastHistoryRef.current = history;
@@ -254,7 +260,7 @@ export const useLiveSession = ({
 
           const ai = new GoogleGenAI({ apiKey: token, apiVersion: "v1alpha" });
 
-          const currentConfig = getLiveConnectConfig(liveModel, languageCode, sessionHandleRef.current);
+          const currentConfig = getLiveConnectConfig(liveModel, languageCode, voiceName, sessionHandleRef.current);
 
           const liveSession = await ai.live.connect({
             model: liveModel.name,

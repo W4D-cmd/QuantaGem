@@ -24,6 +24,8 @@ import ThemeToggleButton from "@/components/ThemeToggleButton";
 import ProjectManagement from "@/components/ProjectManagement";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import ConfirmationModal from "@/components/ConfirmationModal";
+import { liveModels, LiveModel } from "@/lib/live-models";
+import { dialogVoices, standardVoices } from "@/lib/voices";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
 
@@ -174,6 +176,10 @@ export default function Home() {
   const [isLiveSessionActive, setIsLiveSessionActive] = useState(false);
   const [liveInterimText, setLiveInterimText] = useState("");
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
+
+  const [selectedLiveModel, setSelectedLiveModel] = useState<LiveModel>(liveModels[0]);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("de-DE");
+  const [selectedVoice, setSelectedVoice] = useState<string>("Sulafat");
 
   const dragCounter = useRef(0);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -402,6 +408,19 @@ export default function Home() {
         },
         body: JSON.stringify({ lastModel: modelName }),
       }).catch((err) => showToast(extractErrorMessage(err), "error"));
+    }
+  };
+
+  const handleLiveModelChange = (model: LiveModel) => {
+    setSelectedLiveModel(model);
+    if (model.configType === "dialog") {
+      if (!dialogVoices.some((v) => v.name === selectedVoice)) {
+        setSelectedVoice(dialogVoices[0].name);
+      }
+    } else {
+      if (!standardVoices.includes(selectedVoice)) {
+        setSelectedVoice(standardVoices[0]);
+      }
     }
   };
 
@@ -1400,7 +1419,7 @@ export default function Home() {
           className="flex-none sticky min-h-16 top-0 z-10 px-4 py-2 border-b border-neutral-100 dark:border-neutral-950
             transition-colors duration-300 ease-in-out flex items-center justify-between"
         >
-          {displayingProjectManagementId === null && (
+          {displayingProjectManagementId === null ? (
             <>
               <ModelSelector models={models} selected={selectedModel} onChangeAction={handleModelChange} />
 
@@ -1426,6 +1445,8 @@ export default function Home() {
                 </Tooltip>
               </div>
             </>
+          ) : (
+            <div />
           )}
           <div className="flex items-center ml-auto">
             <div className="relative ms-2">
@@ -1535,6 +1556,12 @@ export default function Home() {
                   onLiveInterimText={setLiveInterimText}
                   onTurnComplete={handleLiveSessionTurnComplete}
                   onVideoStream={setLocalVideoStream}
+                  selectedLiveModel={selectedLiveModel}
+                  onLiveModelChange={handleLiveModelChange}
+                  selectedLanguage={selectedLanguage}
+                  onLanguageChange={setSelectedLanguage}
+                  selectedVoice={selectedVoice}
+                  onVoiceChange={setSelectedVoice}
                 />
               </div>
             </div>

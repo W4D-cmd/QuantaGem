@@ -15,10 +15,8 @@ import Tooltip from "@/components/Tooltip";
 import {
   ArrowPathIcon,
   CheckIcon,
-  ChevronDownIcon,
   FolderOpenIcon,
   GlobeAltIcon as OutlineGlobeAltIcon,
-  LanguageIcon,
   MicrophoneIcon,
   PaperClipIcon,
   XCircleIcon,
@@ -35,6 +33,8 @@ import { ToastProps } from "./Toast";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import { Content, Part } from "@google/genai";
 import { liveModels, languageCodes, LiveModel } from "@/lib/live-models";
+import ChatInputSettingsMenu from "./ChatInputSettingsMenu";
+import { dialogVoices, standardVoices } from "@/lib/voices";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -59,6 +59,12 @@ interface ChatInputProps {
   onLiveInterimText: (text: string) => void;
   onTurnComplete: (text: string, audioBlob: Blob | null) => void;
   onVideoStream: (stream: MediaStream | null) => void;
+  selectedLiveModel: LiveModel;
+  onLiveModelChange: (model: LiveModel) => void;
+  selectedLanguage: string;
+  onLanguageChange: (lang: string) => void;
+  selectedVoice: string;
+  onVoiceChange: (voice: string) => void;
 }
 
 export interface ChatInputHandle {
@@ -171,6 +177,12 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onLiveInterimText,
       onTurnComplete,
       onVideoStream,
+      selectedLiveModel,
+      onLiveModelChange,
+      selectedLanguage,
+      onLanguageChange,
+      selectedVoice,
+      onVoiceChange,
     },
     ref,
   ) => {
@@ -178,11 +190,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const attachButtonRef = useRef<HTMLButtonElement>(null);
-    const liveModelButtonRef = useRef<HTMLButtonElement>(null);
-    const languageButtonRef = useRef<HTMLButtonElement>(null);
     const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
-    const [isLiveModelMenuOpen, setIsLiveModelMenuOpen] = useState(false);
-    const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
     const [selectedFiles, setSelectedFiles] = useState<UploadedFileInfo[]>([]);
     const [uploadingFiles, setUploadingFiles] = useState<
       { file: File; id: string; progress: number; error?: string }[]
@@ -199,9 +207,6 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const [isScanning, setIsScanning] = useState(false);
     const [scanStatusMessage, setScanStatusMessage] = useState<string | null>(null);
-
-    const [selectedLiveModel, setSelectedLiveModel] = useState<LiveModel>(liveModels[0]);
-    const [selectedLanguage, setSelectedLanguage] = useState<string>("de-DE");
 
     const {
       isConnecting: isLiveConnecting,
@@ -228,7 +233,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           return acc;
         }, []),
       }));
-      startSession(historyForLive, selectedLiveModel, selectedLanguage, { streamVideo: withVideo });
+      startSession(historyForLive, selectedLiveModel, selectedLanguage, selectedVoice, { streamVideo: withVideo });
     };
 
     const uploadFileWithProgress = (uploadingFile: { file: File; id: string; progress: number }) => {
@@ -411,20 +416,6 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         onClick: handleOpenSourceFolder,
       },
     ];
-
-    const liveModelItems: DropdownItem[] = liveModels.map((model) => ({
-      id: model.name,
-      label: model.displayName,
-      onClick: () => setSelectedLiveModel(model),
-      className: selectedLiveModel.name === model.name ? "font-semibold" : "",
-    }));
-
-    const languageItems: DropdownItem[] = languageCodes.map((code) => ({
-      id: code,
-      label: code,
-      onClick: () => setSelectedLanguage(code),
-      className: selectedLanguage === code ? "font-semibold" : "",
-    }));
 
     useEffect(() => {
       const ta = textareaRef.current;
@@ -822,56 +813,19 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     <span>Search</span>
                   </button>
                 </Tooltip>
-                <Tooltip text="Live Chat Model">
-                  <button
-                    ref={liveModelButtonRef}
-                    type="button"
-                    onClick={() => setIsLiveModelMenuOpen((p) => !p)}
-                    disabled={isLiveSessionActive}
-                    className="cursor-pointer h-9 flex items-center gap-2 px-3 rounded-full text-sm font-medium
-                      transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
-                      text-neutral-500 dark:bg-neutral-950 dark:border-neutral-900 dark:text-neutral-300
-                      dark:hover:bg-neutral-700 disabled:opacity-50"
-                  >
-                    <ChatBubbleLeftRightIcon className="size-5" />
-                    <span className="truncate max-w-[120px]">{selectedLiveModel.displayName}</span>
-                    <ChevronDownIcon className="size-4" />
-                  </button>
-                </Tooltip>
-                <DropdownMenu
-                  open={isLiveModelMenuOpen}
-                  onCloseAction={() => setIsLiveModelMenuOpen(false)}
-                  anchorRef={liveModelButtonRef}
-                  items={liveModelItems}
-                  position="left"
+                <ChatInputSettingsMenu
+                  liveModels={liveModels}
+                  selectedLiveModel={selectedLiveModel}
+                  onLiveModelChange={onLiveModelChange}
+                  languages={languageCodes}
+                  selectedLanguage={selectedLanguage}
+                  onLanguageChange={onLanguageChange}
+                  dialogVoices={dialogVoices}
+                  standardVoices={standardVoices}
+                  selectedVoice={selectedVoice}
+                  onVoiceChange={onVoiceChange}
+                  disabled={isLiveSessionActive}
                 />
-                {selectedLiveModel.configType === "standard" && (
-                  <>
-                    <Tooltip text="Language">
-                      <button
-                        ref={languageButtonRef}
-                        type="button"
-                        onClick={() => setIsLanguageMenuOpen((p) => !p)}
-                        disabled={isLiveSessionActive}
-                        className="cursor-pointer h-9 flex items-center gap-2 px-3 rounded-full text-sm font-medium
-                          transition-colors duration-300 ease-in-out bg-white border border-neutral-300
-                          hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-950 dark:border-neutral-900
-                          dark:text-neutral-300 dark:hover:bg-neutral-700 disabled:opacity-50"
-                      >
-                        <LanguageIcon className="size-5" />
-                        <span>{selectedLanguage}</span>
-                        <ChevronDownIcon className="size-4" />
-                      </button>
-                    </Tooltip>
-                    <DropdownMenu
-                      open={isLanguageMenuOpen}
-                      onCloseAction={() => setIsLanguageMenuOpen(false)}
-                      anchorRef={languageButtonRef}
-                      items={languageItems}
-                      position="left"
-                    />
-                  </>
-                )}
               </div>
 
               <div className="flex items-center gap-2">

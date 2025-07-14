@@ -1,4 +1,4 @@
-import { LiveConnectConfig, Modality } from "@google/genai";
+import { EndSensitivity, LiveConnectConfig, Modality, StartSensitivity } from "@google/genai";
 
 export interface LiveModel {
   name: string;
@@ -65,9 +65,17 @@ export function getLiveConnectConfig(
       responseModalities: [Modality.AUDIO],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } } },
       enableAffectiveDialog: true,
-      proactivity: { proactiveAudio: true },
       sessionResumption: { handle: sessionHandle ?? undefined },
       contextWindowCompression: { slidingWindow: {} },
+      realtimeInputConfig: {
+        automaticActivityDetection: {
+          disabled: false,
+          startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_LOW,
+          prefixPaddingMs: 40,
+          endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
+          silenceDurationMs: 500,
+        },
+      },
     };
   } else {
     return {

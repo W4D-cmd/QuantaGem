@@ -180,6 +180,7 @@ export default function Home() {
   const [selectedLiveModel, setSelectedLiveModel] = useState<LiveModel>(liveModels[0]);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("de-DE");
   const [selectedVoice, setSelectedVoice] = useState<string>("Sulafat");
+  const [isAutoMuteEnabled, setIsAutoMuteEnabled] = useState(true);
 
   const dragCounter = useRef(0);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -382,6 +383,13 @@ export default function Home() {
       showToast(extractErrorMessage(err), "error");
     }
   }, [getAuthHeaders, router, showToast]);
+
+  useEffect(() => {
+    if (userEmail) {
+      fetchAllChats();
+      fetchAllProjects();
+    }
+  }, [fetchAllChats, fetchAllProjects, userEmail]);
 
   useEffect(() => {
     if (userEmail) {
@@ -1562,6 +1570,8 @@ export default function Home() {
                   onLanguageChange={setSelectedLanguage}
                   selectedVoice={selectedVoice}
                   onVoiceChange={setSelectedVoice}
+                  isAutoMuteEnabled={isAutoMuteEnabled}
+                  onAutoMuteToggle={setIsAutoMuteEnabled}
                 />
               </div>
             </div>

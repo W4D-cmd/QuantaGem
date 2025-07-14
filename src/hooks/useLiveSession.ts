@@ -141,9 +141,12 @@ export const useLiveSession = ({
     playbackQueueRef.current = [];
     isPlayingRef.current = false;
     isModelSpeakingRef.current = false;
-    if (playbackAudioContextRef.current) {
-      nextPlayTimeRef.current = playbackAudioContextRef.current.currentTime;
+
+    if (playbackAudioContextRef.current && playbackAudioContextRef.current.state !== "closed") {
+      playbackAudioContextRef.current.close();
     }
+    playbackAudioContextRef.current = null;
+    nextPlayTimeRef.current = 0;
   }, []);
 
   const cleanupResources = useCallback(() => {
@@ -168,10 +171,6 @@ export const useLiveSession = ({
     audioContextRef.current = null;
 
     stopCurrentPlayback();
-    if (playbackAudioContextRef.current && playbackAudioContextRef.current.state !== "closed") {
-      playbackAudioContextRef.current.close();
-    }
-    playbackAudioContextRef.current = null;
   }, [onVideoStream, stopCurrentPlayback]);
 
   const stopSession = useCallback(() => {
@@ -248,6 +247,8 @@ export const useLiveSession = ({
         }
         if (manualStopRef.current) return;
         setIsConnecting(true);
+
+        stopCurrentPlayback();
 
         try {
           const tokenRes = await fetch("/api/live/token", {

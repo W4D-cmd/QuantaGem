@@ -181,6 +181,7 @@ export default function Home() {
   const [selectedLanguage, setSelectedLanguage] = useState<string>("de-DE");
   const [selectedVoice, setSelectedVoice] = useState<string>("Sulafat");
   const [isAutoMuteEnabled, setIsAutoMuteEnabled] = useState(true);
+  const [liveMode, setLiveMode] = useState<"audio" | "video">("audio");
 
   const dragCounter = useRef(0);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1115,7 +1116,7 @@ export default function Home() {
     setMessages((prev) => [...prev, newUserMessage]);
 
     if (isFirstMessageForChatSession && inputText.trim()) {
-      await generateAndSetChatTitle(
+      generateAndSetChatTitle(
         sessionId,
         inputText.trim(),
         keySelection,
@@ -1572,6 +1573,8 @@ export default function Home() {
                   onVoiceChange={setSelectedVoice}
                   isAutoMuteEnabled={isAutoMuteEnabled}
                   onAutoMuteToggle={setIsAutoMuteEnabled}
+                  liveMode={liveMode}
+                  onLiveModeChange={setLiveMode}
                 />
               </div>
             </div>

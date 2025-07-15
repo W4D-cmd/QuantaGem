@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Blob as GenaiBlob, Content, GoogleGenAI, Session } from "@google/genai";
 import { getLiveConnectConfig, LiveModel } from "@/lib/live-models";
 
+const MIN_CHUNKS_TO_PLAY = 5;
 const TARGET_SAMPLE_RATE = 16000;
 const OUTPUT_SAMPLE_RATE = 24000;
 const VIDEO_FRAME_RATE = 1;
@@ -207,8 +208,14 @@ export const useLiveSession = ({
     sessionHandleRef.current = null;
   }, [cleanupResources, onStateChange, onInterimText]);
 
-  const processAndPlayAudio = useCallback(() => {
-    if (isPlayingRef.current || playbackQueueRef.current.length === 0 || !playbackAudioContextRef.current) {
+  const processAndPlayAudio = useCallback((forcePlay = false) => {
+    const shouldWaitForMoreChunks = playbackQueueRef.current.length < MIN_CHUNKS_TO_PLAY;
+    if (
+      isPlayingRef.current ||
+      (shouldWaitForMoreChunks && !forcePlay) ||
+      !playbackAudioContextRef.current ||
+      playbackQueueRef.current.length === 0
+    ) {
       return;
     }
     isPlayingRef.current = true;
@@ -334,6 +341,8 @@ export const useLiveSession = ({
                     processAndPlayAudio();
                   }
                 } else if (message.serverContent?.turnComplete) {
+                  processAndPlayAudio(true);
+
                   const audioBlob =
                     audioBufferChunksRef.current.length > 0
                       ? createWavBlob(audioBufferChunksRef.current, lastPlaybackSampleRateRef.current)

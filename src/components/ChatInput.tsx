@@ -871,17 +871,17 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
                         font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
                         hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700
-                        ${isSessionActive ? "border-blue-500 animate-pulse" : ""}`}
+                        ${isSessionActive ? "border-red-500 animate-pulse" : ""}`}
                       >
                         {isLiveConnecting && !isSessionActive ? (
                           <div
-                            className="w-4 h-4 border-2 border-neutral-300 border-t-blue-500 rounded-full animate-spin"
+                            className="w-4 h-4 border-2 border-neutral-300 border-t-red-500 rounded-full animate-spin"
                           />
                         ) : (
                           <VideoCameraIcon
                             className={`size-5 transition-colors ${
                               isSessionActive
-                                ? "text-blue-500 dark:text-blue-400"
+                                ? "text-red-500 dark:text-red-400"
                                 : "text-neutral-500 dark:text-neutral-300"
                               }`}
                           />
@@ -896,17 +896,17 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
                         font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
                         hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700
-                        ${isSessionActive ? "border-blue-500 animate-pulse" : ""}`}
+                        ${isSessionActive ? "border-red-500 animate-pulse" : ""}`}
                       >
                         {isLiveConnecting && !isSessionActive ? (
                           <div
-                            className="w-4 h-4 border-2 border-neutral-300 border-t-blue-500 rounded-full animate-spin"
+                            className="w-4 h-4 border-2 border-neutral-300 border-t-red-500 rounded-full animate-spin"
                           />
                         ) : (
                           <ChatBubbleLeftRightIcon
                             className={`size-5 transition-colors ${
                               isSessionActive
-                                ? "text-blue-500 dark:text-blue-400"
+                                ? "text-red-500 dark:text-red-400"
                                 : "text-neutral-500 dark:text-neutral-300"
                               }`}
                           />

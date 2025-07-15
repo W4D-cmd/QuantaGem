@@ -1524,7 +1524,7 @@ export default function Home() {
                       items-center gap-3 transition-opacity duration-300"
                   >
                     <ChatBubbleLeftRightIcon
-                      className="size-6 flex-shrink-0 text-blue-500 dark:text-blue-400 animate-pulse"
+                      className="size-6 flex-shrink-0 text-red-500 dark:text-red-400 animate-pulse"
                     />
                     <p className="text-sm text-neutral-800 dark:text-neutral-200 flex-1 min-h-[1.25rem]">
                       {liveInterimText || "Listening..."}
@@ -1581,7 +1581,7 @@ export default function Home() {
 
       {localVideoStream && (
         <div
-          className="fixed bottom-24 right-4 w-48 h-auto bg-black border-2 border-blue-500 rounded-lg shadow-2xl z-50
+          className="fixed bottom-24 right-4 w-48 h-auto bg-black border-2 border-red-500 rounded-lg shadow-2xl z-50
             animate-pulse"
         >
           <video

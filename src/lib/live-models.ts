@@ -90,6 +90,15 @@ export function getLiveConnectConfig(
       },
       sessionResumption: { handle: sessionHandle ?? undefined },
       contextWindowCompression: { slidingWindow: {} },
+      realtimeInputConfig: {
+        automaticActivityDetection: {
+          disabled: false,
+          startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_LOW,
+          prefixPaddingMs: 40,
+          endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
+          silenceDurationMs: 500,
+        },
+      },
     };
   }
 }

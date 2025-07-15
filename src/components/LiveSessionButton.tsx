@@ -50,25 +50,13 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [dropdownCoords, setDropdownCoords] = useState({ top: 0, left: 0 });
   const [settingsCoords, setSettingsCoords] = useState({ top: 0, left: 0 });
+  const [settingsDirection, setSettingsDirection] = useState<"left" | "right">("right");
 
   const buttonRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const settingsMenuItemRef = useRef<HTMLDivElement>(null);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const leaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleMouseEnter = () => {
-    if (leaveTimeoutRef.current) {
-      clearTimeout(leaveTimeoutRef.current);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    leaveTimeoutRef.current = setTimeout(() => {
-      setIsDropdownOpen(false);
-      setIsSettingsOpen(false);
-    }, 200);
-  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -107,9 +95,22 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
   useLayoutEffect(() => {
     if (isSettingsOpen && settingsMenuItemRef.current && settingsMenuRef.current) {
       const itemRect = settingsMenuItemRef.current.getBoundingClientRect();
+      const settingsMenuRect = settingsMenuRef.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const margin = 12;
+
+      let direction: "left" | "right" = "right";
+      let left = itemRect.right + margin;
+
+      if (left + settingsMenuRect.width > viewportWidth) {
+        left = itemRect.left - settingsMenuRect.width - margin;
+        direction = "left";
+      }
+
+      setSettingsDirection(direction);
       setSettingsCoords({
         top: dropdownCoords.top,
-        left: itemRect.right + 8,
+        left: left,
       });
     }
   }, [isSettingsOpen, dropdownCoords.top]);
@@ -122,6 +123,18 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
 
   const handlePrimaryAction = () => {
     onStartSession(liveMode === "video");
+  };
+
+  const handleMouseEnterMenu = () => {
+    if (leaveTimeoutRef.current) {
+      clearTimeout(leaveTimeoutRef.current);
+    }
+  };
+
+  const handleMouseLeaveMenu = () => {
+    leaveTimeoutRef.current = setTimeout(() => {
+      setIsSettingsOpen(false);
+    }, 200);
   };
 
   if (isSessionActive || isConnecting) {
@@ -150,14 +163,14 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
       style={{ position: "absolute", top: `${dropdownCoords.top}px`, left: `${dropdownCoords.left}px` }}
       className="w-64 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl
         shadow-lg p-2 z-50"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onMouseLeave={handleMouseLeaveMenu}
     >
       <div className="space-y-1">
         <button
           onClick={() => handleModeSelect("audio")}
+          onMouseEnter={() => setIsSettingsOpen(false)}
           className="w-full text-left px-3 py-2 text-sm rounded-lg flex justify-between items-center
-            hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <ChatBubbleLeftRightIcon className="size-5" />
@@ -167,8 +180,9 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
         </button>
         <button
           onClick={() => handleModeSelect("video")}
+          onMouseEnter={() => setIsSettingsOpen(false)}
           className="w-full text-left px-3 py-2 text-sm rounded-lg flex justify-between items-center
-            hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <VideoCameraIcon className="size-5" />
@@ -179,7 +193,10 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
         <div className="border-t border-neutral-200 dark:border-neutral-700 my-1 !mx-2"></div>
         <div
           ref={settingsMenuItemRef}
-          onMouseEnter={() => setIsSettingsOpen(true)}
+          onMouseEnter={() => {
+            handleMouseEnterMenu();
+            setIsSettingsOpen(true);
+          }}
           className="w-full text-left px-3 py-2 text-sm rounded-lg flex justify-between items-center
             hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
         >
@@ -198,10 +215,10 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
       ref={settingsMenuRef}
       style={{ position: "absolute", top: `${settingsCoords.top}px`, left: `${settingsCoords.left}px` }}
       className="z-[60]"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onMouseEnter={handleMouseEnterMenu}
+      onMouseLeave={handleMouseLeaveMenu}
     >
-      <ChatInputSettingsMenu {...settingsProps} disabled={false} />
+      <ChatInputSettingsMenu {...settingsProps} direction={settingsDirection} disabled={false} />
     </div>
   );
 

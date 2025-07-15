@@ -1,14 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useEffect, ReactNode, useLayoutEffect } from "react";
-import { createPortal } from "react-dom";
-import {
-  ChevronRightIcon,
-  Cog8ToothIcon,
-  CpuChipIcon,
-  LanguageIcon,
-  SpeakerWaveIcon,
-} from "@heroicons/react/24/outline";
+import React, { useState, useRef, ReactNode, useLayoutEffect } from "react";
+import { ChevronRightIcon, CpuChipIcon, LanguageIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import { LiveModel } from "@/lib/live-models";
 import { DialogVoice } from "@/lib/voices";
 import Tooltip from "./Tooltip";
@@ -23,8 +16,8 @@ interface SubMenuProps {
 const SubMenu: React.FC<SubMenuProps> = ({ items, onSelect, title, onMouseEnter }) => (
   <div
     onMouseEnter={onMouseEnter}
-    className="absolute left-full top-0 ml-2 w-72 bg-white dark:bg-neutral-900 border border-neutral-200
-      dark:border-neutral-800 rounded-2xl shadow-lg z-20"
+    className="w-72 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-lg
+      z-20"
   >
     <div className="p-2">
       <h4 className="px-3 py-1 text-xs font-semibold text-neutral-500 dark:text-neutral-400">{title}</h4>
@@ -59,25 +52,43 @@ interface MainMenuItemProps {
   value: string;
   onMouseEnter: () => void;
   disabled?: boolean;
+  children?: ReactNode;
 }
 
-const MainMenuItem: React.FC<MainMenuItemProps> = ({ icon, label, value, onMouseEnter, disabled }) => (
-  <div
-    onMouseEnter={onMouseEnter}
-    className={`flex items-center justify-between px-3 py-2 rounded-lg ${
-      disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
-    }`}
-  >
-    <div className="flex items-center gap-3">
-      {icon}
-      <div className="flex flex-col">
-        <span className="text-sm font-medium">{label}</span>
-        <span className="text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-40">{value}</span>
+const MainMenuItem: React.FC<MainMenuItemProps> = ({ icon, label, value, onMouseEnter, disabled, children }) => {
+  const itemRef = useRef<HTMLDivElement>(null);
+  const [verticalOffset, setVerticalOffset] = useState(0);
+
+  useLayoutEffect(() => {
+    if (itemRef.current) {
+      setVerticalOffset(-itemRef.current.offsetTop);
+    }
+  }, []);
+
+  return (
+    <div
+      ref={itemRef}
+      onMouseEnter={onMouseEnter}
+      className={`relative flex items-center justify-between px-3 py-2 rounded-lg ${
+        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        {icon}
+        <div className="flex flex-col">
+          <span className="text-sm font-medium">{label}</span>
+          <span className="text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-40">{value}</span>
+        </div>
       </div>
+      {!disabled && <ChevronRightIcon className="size-4 text-neutral-400" />}
+      {children && (
+        <div className="absolute left-full ml-2" style={{ top: `${verticalOffset}px` }}>
+          {children}
+        </div>
+      )}
     </div>
-    {!disabled && <ChevronRightIcon className="size-4 text-neutral-400" />}
-  </div>
-);
+  );
+};
 
 interface ChatInputSettingsMenuProps {
   liveModels: LiveModel[];
@@ -104,13 +115,8 @@ const ChatInputSettingsMenu: React.FC<ChatInputSettingsMenuProps> = ({
   standardVoices,
   selectedVoice,
   onVoiceChange,
-  disabled,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
   const [openSubMenu, setOpenSubMenu] = useState<"liveModel" | "language" | "voice" | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const [coords, setCoords] = useState({ top: 0, left: 0 });
   const leaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseEnterItem = (subMenu: "liveModel" | "language" | "voice" | null) => {
@@ -126,36 +132,6 @@ const ChatInputSettingsMenu: React.FC<ChatInputSettingsMenuProps> = ({
     }, 150);
   };
 
-  useLayoutEffect(() => {
-    if (!isOpen || !buttonRef.current || !menuRef.current) return;
-
-    const anchorEl = buttonRef.current;
-    const menuEl = menuRef.current;
-    const anchorRect = anchorEl.getBoundingClientRect();
-    const menuRect = menuEl.getBoundingClientRect();
-
-    const menuMargin = 8;
-    const top = anchorRect.top + window.scrollY - menuRect.height - menuMargin;
-    const left = anchorRect.right + window.scrollX - menuRect.width;
-
-    setCoords({ top, left });
-  }, [isOpen]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   const isDialogModel = selectedLiveModel.configType === "dialog";
   const showLanguageMenu = selectedLiveModel.configType === "standard";
 
@@ -168,18 +144,12 @@ const ChatInputSettingsMenu: React.FC<ChatInputSettingsMenuProps> = ({
       }))
     : standardVoices.map((v) => ({ id: v, label: v, selected: v === selectedVoice }));
 
-  const menuContent = (
+  return (
     <div
-      ref={menuRef}
-      style={{
-        position: "absolute",
-        top: `${coords.top}px`,
-        left: `${coords.left}px`,
-        zIndex: 9999,
-      }}
-      className="w-64 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl
-        shadow-lg p-2"
+      className="relative w-64 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800
+        rounded-2xl shadow-lg p-2"
       onMouseLeave={handleMouseLeaveMenu}
+      onMouseEnter={() => handleMouseEnterItem(openSubMenu)}
     >
       <div className="space-y-1">
         <MainMenuItem
@@ -187,74 +157,55 @@ const ChatInputSettingsMenu: React.FC<ChatInputSettingsMenuProps> = ({
           label="Live Model"
           value={selectedLiveModel.displayName}
           onMouseEnter={() => handleMouseEnterItem("liveModel")}
-        />
+        >
+          {openSubMenu === "liveModel" && (
+            <SubMenu
+              title="Live Model"
+              items={liveModels.map((m) => ({
+                id: m.name,
+                label: m.displayName,
+                selected: m.name === selectedLiveModel.name,
+              }))}
+              onSelect={(id) => {
+                const newModel = liveModels.find((m) => m.name === id)!;
+                onLiveModelChange(newModel);
+              }}
+              onMouseEnter={() => handleMouseEnterItem("liveModel")}
+            />
+          )}
+        </MainMenuItem>
         <MainMenuItem
           icon={<LanguageIcon className="size-5" />}
           label="Language"
           value={selectedLanguage}
           onMouseEnter={() => handleMouseEnterItem("language")}
           disabled={!showLanguageMenu}
-        />
+        >
+          {openSubMenu === "language" && showLanguageMenu && (
+            <SubMenu
+              title="Language"
+              items={languages.map((l) => ({ id: l, label: l, selected: l === selectedLanguage }))}
+              onSelect={(id) => onLanguageChange(id)}
+              onMouseEnter={() => handleMouseEnterItem("language")}
+            />
+          )}
+        </MainMenuItem>
         <MainMenuItem
           icon={<SpeakerWaveIcon className="size-5" />}
           label="Voice"
           value={selectedVoice}
           onMouseEnter={() => handleMouseEnterItem("voice")}
-        />
-      </div>
-
-      {openSubMenu === "liveModel" && (
-        <SubMenu
-          title="Live Model"
-          items={liveModels.map((m) => ({
-            id: m.name,
-            label: m.displayName,
-            selected: m.name === selectedLiveModel.name,
-          }))}
-          onSelect={(id) => {
-            const newModel = liveModels.find((m) => m.name === id)!;
-            onLiveModelChange(newModel);
-          }}
-          onMouseEnter={() => handleMouseEnterItem("liveModel")}
-        />
-      )}
-      {openSubMenu === "language" && showLanguageMenu && (
-        <SubMenu
-          title="Language"
-          items={languages.map((l) => ({ id: l, label: l, selected: l === selectedLanguage }))}
-          onSelect={(id) => onLanguageChange(id)}
-          onMouseEnter={() => handleMouseEnterItem("language")}
-        />
-      )}
-      {openSubMenu === "voice" && (
-        <SubMenu
-          title="Voice"
-          items={voiceItems}
-          onSelect={(id) => onVoiceChange(id)}
-          onMouseEnter={() => handleMouseEnterItem("voice")}
-        />
-      )}
-    </div>
-  );
-
-  return (
-    <div className="relative">
-      <Tooltip text="Live Session Settings">
-        <button
-          ref={buttonRef}
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          disabled={disabled}
-          className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium border
-            transition-colors duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100
-            dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700
-            disabled:opacity-50"
         >
-          <Cog8ToothIcon className="size-5 text-neutral-500 dark:text-neutral-300" />
-        </button>
-      </Tooltip>
-
-      {isOpen && createPortal(menuContent, document.body)}
+          {openSubMenu === "voice" && (
+            <SubMenu
+              title="Voice"
+              items={voiceItems}
+              onSelect={(id) => onVoiceChange(id)}
+              onMouseEnter={() => handleMouseEnterItem("voice")}
+            />
+          )}
+        </MainMenuItem>
+      </div>
     </div>
   );
 };

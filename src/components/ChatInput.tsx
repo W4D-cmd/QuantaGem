@@ -21,8 +21,6 @@ import {
   PaperClipIcon,
   XCircleIcon,
   XMarkIcon,
-  ChatBubbleLeftRightIcon,
-  VideoCameraIcon,
   SpeakerWaveIcon,
   SpeakerXMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -35,8 +33,8 @@ import { ToastProps } from "./Toast";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import { Content, Part } from "@google/genai";
 import { liveModels, languageCodes, LiveModel } from "@/lib/live-models";
-import ChatInputSettingsMenu from "./ChatInputSettingsMenu";
 import { dialogVoices, standardVoices } from "@/lib/voices";
+import LiveSessionButton from "./LiveSessionButton";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -69,6 +67,8 @@ interface ChatInputProps {
   onVoiceChange: (voice: string) => void;
   isAutoMuteEnabled: boolean;
   onAutoMuteToggle: (enabled: boolean) => void;
+  liveMode: "audio" | "video";
+  onLiveModeChange: (mode: "audio" | "video") => void;
 }
 
 export interface ChatInputHandle {
@@ -77,7 +77,6 @@ export interface ChatInputHandle {
 }
 
 const SOURCE_CODE_EXTENSIONS = new Set([
-  // Web Development
   ".html",
   ".htm",
   ".css",
@@ -91,7 +90,6 @@ const SOURCE_CODE_EXTENSIONS = new Set([
   ".tsx",
   ".jsx",
   ".vue",
-  // Backend & General Purpose
   ".py",
   ".rb",
   ".php",
@@ -121,14 +119,12 @@ const SOURCE_CODE_EXTENSIONS = new Set([
   ".hrl",
   ".ex",
   ".exs",
-  // Shell & Scripting
   ".sh",
   ".bash",
   ".zsh",
   ".ps1",
   ".bat",
   ".cmd",
-  // Data & Configuration
   ".json",
   ".jsonc",
   ".xml",
@@ -143,17 +139,14 @@ const SOURCE_CODE_EXTENSIONS = new Set([
   "Dockerfile",
   ".gitignore",
   ".gitattributes",
-  // SQL
   ".sql",
   ".ddl",
   ".dml",
-  // Markup & Docs
   ".md",
   ".markdown",
   ".rst",
   ".adoc",
   ".asciidoc",
-  // Other
   ".gradle",
   ".kts",
   ".groovy",
@@ -189,6 +182,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onVoiceChange,
       isAutoMuteEnabled,
       onAutoMuteToggle,
+      liveMode,
+      onLiveModeChange,
     },
     ref,
   ) => {
@@ -820,19 +815,6 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     <span>Search</span>
                   </button>
                 </Tooltip>
-                <ChatInputSettingsMenu
-                  liveModels={liveModels}
-                  selectedLiveModel={selectedLiveModel}
-                  onLiveModelChange={onLiveModelChange}
-                  languages={languageCodes}
-                  selectedLanguage={selectedLanguage}
-                  onLanguageChange={onLanguageChange}
-                  dialogVoices={dialogVoices}
-                  standardVoices={standardVoices}
-                  selectedVoice={selectedVoice}
-                  onVoiceChange={onVoiceChange}
-                  disabled={isSessionActive}
-                />
               </div>
 
               <div className="flex items-center gap-2">
@@ -863,56 +845,25 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 )}
                 {!isLoading && !isTranscribing && !isScanning && (
                   <>
-                    <Tooltip text={isSessionActive ? "Stop Live Chat" : "Start Live Chat + Screen"}>
-                      <button
-                        type="button"
-                        onClick={isSessionActive ? stopSession : () => handleStartLiveSession(true)}
-                        disabled={isLoading || isRecording || isTranscribing || isScanning || isLiveConnecting}
-                        className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
-                        font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
-                        hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700
-                        ${isSessionActive ? "border-red-500 animate-pulse" : ""}`}
-                      >
-                        {isLiveConnecting && !isSessionActive ? (
-                          <div
-                            className="w-4 h-4 border-2 border-neutral-300 border-t-red-500 rounded-full animate-spin"
-                          />
-                        ) : (
-                          <VideoCameraIcon
-                            className={`size-5 transition-colors ${
-                              isSessionActive
-                                ? "text-red-500 dark:text-red-400"
-                                : "text-neutral-500 dark:text-neutral-300"
-                              }`}
-                          />
-                        )}
-                      </button>
-                    </Tooltip>
-                    <Tooltip text={isSessionActive ? "Stop Live Chat" : "Start Live Chat (Audio Only)"}>
-                      <button
-                        type="button"
-                        onClick={isSessionActive ? stopSession : () => handleStartLiveSession(false)}
-                        disabled={isLoading || isRecording || isTranscribing || isScanning || isLiveConnecting}
-                        className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
-                        font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
-                        hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700
-                        ${isSessionActive ? "border-red-500 animate-pulse" : ""}`}
-                      >
-                        {isLiveConnecting && !isSessionActive ? (
-                          <div
-                            className="w-4 h-4 border-2 border-neutral-300 border-t-red-500 rounded-full animate-spin"
-                          />
-                        ) : (
-                          <ChatBubbleLeftRightIcon
-                            className={`size-5 transition-colors ${
-                              isSessionActive
-                                ? "text-red-500 dark:text-red-400"
-                                : "text-neutral-500 dark:text-neutral-300"
-                              }`}
-                          />
-                        )}
-                      </button>
-                    </Tooltip>
+                    <LiveSessionButton
+                      isSessionActive={isSessionActive}
+                      isConnecting={isLiveConnecting}
+                      liveMode={liveMode}
+                      onLiveModeChange={onLiveModeChange}
+                      onStartSession={handleStartLiveSession}
+                      onStopSession={stopSession}
+                      disabled={isLoading || isRecording || isTranscribing || isScanning}
+                      liveModels={liveModels}
+                      selectedLiveModel={selectedLiveModel}
+                      onLiveModelChange={onLiveModelChange}
+                      languages={languageCodes}
+                      selectedLanguage={selectedLanguage}
+                      onLanguageChange={onLanguageChange}
+                      dialogVoices={dialogVoices}
+                      standardVoices={standardVoices}
+                      selectedVoice={selectedVoice}
+                      onVoiceChange={onVoiceChange}
+                    />
                     <Tooltip text={isRecording ? "Cancel recording" : "Dictate message"}>
                       <button
                         type="button"

@@ -28,6 +28,7 @@ import { liveModels, LiveModel } from "@/lib/live-models";
 import { dialogVoices, standardVoices } from "@/lib/voices";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
+const TITLE_GENERATION_MAX_LENGTH = 30000;
 
 export interface MessagePart {
   type: "text" | "file";
@@ -91,13 +92,18 @@ async function generateAndSetChatTitle(
   fetchAllChats: () => Promise<void>,
 ) {
   try {
+    const truncatedContent =
+      userMessageContent.length > TITLE_GENERATION_MAX_LENGTH
+        ? userMessageContent.substring(0, TITLE_GENERATION_MAX_LENGTH)
+        : userMessageContent;
+
     const res = await fetch("/api/generate-chat-title", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...getAuthHeaders(),
       },
-      body: JSON.stringify({ userMessageContent, keySelection }),
+      body: JSON.stringify({ userMessageContent: truncatedContent, keySelection }),
     });
 
     if (res.status === 401) {
@@ -105,7 +111,12 @@ async function generateAndSetChatTitle(
       return;
     }
     if (!res.ok) {
-      const errorData = await res.json();
+      let errorData;
+      try {
+        errorData = await res.json();
+      } catch (e) {
+        errorData = { error: `Failed to generate title: ${res.statusText}` };
+      }
       throw new Error(errorData.error || `Failed to generate title: ${res.statusText}`);
     }
 
@@ -125,7 +136,12 @@ async function generateAndSetChatTitle(
       return;
     }
     if (!patchRes.ok) {
-      const errorData = await res.json();
+      let errorData;
+      try {
+        errorData = await patchRes.json();
+      } catch (e) {
+        errorData = { error: `Failed to update chat title: ${patchRes.statusText}` };
+      }
       throw new Error(errorData.error || `Failed to update chat title: ${patchRes.statusText}`);
     }
 

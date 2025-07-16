@@ -17,6 +17,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
 import { Message, MessagePart } from "@/app/page";
 import {
   ClipboardDocumentListIcon,
@@ -27,7 +28,7 @@ import {
 } from "@heroicons/react/24/outline";
 import Tooltip from "@/components/Tooltip";
 import MessageSkeleton from "./MessageSkeleton";
-import rehypeRaw from "rehype-raw";
+import LazyMarkdownRenderer from "./LazyMarkdownRenderer";
 
 type GetAuthHeaders = () => HeadersInit;
 
@@ -612,13 +613,17 @@ function ChatAreaComponent(
                               prose-code:before:content-none prose-code:after:content-none prose-code:py-0.5
                               prose-code:px-1"
                           >
-                            <ReactMarkdown
-                              remarkPlugins={[remarkMath, remarkGfm]}
-                              rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeHighlight, { detect: true }]]}
-                              components={markdownComponents}
-                            >
-                              {part.text}
-                            </ReactMarkdown>
+                            {isUserMessage ? (
+                              <LazyMarkdownRenderer content={part.text} components={markdownComponents} />
+                            ) : (
+                              <ReactMarkdown
+                                remarkPlugins={[remarkMath, remarkGfm]}
+                                rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeHighlight, { detect: true }]]}
+                                components={markdownComponents}
+                              >
+                                {part.text}
+                              </ReactMarkdown>
+                            )}
                           </div>
                         );
                       } else if (part.type === "file" && part.objectName && part.mimeType && part.fileName) {

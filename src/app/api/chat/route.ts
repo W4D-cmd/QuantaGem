@@ -335,9 +335,7 @@ export async function POST(request: NextRequest) {
     if (!isRegeneration) {
       await pool.query(
         `INSERT INTO messages (chat_session_id, role, content, parts, position, sources)
-         SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5
-         FROM messages
-         WHERE chat_session_id = $1`,
+         VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $5)`,
         [chatSessionId, "user", combinedUserTextForDB, JSON.stringify(newMessageAppParts), JSON.stringify([])],
       );
     }
@@ -522,9 +520,7 @@ export async function POST(request: NextRequest) {
         } else {
           await pool.query(
             `INSERT INTO messages (chat_session_id, role, content, parts, position, sources)
-             SELECT $1, $2, $3, $4, COALESCE(MAX(position), 0) + 1, $5
-             FROM messages
-             WHERE chat_session_id = $1`,
+             VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $5)`,
             [
               chatSessionId,
               "model",

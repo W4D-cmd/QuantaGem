@@ -31,7 +31,7 @@ const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
 const TITLE_GENERATION_MAX_LENGTH = 30000;
 
 export interface MessagePart {
-  type: "text" | "file";
+  type: "text" | "file" | "scraped_url";
   text?: string;
   fileName?: string;
   mimeType?: string;
@@ -39,6 +39,7 @@ export interface MessagePart {
   size?: number;
   isProjectFile?: boolean;
   projectFileId?: number;
+  url?: string;
 }
 
 export interface Message {

@@ -4,6 +4,7 @@ import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { getUserFromToken } from "@/lib/auth";
+import * as cheerio from "cheerio";
 
 interface ChatRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
@@ -156,6 +157,31 @@ function getFileExtension(fileName?: string): string {
   return (fileName.split(".").pop() || "").toLowerCase();
 }
 
+async function scrapeUrl(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) {
+      console.warn(`Failed to fetch URL ${url}: Status ${response.status}`);
+      return null;
+    }
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    $("script, style, nav, footer, header, aside, form, .sidebar, #sidebar").remove();
+
+    const bodyText = $("body").text();
+
+    const cleanedText = bodyText.replace(/\s\s+/g, " ").trim();
+    return cleanedText.substring(0, 20000);
+  } catch (error) {
+    console.error(`Error scraping URL ${url}:`, error);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const user = await getUserFromToken(request);
   if (!user) {
@@ -165,13 +191,48 @@ export async function POST(request: NextRequest) {
 
   const {
     history: clientHistoryWithAppParts,
-    messageParts: newMessageAppParts,
+    messageParts: originalNewMessageAppParts,
     chatSessionId,
     model,
     keySelection,
     isSearchActive,
     isRegeneration,
   } = (await request.json()) as ChatRequest;
+
+  const newMessageAppParts: MessagePart[] = [...originalNewMessageAppParts];
+  const urlRegex = /https?:\/\/[^\s"'<>()]+/g;
+  const scrapingPromises: Promise<MessagePart | null>[] = [];
+
+  for (const part of originalNewMessageAppParts) {
+    if (part.type === "text" && part.text) {
+      const urls = part.text.match(urlRegex);
+      if (urls) {
+        const uniqueUrls = [...new Set(urls)];
+        for (const url of uniqueUrls) {
+          const promise = scrapeUrl(url).then((scrapedText): MessagePart | null => {
+            if (scrapedText) {
+              return {
+                type: "scraped_url",
+                text: `CONTEXT FROM ${url}:\n---\n${scrapedText}\n---`,
+                url: url,
+              };
+            }
+            return null;
+          });
+          scrapingPromises.push(promise);
+        }
+      }
+    }
+  }
+
+  if (scrapingPromises.length > 0) {
+    const scrapedParts = await Promise.all(scrapingPromises);
+    scrapedParts.forEach((part) => {
+      if (part) {
+        newMessageAppParts.push(part);
+      }
+    });
+  }
 
   const apiKey = keySelection === "paid" ? process.env.PAID_GOOGLE_API_KEY : process.env.FREE_GOOGLE_API_KEY;
 
@@ -194,6 +255,8 @@ export async function POST(request: NextRequest) {
     if (appPart.type === "text" && appPart.text) {
       newMessageGeminiParts.push({ text: appPart.text });
       combinedUserTextForDB += (combinedUserTextForDB ? " " : "") + appPart.text;
+    } else if (appPart.type === "scraped_url" && appPart.text) {
+      newMessageGeminiParts.push({ text: appPart.text });
     } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
       let effectiveMimeType = appPart.mimeType.toLowerCase();
       const extension = getFileExtension(appPart.fileName);
@@ -285,6 +348,8 @@ export async function POST(request: NextRequest) {
         const prevMsgGeminiParts: Part[] = [];
         for (const appPart of prevMsg.parts) {
           if (appPart.type === "text" && appPart.text) {
+            prevMsgGeminiParts.push({ text: appPart.text });
+          } else if (appPart.type === "scraped_url" && appPart.text) {
             prevMsgGeminiParts.push({ text: appPart.text });
           } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
             if (prevMsg.role === "user") {

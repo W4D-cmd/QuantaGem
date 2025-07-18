@@ -1076,6 +1076,7 @@ export default function Home() {
               ? error.message
               : "An unexpected error occurred.";
         showToast(msg, "error");
+        if (currentChatId) loadChat(currentChatId);
       } finally {
         setIsLoading(false);
         setController(null);

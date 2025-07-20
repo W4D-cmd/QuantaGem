@@ -1026,46 +1026,49 @@ export default function Home() {
 
           if (lines.length === 0) continue;
 
-          setMessages((prev) => {
-            const updatedMessages = [...prev];
-            const messageToUpdate = updatedMessages[modelMessageIndexForStream];
+          for (const line of lines) {
+            if (line.trim() === "") continue;
 
-            if (!messageToUpdate) return prev;
-
-            for (const line of lines) {
-              if (line.trim() === "") continue;
-
-              try {
-                const parsedChunk = JSON.parse(line);
-                if (parsedChunk.type === "text") {
-                  textAccumulator += parsedChunk.value;
-                } else if (parsedChunk.type === "grounding") {
-                  if (parsedChunk.sources && Array.isArray(parsedChunk.sources)) {
-                    parsedChunk.sources.forEach((s: { title: string; uri: string }) => {
-                      const exists = currentSources.some((existing) => existing.uri === s.uri);
-                      if (!exists) {
-                        currentSources.push(s);
-                      }
-                    });
-                  }
-                } else if (parsedChunk.type === "error" && parsedChunk.value) {
-                  modelReturnedEmptyMessage = true;
-                  showToast(parsedChunk.value, "error");
+            try {
+              const parsedChunk = JSON.parse(line);
+              if (parsedChunk.type === "text") {
+                textAccumulator += parsedChunk.value;
+              } else if (parsedChunk.type === "grounding") {
+                if (parsedChunk.sources && Array.isArray(parsedChunk.sources)) {
+                  parsedChunk.sources.forEach((s: { title: string; uri: string }) => {
+                    const exists = currentSources.some((existing) => existing.uri === s.uri);
+                    if (!exists) {
+                      currentSources.push(s);
+                    }
+                  });
                 }
-              } catch (jsonError) {
-                console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
+              } else if (parsedChunk.type === "error" && parsedChunk.value) {
+                modelReturnedEmptyMessage = true;
+                showToast(parsedChunk.value, "error");
               }
+            } catch (jsonError) {
+              console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
             }
-            messageToUpdate.parts = [{ type: "text", text: textAccumulator }];
-            messageToUpdate.sources = [...currentSources];
-            return updatedMessages;
-          });
+          }
+
+          setMessages((prev) =>
+            prev.map((msg, index) => {
+              if (index === modelMessageIndexForStream) {
+                return {
+                  ...msg,
+                  parts: [{ type: "text", text: textAccumulator }],
+                  sources: [...currentSources],
+                };
+              }
+              return msg;
+            }),
+          );
         }
 
         if (modelReturnedEmptyMessage) {
           setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
         } else {
-          loadChat(currentChatId);
+          await loadChat(currentChatId);
         }
       } catch (error: unknown) {
         setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
@@ -1076,7 +1079,7 @@ export default function Home() {
               ? error.message
               : "An unexpected error occurred.";
         showToast(msg, "error");
-        if (currentChatId) loadChat(currentChatId);
+        if (currentChatId) await loadChat(currentChatId);
       } finally {
         setIsLoading(false);
         setController(null);

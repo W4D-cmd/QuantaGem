@@ -469,12 +469,41 @@ function ChatAreaComponent(
   }, [activeChatId, isLoading, messages.length, onAutoScrollChange]);
 
   useEffect(() => {
-    if (autoScrollEnabled && containerRef.current && !editingMessage) {
-      containerRef.current.scrollTo({
-        top: containerRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }
+    const el = containerRef.current;
+    if (!el || !autoScrollEnabled || editingMessage) return;
+
+    let animationFrameId: number;
+
+    const smoothScrollStep = () => {
+      if (!containerRef.current || !autoScrollEnabled) {
+        cancelAnimationFrame(animationFrameId);
+        return;
+      }
+
+      const currentScroll = el.scrollTop;
+      const targetScroll = el.scrollHeight - el.clientHeight;
+      const distance = targetScroll - currentScroll;
+
+      if (distance < 1) {
+        el.scrollTop = targetScroll;
+        return;
+      }
+
+      const easingFactor = 0.15;
+      const step = Math.max(1, distance * easingFactor);
+
+      el.scrollTop += step;
+
+      if (el.scrollTop < targetScroll) {
+        animationFrameId = requestAnimationFrame(smoothScrollStep);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(smoothScrollStep);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
   }, [messages, autoScrollEnabled, editingMessage]);
 
   useEffect(() => {

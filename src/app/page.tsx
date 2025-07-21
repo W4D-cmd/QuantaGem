@@ -578,10 +578,6 @@ export default function Home() {
     setAllChats((prev) => prev.filter((c) => c.id !== chatId));
     if (activeChatId === chatId) {
       setActiveChatId(null);
-      setMessages([]);
-      setEditingPromptInitialValue(null);
-      setKeySelection("free");
-      setTotalTokens(null);
     }
     showToast("Chat deleted.", "success");
   };
@@ -655,11 +651,7 @@ export default function Home() {
 
   const handleNewChat = useCallback(
     async (projectId: number | null = null) => {
-      setMessages([]);
-      setEditingPromptInitialValue(null);
-      setKeySelection("free");
       setCurrentChatProjectId(projectId);
-      setTotalTokens(0);
       setEditingMessage(null);
 
       if (projectId !== null) {
@@ -882,7 +874,6 @@ export default function Home() {
     if (activeChatId !== null) {
       if (activeChatId !== prevActiveChatIdRef.current) {
         const chat = allChats.find((c) => c.id === activeChatId);
-
         if (chat?.lastModel) {
           const modelForThisChat = models.find((m) => m.name === chat.lastModel);
           if (modelForThisChat && selectedModel?.name !== modelForThisChat.name) {
@@ -900,16 +891,13 @@ export default function Home() {
           setKeySelection("free");
         }
 
-        if (!(isNewChatJustCreated && chat?.projectId === null)) {
+        if (isNewChatJustCreated) {
+          setIsNewChatJustCreated(false);
+        } else {
           setIsLoading(true);
           loadChat(activeChatId).finally(() => {
             setIsLoading(false);
-            if (isNewChatJustCreated) {
-              setIsNewChatJustCreated(false);
-            }
           });
-        } else if (isNewChatJustCreated && chat?.projectId === null) {
-          setIsNewChatJustCreated(false);
         }
       }
       prevActiveChatIdRef.current = activeChatId;
@@ -950,7 +938,7 @@ export default function Home() {
       isSearchEnabled: boolean,
       isRegeneration = false,
     ) => {
-      let modelMessageIndexForStream: number;
+      let modelMessageIndexForStream: number | null = null;
       setMessages((prev) => {
         const placeholderMessage: Message = {
           role: "model",
@@ -991,6 +979,7 @@ export default function Home() {
 
         if (res.status === 401) {
           router.replace("/login");
+          setIsLoading(false);
           return;
         }
 
@@ -1050,28 +1039,31 @@ export default function Home() {
               console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
             }
           }
-
-          setMessages((prev) =>
-            prev.map((msg, index) => {
-              if (index === modelMessageIndexForStream) {
-                return {
-                  ...msg,
-                  parts: [{ type: "text", text: textAccumulator }],
-                  sources: [...currentSources],
-                };
-              }
-              return msg;
-            }),
-          );
+          if (modelMessageIndexForStream !== null) {
+            setMessages((prev) =>
+              prev.map((msg, index) => {
+                if (index === modelMessageIndexForStream) {
+                  return {
+                    ...msg,
+                    parts: [{ type: "text", text: textAccumulator }],
+                    sources: [...currentSources],
+                  };
+                }
+                return msg;
+              }),
+            );
+          }
         }
 
-        if (modelReturnedEmptyMessage) {
+        if (modelReturnedEmptyMessage && modelMessageIndexForStream !== null) {
           setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
         } else {
           await loadChat(currentChatId);
         }
       } catch (error: unknown) {
-        setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
+        if (modelMessageIndexForStream !== null) {
+          setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
+        }
         const msg =
           error instanceof DOMException && error.name === "AbortError"
             ? "Response cancelled."
@@ -1083,7 +1075,7 @@ export default function Home() {
       } finally {
         setIsLoading(false);
         setController(null);
-        fetchAllChats();
+        await fetchAllChats();
       }
     },
     [getAuthHeaders, selectedModel, keySelection, router, loadChat, fetchAllChats, showToast],

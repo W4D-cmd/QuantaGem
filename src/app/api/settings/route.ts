@@ -10,13 +10,30 @@ export async function GET(request: NextRequest) {
   const userId = user.id.toString();
 
   try {
-    const { rows } = await pool.query("SELECT system_prompt FROM user_settings WHERE user_id = $1", [userId]);
+    const { rows } = await pool.query(
+      "SELECT system_prompt, tts_voice, tts_model FROM user_settings WHERE user_id = $1",
+      [userId],
+    );
 
     if (rows.length === 0) {
-      return NextResponse.json({ system_prompt: "" }, { status: 200 });
+      return NextResponse.json(
+        {
+          system_prompt: "",
+          tts_voice: "Sulafat",
+          tts_model: "gemini-2.5-flash-preview-tts",
+        },
+        { status: 200 },
+      );
     }
 
-    return NextResponse.json({ system_prompt: rows[0].system_prompt || "" }, { status: 200 });
+    return NextResponse.json(
+      {
+        system_prompt: rows[0].system_prompt || "",
+        tts_voice: rows[0].tts_voice || "Sulafat",
+        tts_model: rows[0].tts_model || "gemini-2.5-flash-preview-tts",
+      },
+      { status: 200 },
+    );
   } catch (error) {
     console.error(`Error fetching user settings for user ${userId}:`, error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
@@ -32,22 +49,26 @@ export async function POST(request: NextRequest) {
   const userId = user.id.toString();
 
   try {
-    const { systemPrompt } = (await request.json()) as {
+    const { systemPrompt, ttsVoice, ttsModel } = (await request.json()) as {
       systemPrompt?: string;
+      ttsVoice?: string;
+      ttsModel?: string;
     };
 
-    if (typeof systemPrompt === "undefined") {
-      return NextResponse.json({ error: "systemPrompt is required" }, { status: 400 });
-    }
+    const finalSystemPrompt = systemPrompt ?? "";
+    const finalTtsVoice = ttsVoice ?? "Sulafat";
+    const finalTtsModel = ttsModel ?? "gemini-2.5-flash-preview-tts";
 
     const { rows } = await pool.query(
-      `INSERT INTO user_settings (user_id, system_prompt, updated_at)
-         VALUES ($1, $2, NOW())
+      `INSERT INTO user_settings (user_id, system_prompt, tts_voice, tts_model, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
            ON CONFLICT (user_id) DO UPDATE
                                       SET system_prompt = EXCLUDED.system_prompt,
-                                      updated_at = NOW()
-                                      RETURNING system_prompt, updated_at`,
-      [userId, systemPrompt ?? ""],
+                                          tts_voice     = EXCLUDED.tts_voice,
+                                          tts_model     = EXCLUDED.tts_model,
+                                          updated_at    = NOW()
+                                      RETURNING system_prompt, tts_voice, tts_model, updated_at`,
+      [userId, finalSystemPrompt, finalTtsVoice, finalTtsModel],
     );
 
     if (rows.length === 0) {
@@ -63,6 +84,8 @@ export async function POST(request: NextRequest) {
       {
         message: "Settings updated successfully",
         system_prompt: rows[0].system_prompt,
+        tts_voice: rows[0].tts_voice,
+        tts_model: rows[0].tts_model,
         updated_at: rows[0].updated_at,
       },
       { status: 200 },

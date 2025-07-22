@@ -25,12 +25,19 @@ import {
   PencilIcon,
   ArrowPathIcon,
   XCircleIcon,
+  SpeakerWaveIcon,
+  StopIcon,
 } from "@heroicons/react/24/outline";
 import Tooltip from "@/components/Tooltip";
 import MessageSkeleton from "./MessageSkeleton";
 import LazyMarkdownRenderer from "./LazyMarkdownRenderer";
 
 type GetAuthHeaders = () => HeadersInit;
+
+export interface AudioPlaybackState {
+  messageId: number | null;
+  status: "loading" | "playing" | "idle";
+}
 
 interface ChatAreaProps {
   messages: Message[];
@@ -43,6 +50,8 @@ interface ChatAreaProps {
   setEditingMessage: React.Dispatch<React.SetStateAction<{ index: number; message: Message } | null>>;
   onEditSave: (index: number, newParts: MessagePart[]) => void;
   onRegenerate: (index: number) => void;
+  onPlayAudio: (message: Message) => void;
+  audioPlaybackState: AudioPlaybackState;
 }
 
 export interface ChatAreaHandle {
@@ -264,7 +273,8 @@ export default memo(
     prev.streamStarted === next.streamStarted &&
     prev.onAutoScrollChange === next.onAutoScrollChange &&
     prev.getAuthHeaders === next.getAuthHeaders &&
-    prev.editingMessage === next.editingMessage,
+    prev.editingMessage === next.editingMessage &&
+    prev.audioPlaybackState === next.audioPlaybackState,
 );
 
 function ChatAreaComponent(
@@ -279,6 +289,8 @@ function ChatAreaComponent(
     setEditingMessage,
     onEditSave,
     onRegenerate,
+    onPlayAudio,
+    audioPlaybackState,
   }: ChatAreaProps,
   ref: React.Ref<ChatAreaHandle>,
 ) {
@@ -558,12 +570,25 @@ function ChatAreaComponent(
     ),
   };
 
+  const getAudioButtonIcon = (messageId: number) => {
+    if (audioPlaybackState.messageId === messageId) {
+      if (audioPlaybackState.status === "loading") {
+        return <ArrowPathIcon className="size-4 animate-spin" />;
+      }
+      if (audioPlaybackState.status === "playing") {
+        return <StopIcon className="size-4 text-red-400" />;
+      }
+    }
+    return <SpeakerWaveIcon className="size-4" />;
+  };
+
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-2 focus:outline-none" tabIndex={-1}>
       <div className="mx-auto max-w-[52rem] p-4 space-y-4">
         {messages.map((msg, i) => {
           const isUserMessage = msg.role === "user";
           const isBeingEdited = editingMessage?.index === i;
+          const hasText = msg.parts.some((p) => p.type === "text" && p.text && p.text.trim().length > 0);
 
           return (
             <div
@@ -759,6 +784,20 @@ function ChatAreaComponent(
                           hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                       >
                         <ArrowPathIcon className="size-4" />
+                      </button>
+                    </Tooltip>
+                  )}
+                  {hasText && (
+                    <Tooltip
+                      text={audioPlaybackState.messageId === msg.id ? audioPlaybackState.status : "Read message"}
+                    >
+                      <button
+                        onClick={() => onPlayAudio(msg)}
+                        disabled={isLoading && audioPlaybackState.status !== "playing"}
+                        className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
+                          hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        {getAudioButtonIcon(msg.id)}
                       </button>
                     </Tooltip>
                   )}

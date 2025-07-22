@@ -55,5 +55,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL UNIQUE REFERENCES users (id) ON DELETE CASCADE,
   system_prompt TEXT,
+  tts_voice TEXT DEFAULT 'Sulafat',
+  tts_model TEXT DEFAULT 'gemini-2.5-flash-preview-tts',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

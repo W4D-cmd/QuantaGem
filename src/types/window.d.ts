@@ -29,4 +29,5 @@ interface Window {
     mode?: "read" | "readwrite";
     startIn?: "desktop" | "documents" | "downloads" | "music" | "pictures" | "videos" | FileSystemHandle;
   }): Promise<FileSystemDirectoryHandle>;
+  webkitAudioContext: typeof AudioContext;
 }

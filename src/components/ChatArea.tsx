@@ -50,7 +50,7 @@ interface ChatAreaProps {
   setEditingMessage: React.Dispatch<React.SetStateAction<{ index: number; message: Message } | null>>;
   onEditSave: (index: number, newParts: MessagePart[]) => void;
   onRegenerate: (index: number) => void;
-  onPlayAudio: (message: Message) => void;
+  onPlayAudio: (message: Message, selectedText?: string) => void;
   audioPlaybackState: AudioPlaybackState;
 }
 
@@ -792,7 +792,19 @@ function ChatAreaComponent(
                       text={audioPlaybackState.messageId === msg.id ? audioPlaybackState.status : "Read message"}
                     >
                       <button
-                        onClick={() => onPlayAudio(msg)}
+                        onClick={(e) => {
+                          const messageContainer = (e.currentTarget as HTMLElement).closest(".group\\/message");
+                          const selection = window.getSelection();
+                          let textToPlay: string | undefined = undefined;
+
+                          if (selection && selection.rangeCount > 0 && selection.toString().trim()) {
+                            const range = selection.getRangeAt(0);
+                            if (messageContainer && messageContainer.contains(range.commonAncestorContainer)) {
+                              textToPlay = selection.toString();
+                            }
+                          }
+                          onPlayAudio(msg, textToPlay);
+                        }}
                         disabled={isLoading && audioPlaybackState.status !== "playing"}
                         className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
                           hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"

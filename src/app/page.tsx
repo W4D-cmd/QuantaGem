@@ -1394,7 +1394,7 @@ export default function Home() {
   };
 
   const handlePlayAudio = useCallback(
-    async (message: Message) => {
+    async (message: Message, selectedText?: string) => {
       if (audioSourceRef.current) {
         audioSourceRef.current.stop();
         audioSourceRef.current.disconnect();
@@ -1409,10 +1409,12 @@ export default function Home() {
       setAudioPlaybackState({ messageId: message.id, status: "loading" });
 
       try {
-        const textToPlay = message.parts
-          .filter((p) => p.type === "text" && p.text)
-          .map((p) => p.text)
-          .join("\n\n");
+        const textToPlay =
+          selectedText?.trim() ||
+          message.parts
+            .filter((p) => p.type === "text" && p.text)
+            .map((p) => p.text)
+            .join("\n\n");
 
         if (!textToPlay.trim()) {
           throw new Error("No text content to play.");

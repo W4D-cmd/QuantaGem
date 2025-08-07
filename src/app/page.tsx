@@ -1258,18 +1258,6 @@ export default function Home() {
     const messageToEdit = messages[index];
     if (messageToEdit.role !== "user") return;
 
-    const originalPartsJSON = JSON.stringify(
-      [...messageToEdit.parts].sort((a, b) => (a.text ?? a.fileName ?? "").localeCompare(b.text ?? b.fileName ?? "")),
-    );
-    const newPartsJSON = JSON.stringify(
-      [...newParts].sort((a, b) => (a.text ?? a.fileName ?? "").localeCompare(b.text ?? b.fileName ?? "")),
-    );
-
-    if (originalPartsJSON === newPartsJSON) {
-      setEditingMessage(null);
-      return;
-    }
-
     setIsLoading(true);
     setEditingMessage(null);
 

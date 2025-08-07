@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   experimental: {
     useLightningcss: false,
   },
+  api: {
+    responseLimit: "20mb",
+  },
   async headers() {
     return [
       {

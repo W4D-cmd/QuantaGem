@@ -158,41 +158,43 @@ function getFileExtension(fileName?: string): string {
 }
 
 async function scrapeUrl(url: string): Promise<string | null> {
-  const userAgents = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
-  ];
+  const GOOGLEBOT_USER_AGENT = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+  const REALISTIC_USER_AGENT =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+
+  const parseHtml = (html: string): string => {
+    const $ = cheerio.load(html);
+    $("script, style, nav, footer, header, aside, form, .sidebar, #sidebar").remove();
+    return $("body").text().replace(/\s\s+/g, " ").trim();
+  };
 
   try {
-    const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
     const response = await fetch(url, {
-      headers: {
-        "User-Agent": randomUserAgent,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate, br",
-        DNT: "1",
-        "Upgrade-Insecure-Requests": "1",
-      },
+      headers: { "User-Agent": GOOGLEBOT_USER_AGENT },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (response.ok) {
+      const html = await response.text();
+      return parseHtml(html);
+    }
+    console.warn(`Googlebot scrape for ${url} failed with status: ${response.status}. Retrying...`);
+  } catch (error) {
+    console.warn(`Googlebot scrape for ${url} threw an error. Retrying...`, error);
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: { "User-Agent": REALISTIC_USER_AGENT },
       signal: AbortSignal.timeout(20000),
     });
-
-    if (!response.ok) {
-      console.warn(`Failed to fetch URL ${url}: Status ${response.status}`);
-      return null;
+    if (response.ok) {
+      const html = await response.text();
+      return parseHtml(html);
     }
-    const html = await response.text();
-    const $ = cheerio.load(html);
-
-    $("script, style, nav, footer, header, aside, form, .sidebar, #sidebar").remove();
-
-    const bodyText = $("body").text();
-
-    return bodyText.replace(/\s\s+/g, " ").trim();
+    console.error(`Fallback scrape for ${url} also failed with status: ${response.status}`);
+    return null;
   } catch (error) {
-    console.error(`Error scraping URL ${url}:`, error);
+    console.error(`Fallback scrape for ${url} also failed with an error:`, error);
     return null;
   }
 }

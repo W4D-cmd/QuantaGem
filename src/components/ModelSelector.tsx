@@ -5,6 +5,7 @@ import { Model } from "@google/genai";
 import Tooltip from "@/components/Tooltip";
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
+import { motion, AnimatePresence } from "framer-motion";
 
 export interface Props {
   models: Model[];
@@ -47,63 +48,76 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
         ) : (
           <div className="w-4 h-4 border-3 border-neutral-300 border-t-neutral-500 rounded-full animate-spin" />
         )}
-        <ChevronDownIcon
-          className="size-3 stroke-3 ml-2 text-neutral-400 dark:text-neutral-600 transition-colors duration-300
-            ease-in-out"
-        />
+        <motion.div
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          style={{ display: "inline-block" }}
+        >
+          <ChevronDownIcon
+            className="size-3 stroke-3 ml-2 text-neutral-400 dark:text-neutral-600 transition-colors duration-300
+              ease-in-out"
+          />
+        </motion.div>
       </button>
 
-      {open && (
-        <div
-          className="absolute left-0 top-full mt-2 min-w-md border bg-white dark:bg-neutral-900 border-neutral-200
-            dark:border-neutral-800 transition-colors duration-300 ease-in-out rounded-2xl shadow-lg z-50
-            overflow-hidden"
-        >
-          <div
-            className="px-4 py-2 flex items-center justify-between text-neutral-500 dark:text-neutral-400
-              transition-colors duration-300 ease-in-out"
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            style={{ transformOrigin: "top center" }}
+            className="absolute left-0 top-full mt-2 min-w-md border bg-white dark:bg-neutral-900 border-neutral-200
+              dark:border-neutral-800 transition-colors duration-300 ease-in-out rounded-2xl shadow-lg z-50
+              overflow-hidden"
           >
-            <span>Model</span>
-          </div>
-          <div ref={listRef} className="max-h-96 overflow-y-auto p-2 space-y-1" style={{ scrollbarGutter: "stable" }}>
-            {models.map((m) => (
-              <Tooltip key={m.name} text={m.description ?? ""}>
-                <button
-                  data-selected={m.name === selected?.name}
-                  key={m.name}
-                  onClick={() => {
-                    onChangeAction(m);
-                    setOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between px-4 py-2 hover:bg-neutral-100
-                    dark:hover:bg-neutral-800 rounded-lg transition-colors duration-300 ease-in-out cursor-pointer"
-                >
-                  <div className="flex flex-col">
-                    <span
-                      className="font-medium text-neutral-600 dark:text-neutral-300 transition-colors duration-300
-                        ease-in-out"
-                    >
-                      {m.displayName}
-                    </span>
-                    <div
-                      className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-2 mt-1
-                        transition-colors duration-300 ease-in-out"
-                    >
-                      <ArrowDownTrayIcon className="size-3 transition-colors duration-300 ease-in-out" />
-                      {m.inputTokenLimit}
-                      <ArrowUpTrayIcon className="size-3 transition-colors duration-300 ease-in-out" />
-                      {m.outputTokenLimit}
+            <div
+              className="px-4 py-2 flex items-center justify-between text-neutral-500 dark:text-neutral-400
+                transition-colors duration-300 ease-in-out"
+            >
+              <span>Model</span>
+            </div>
+            <div ref={listRef} className="max-h-96 overflow-y-auto p-2 space-y-1" style={{ scrollbarGutter: "stable" }}>
+              {models.map((m) => (
+                <Tooltip key={m.name} text={m.description ?? ""}>
+                  <button
+                    data-selected={m.name === selected?.name}
+                    key={m.name}
+                    onClick={() => {
+                      onChangeAction(m);
+                      setOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-4 py-2 hover:bg-neutral-100
+                      dark:hover:bg-neutral-800 rounded-lg transition-colors duration-300 ease-in-out cursor-pointer"
+                  >
+                    <div className="flex flex-col">
+                      <span
+                        className="font-medium text-neutral-600 dark:text-neutral-300 transition-colors duration-300
+                          ease-in-out"
+                      >
+                        {m.displayName}
+                      </span>
+                      <div
+                        className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-2 mt-1
+                          transition-colors duration-300 ease-in-out"
+                      >
+                        <ArrowDownTrayIcon className="size-3 transition-colors duration-300 ease-in-out" />
+                        {m.inputTokenLimit}
+                        <ArrowUpTrayIcon className="size-3 transition-colors duration-300 ease-in-out" />
+                        {m.outputTokenLimit}
+                      </div>
                     </div>
-                  </div>
-                  {m.name === selected?.name && (
-                    <CheckCircleIcon className="size-4 transition-colors duration-300 ease-in-out" />
-                  )}
-                </button>
-              </Tooltip>
-            ))}
-          </div>
-        </div>
-      )}
+                    {m.name === selected?.name && (
+                      <CheckCircleIcon className="size-4 transition-colors duration-300 ease-in-out" />
+                    )}
+                  </button>
+                </Tooltip>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

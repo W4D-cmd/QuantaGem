@@ -1,6 +1,14 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import dynamic from "next/dynamic";
+
+const HighlightJsThemeLoader = dynamic(
+  () => import("@/components/HighlightJsThemeLoader").then((mod) => mod.HighlightJsThemeLoader),
+  {
+    ssr: false,
+  },
+);
 
 type Theme = "light" | "dark" | "system";
 
@@ -82,7 +90,12 @@ export function ThemeProvider({ children, initialTheme = "system" }: ThemeProvid
     resolvedTheme,
   };
 
-  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={contextValue}>
+      <HighlightJsThemeLoader />
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

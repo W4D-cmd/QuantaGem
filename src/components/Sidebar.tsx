@@ -14,6 +14,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 
 interface SidebarProps {
   chats: ChatListItem[];
@@ -145,6 +146,14 @@ const EditableItem: React.FC<{
   );
 };
 
+const AnimatedList: React.FC<{ children: React.ReactNode; as?: "ul" | "div" }> = ({
+  children,
+  as: Component = "ul",
+}) => {
+  const [parent] = useAutoAnimate();
+  return <Component ref={parent}>{children}</Component>;
+};
+
 export default function Sidebar({
   chats,
   projects,
@@ -255,85 +264,87 @@ export default function Sidebar({
       </div>
 
       <div className="flex-grow overflow-y-auto">
-        {groupedGlobalChats.map((group) => (
-          <div key={group.label} className="mb-4">
-            <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2 pr-3">
-              {group.label}
-            </h3>
-            <ul>
-              {group.chats.map((chat) => (
-                <li key={chat.id} className="mb-0.5 relative group">
-                  <EditableItem
-                    item={chat}
-                    isActive={chat.id === activeChatId}
-                    isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
-                    onSelect={() => onSelectChat(chat.id)}
-                    onStartEdit={() => handleStartEdit("chat", chat.id)}
-                    onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
-                    onCancelEdit={handleCancelEdit}
-                  >
-                    <span className="truncate">{chat.title}</span>
-                    <div className="relative inline-block opacity-0 group-hover:opacity-100 duration-150">
-                      <button
-                        ref={(el) => {
-                          menuButtonRefs.current[`chat-${chat.id}`] = el;
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
-                        }}
-                        className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
-                      >
-                        <EllipsisHorizontalIcon className="size-5" />
-                      </button>
+        <AnimatedList as="div">
+          {groupedGlobalChats.map((group) => (
+            <div key={group.label} className="mb-4">
+              <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2 pr-3">
+                {group.label}
+              </h3>
+              <AnimatedList>
+                {group.chats.map((chat) => (
+                  <li key={chat.id} className="mb-0.5 relative group">
+                    <EditableItem
+                      item={chat}
+                      isActive={chat.id === activeChatId}
+                      isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
+                      onSelect={() => onSelectChat(chat.id)}
+                      onStartEdit={() => handleStartEdit("chat", chat.id)}
+                      onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
+                      onCancelEdit={handleCancelEdit}
+                    >
+                      <span className="truncate">{chat.title}</span>
+                      <div className="relative inline-block opacity-0 group-hover:opacity-100 duration-150">
+                        <button
+                          ref={(el) => {
+                            menuButtonRefs.current[`chat-${chat.id}`] = el;
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
+                          }}
+                          className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                        >
+                          <EllipsisHorizontalIcon className="size-5" />
+                        </button>
 
-                      <DropdownMenu
-                        open={openMenuId === `chat-${chat.id}`}
-                        anchorRef={{ current: menuButtonRefs.current[`chat-${chat.id}`] }}
-                        onCloseAction={() => setOpenMenuId(null)}
-                        position="left"
-                        items={[
-                          {
-                            id: "rename",
-                            icon: <PencilIcon className="size-4" />,
-                            label: "Rename",
-                            onClick: () => handleStartEdit("chat", chat.id),
-                          },
-                          {
-                            id: "duplicate",
-                            icon: <DocumentDuplicateIcon className="size-4" />,
-                            label: "Duplicate",
-                            onClick: () => onDuplicateChat(chat.id),
-                          },
-                          {
-                            id: "settings",
-                            icon: <Cog6ToothIcon className="size-4" />,
-                            label: "Settings",
-                            onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
-                          },
-                          {
-                            id: "delete",
-                            icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
-                            label: "Delete",
-                            onClick: () => onDeleteChat(chat.id),
-                            className: "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
-                          },
-                        ]}
-                      />
-                    </div>
-                  </EditableItem>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+                        <DropdownMenu
+                          open={openMenuId === `chat-${chat.id}`}
+                          anchorRef={{ current: menuButtonRefs.current[`chat-${chat.id}`] }}
+                          onCloseAction={() => setOpenMenuId(null)}
+                          position="left"
+                          items={[
+                            {
+                              id: "rename",
+                              icon: <PencilIcon className="size-4" />,
+                              label: "Rename",
+                              onClick: () => handleStartEdit("chat", chat.id),
+                            },
+                            {
+                              id: "duplicate",
+                              icon: <DocumentDuplicateIcon className="size-4" />,
+                              label: "Duplicate",
+                              onClick: () => onDuplicateChat(chat.id),
+                            },
+                            {
+                              id: "settings",
+                              icon: <Cog6ToothIcon className="size-4" />,
+                              label: "Settings",
+                              onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
+                            },
+                            {
+                              id: "delete",
+                              icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
+                              label: "Delete",
+                              onClick: () => onDeleteChat(chat.id),
+                              className: "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
+                            },
+                          ]}
+                        />
+                      </div>
+                    </EditableItem>
+                  </li>
+                ))}
+              </AnimatedList>
+            </div>
+          ))}
+        </AnimatedList>
 
         {projects.length > 0 && (
           <div className="mb-4">
             <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2 pr-3">
               Projects
             </h3>
-            <ul>
+            <AnimatedList>
               {projects.map((project) => (
                 <li key={project.id} className="mb-0.5">
                   <div className="flex items-center group">
@@ -403,81 +414,83 @@ export default function Sidebar({
                     </EditableItem>
                   </div>
                   {expandedProjects.has(project.id) && (
-                    <ul className="ms-6 border-l border-neutral-300 dark:border-neutral-700 mt-1 ps-2">
-                      {getChatsForProject(project.id).length > 0 ? (
-                        getChatsForProject(project.id).map((chat) => (
-                          <li key={chat.id} className="mb-0.5 relative group">
-                            <EditableItem
-                              item={chat}
-                              isActive={chat.id === activeChatId}
-                              isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
-                              onSelect={() => onSelectChat(chat.id)}
-                              onStartEdit={() => handleStartEdit("chat", chat.id)}
-                              onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
-                              onCancelEdit={handleCancelEdit}
-                            >
-                              <span className="truncate">{chat.title}</span>
-                              <div className="relative inline-block opacity-0 group-hover:opacity-100 duration-150">
-                                <button
-                                  ref={(el) => {
-                                    menuButtonRefs.current[`chat-${chat.id}`] = el;
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
-                                  }}
-                                  className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
-                                >
-                                  <EllipsisHorizontalIcon className="size-5" />
-                                </button>
-                                <DropdownMenu
-                                  open={openMenuId === `chat-${chat.id}`}
-                                  anchorRef={{ current: menuButtonRefs.current[`chat-${chat.id}`] }}
-                                  onCloseAction={() => setOpenMenuId(null)}
-                                  position="left"
-                                  items={[
-                                    {
-                                      id: "rename",
-                                      icon: <PencilIcon className="size-4" />,
-                                      label: "Rename",
-                                      onClick: () => handleStartEdit("chat", chat.id),
-                                    },
-                                    {
-                                      id: "duplicate",
-                                      icon: <DocumentDuplicateIcon className="size-4" />,
-                                      label: "Duplicate",
-                                      onClick: () => onDuplicateChat(chat.id),
-                                    },
-                                    {
-                                      id: "settings",
-                                      icon: <Cog6ToothIcon className="size-4" />,
-                                      label: "Settings",
-                                      onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
-                                    },
-                                    {
-                                      id: "delete",
-                                      icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
-                                      label: "Delete",
-                                      onClick: () => onDeleteChat(chat.id),
-                                      className:
-                                        "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
-                                    },
-                                  ]}
-                                />
-                              </div>
-                            </EditableItem>
+                    <div className="ms-6 border-l border-neutral-300 dark:border-neutral-700 mt-1 ps-2">
+                      <AnimatedList>
+                        {getChatsForProject(project.id).length > 0 ? (
+                          getChatsForProject(project.id).map((chat) => (
+                            <li key={chat.id} className="mb-0.5 relative group">
+                              <EditableItem
+                                item={chat}
+                                isActive={chat.id === activeChatId}
+                                isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
+                                onSelect={() => onSelectChat(chat.id)}
+                                onStartEdit={() => handleStartEdit("chat", chat.id)}
+                                onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
+                                onCancelEdit={handleCancelEdit}
+                              >
+                                <span className="truncate">{chat.title}</span>
+                                <div className="relative inline-block opacity-0 group-hover:opacity-100 duration-150">
+                                  <button
+                                    ref={(el) => {
+                                      menuButtonRefs.current[`chat-${chat.id}`] = el;
+                                    }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
+                                    }}
+                                    className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                                  >
+                                    <EllipsisHorizontalIcon className="size-5" />
+                                  </button>
+                                  <DropdownMenu
+                                    open={openMenuId === `chat-${chat.id}`}
+                                    anchorRef={{ current: menuButtonRefs.current[`chat-${chat.id}`] }}
+                                    onCloseAction={() => setOpenMenuId(null)}
+                                    position="left"
+                                    items={[
+                                      {
+                                        id: "rename",
+                                        icon: <PencilIcon className="size-4" />,
+                                        label: "Rename",
+                                        onClick: () => handleStartEdit("chat", chat.id),
+                                      },
+                                      {
+                                        id: "duplicate",
+                                        icon: <DocumentDuplicateIcon className="size-4" />,
+                                        label: "Duplicate",
+                                        onClick: () => onDuplicateChat(chat.id),
+                                      },
+                                      {
+                                        id: "settings",
+                                        icon: <Cog6ToothIcon className="size-4" />,
+                                        label: "Settings",
+                                        onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
+                                      },
+                                      {
+                                        id: "delete",
+                                        icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
+                                        label: "Delete",
+                                        onClick: () => onDeleteChat(chat.id),
+                                        className:
+                                          "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
+                                      },
+                                    ]}
+                                  />
+                                </div>
+                              </EditableItem>
+                            </li>
+                          ))
+                        ) : (
+                          <li className="text-neutral-500 dark:text-neutral-400 text-sm py-2 ps-2">
+                            No chats in this project.
                           </li>
-                        ))
-                      ) : (
-                        <li className="text-neutral-500 dark:text-neutral-400 text-sm py-2 ps-2">
-                          No chats in this project.
-                        </li>
-                      )}
-                    </ul>
+                        )}
+                      </AnimatedList>
+                    </div>
                   )}
                 </li>
               ))}
-            </ul>
+            </AnimatedList>
           </div>
         )}
       </div>

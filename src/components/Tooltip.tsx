@@ -2,6 +2,7 @@
 
 import React, { ReactNode, useState, useRef, useLayoutEffect, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface TooltipProps {
   text: string;
@@ -11,14 +12,15 @@ interface TooltipProps {
 
 export default function Tooltip({ text, children, offset = 8 }: TooltipProps) {
   const [visible, setVisible] = useState(false);
-  const [fadeIn, setFadeIn] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const [isMounted, setIsMounted] = useState(false);
 
   const triggerRef = useRef<HTMLSpanElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const showTimer = useRef<number | null>(null);
 
   useEffect(() => {
+    setIsMounted(true);
     return () => {
       if (showTimer.current !== null) {
         clearTimeout(showTimer.current);
@@ -40,14 +42,13 @@ export default function Tooltip({ text, children, offset = 8 }: TooltipProps) {
       showTimer.current = null;
     }
     setVisible(false);
-    setFadeIn(false);
   };
 
   useLayoutEffect(() => {
-    if (!visible) return;
-    const wrapper = triggerRef.current!;
-    const tipEl = tooltipRef.current!;
-    const anchor = (wrapper.firstElementChild as HTMLElement) || wrapper;
+    if (!visible || !triggerRef.current || !tooltipRef.current) return;
+
+    const tipEl = tooltipRef.current;
+    const anchor = (triggerRef.current.firstElementChild as HTMLElement) || triggerRef.current;
     const tipRect = tipEl.getBoundingClientRect();
     const trigRect = anchor.getBoundingClientRect();
     const minMargin = 8;
@@ -64,7 +65,6 @@ export default function Tooltip({ text, children, offset = 8 }: TooltipProps) {
     }
 
     setCoords({ top, left });
-    requestAnimationFrame(() => setFadeIn(true));
   }, [visible, offset]);
 
   return (
@@ -73,27 +73,30 @@ export default function Tooltip({ text, children, offset = 8 }: TooltipProps) {
         {children}
       </span>
 
-      {visible &&
-        text.trim() &&
+      {isMounted &&
         createPortal(
-          <div
-            ref={tooltipRef}
-            style={{
-              position: "absolute",
-              top: coords.top,
-              left: coords.left,
-              zIndex: 9999,
-              pointerEvents: "none",
-            }}
-            className={
-              "transition-opacity duration-100 ease-in " +
-              (fadeIn ? "opacity-100" : "opacity-0") +
-              ` bg-black dark:bg-white text-white dark:text-black text-xs rounded-lg py-1 px-2 whitespace-nowrap
-              shadow-lg`
-            }
-          >
-            {text}
-          </div>,
+          <AnimatePresence>
+            {visible && text.trim() && (
+              <motion.div
+                ref={tooltipRef}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 5 }}
+                transition={{ duration: 0.15 }}
+                style={{
+                  position: "absolute",
+                  top: coords.top,
+                  left: coords.left,
+                  zIndex: 9999,
+                  pointerEvents: "none",
+                }}
+                className="bg-black dark:bg-white text-white dark:text-black text-xs rounded-lg py-1 px-2
+                  whitespace-nowrap shadow-lg"
+              >
+                {text}
+              </motion.div>
+            )}
+          </AnimatePresence>,
           document.body,
         )}
     </>

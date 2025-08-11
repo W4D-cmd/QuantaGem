@@ -35,6 +35,8 @@ import { Content, Part } from "@google/genai";
 import { liveModels, languageCodes, LiveModel } from "@/lib/live-models";
 import { dialogVoices, standardVoices } from "@/lib/voices";
 import LiveSessionButton from "./LiveSessionButton";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -208,6 +210,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const [isScanning, setIsScanning] = useState(false);
     const [scanStatusMessage, setScanStatusMessage] = useState<string | null>(null);
+
+    const [fileAnimationParent] = useAutoAnimate();
 
     const {
       isConnecting: isLiveConnecting,
@@ -668,45 +672,46 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               </ul>
             </div>
           )}
-          {(selectedFiles.length > 0 || uploadingFiles.length > 0) && !isSessionActive && (
-            <div
-              className="mb-2 p-2 border border-neutral-100 dark:border-neutral-900 rounded-xl flex flex-wrap gap-2
-                transition-colors duration-300 ease-in-out"
-            >
-              {selectedFiles.map((file) => (
-                <div
-                  key={file.objectName}
-                  className="bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-400 px-3 py-1
-                    rounded-full text-sm flex items-center gap-2 transition-colors duration-300 ease-in-out"
-                >
-                  <span className={file.isProjectFile ? "font-semibold" : ""}>{file.fileName}</span>
-                  {!isLoading && (
-                    <XCircleIcon
-                      className="size-4 text-neutral-500 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
-                      onClick={() => removeSelectedFile(file.objectName)}
-                    />
-                  )}
-                </div>
-              ))}
-              {uploadingFiles.map((upload) => (
-                <div
-                  key={upload.id}
-                  className="relative overflow-hidden bg-blue-100 dark:bg-blue-900/50 rounded-full text-sm flex
-                    items-center transition-colors duration-300 ease-in-out"
-                >
+          <div ref={fileAnimationParent}>
+            {(selectedFiles.length > 0 || uploadingFiles.length > 0) && !isSessionActive && (
+              <div
+                className="mb-2 p-2 border border-neutral-100 dark:border-neutral-900 rounded-xl flex flex-wrap gap-2
+                  transition-colors duration-300 ease-in-out"
+              >
+                {selectedFiles.map((file) => (
                   <div
-                    className="absolute top-0 left-0 h-full bg-blue-200 dark:bg-blue-800 transition-all duration-150"
-                    style={{ width: `${upload.progress}%` }}
-                  ></div>
-                  <div className="relative z-10 flex items-center gap-2 px-3 py-1 text-blue-700 dark:text-blue-300">
-                    <ArrowPathIcon className="size-4 animate-spin" />
-                    <span className="truncate max-w-xs">{upload.file.name}</span>
+                    key={file.objectName}
+                    className="bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-400 px-3 py-1
+                      rounded-full text-sm flex items-center gap-2 transition-colors duration-300 ease-in-out"
+                  >
+                    <span className={file.isProjectFile ? "font-semibold" : ""}>{file.fileName}</span>
+                    {!isLoading && (
+                      <XCircleIcon
+                        className="size-4 text-neutral-500 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
+                        onClick={() => removeSelectedFile(file.objectName)}
+                      />
+                    )}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-
+                ))}
+                {uploadingFiles.map((upload) => (
+                  <div
+                    key={upload.id}
+                    className="relative overflow-hidden bg-blue-100 dark:bg-blue-900/50 rounded-full text-sm flex
+                      items-center transition-colors duration-300 ease-in-out"
+                  >
+                    <div
+                      className="absolute top-0 left-0 h-full bg-blue-200 dark:bg-blue-800 transition-all duration-150"
+                      style={{ width: `${upload.progress}%` }}
+                    ></div>
+                    <div className="relative z-10 flex items-center gap-2 px-3 py-1 text-blue-700 dark:text-blue-300">
+                      <ArrowPathIcon className="size-4 animate-spin" />
+                      <span className="truncate max-w-xs">{upload.file.name}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           {scanStatusMessage && (
             <div className="mb-2 p-2 text-sm text-neutral-500 flex items-center gap-2">
               <ArrowPathIcon className="size-4 animate-spin" />
@@ -885,7 +890,6 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     </Tooltip>
                   </>
                 )}
-
                 <button
                   type={isSessionActive || isLoading || isRecording || isTranscribing ? "button" : "submit"}
                   onClick={getMainButtonAction()}
@@ -910,15 +914,45 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           dark:hover:bg-neutral-400`
                     }`}
                 >
-                  {isLoading ? (
-                    <StopIcon className="size-5" />
-                  ) : isTranscribing || isScanning || isLiveConnecting ? (
-                    <ArrowPathIcon className="size-5 animate-spin" />
-                  ) : isRecording ? (
-                    <CheckIcon className="size-5 text-green-500" />
-                  ) : (
-                    <ArrowUpIcon className="size-5 stroke-2" />
-                  )}
+                  <AnimatePresence mode="wait">
+                    {isLoading ? (
+                      <motion.div
+                        key="stop"
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                      >
+                        <StopIcon className="size-5" />
+                      </motion.div>
+                    ) : isTranscribing || isScanning || isLiveConnecting ? (
+                      <motion.div
+                        key="loading"
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                      >
+                        <ArrowPathIcon className="size-5 animate-spin" />
+                      </motion.div>
+                    ) : isRecording ? (
+                      <motion.div
+                        key="check"
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                      >
+                        <CheckIcon className="size-5 text-green-500" />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="send"
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                      >
+                        <ArrowUpIcon className="size-5 stroke-2" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </button>
               </div>
             </div>

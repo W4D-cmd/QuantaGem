@@ -26,6 +26,7 @@ import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.share
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { liveModels, LiveModel } from "@/lib/live-models";
 import { dialogVoices, standardVoices } from "@/lib/voices";
+import { motion, AnimatePresence } from "framer-motion";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
 const TITLE_GENERATION_MAX_LENGTH = 30000;
@@ -1532,11 +1533,15 @@ export default function Home() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {toast && <Toast message={toast.message} type={toast.type} onClose={handleCloseToast} />}
-      <ConfirmationModal
-        {...confirmationModal}
-        onClose={() => setConfirmationModal((prev) => ({ ...prev, isOpen: false }))}
-      />
+      <AnimatePresence>{toast && <Toast {...toast} onClose={handleCloseToast} />}</AnimatePresence>
+      <AnimatePresence>
+        {confirmationModal.isOpen && (
+          <ConfirmationModal
+            {...confirmationModal}
+            onClose={() => setConfirmationModal((prev) => ({ ...prev, isOpen: false }))}
+          />
+        )}
+      </AnimatePresence>
       <Sidebar
         chats={allChats}
         projects={allProjects}
@@ -1564,17 +1569,23 @@ export default function Home() {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {isDraggingOver && !isLiveSessionActive && (
-          <div
-            className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-2xl border-2
-              border-dashed border-blue-500 bg-blue-100/50 dark:bg-blue-900/50 backdrop-blur-sm"
-          >
-            <div className="flex flex-col items-center gap-2 text-blue-600 dark:text-blue-300">
-              <PaperClipIcon className="size-8" />
-              <p className="font-semibold">Drop files to attach</p>
-            </div>
-          </div>
-        )}
+        <AnimatePresence>
+          {isDraggingOver && !isLiveSessionActive && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-2xl border-2
+                border-dashed border-blue-500 bg-blue-100/50 dark:bg-blue-900/50 backdrop-blur-sm"
+            >
+              <div className="flex flex-col items-center gap-2 text-blue-600 dark:text-blue-300">
+                <PaperClipIcon className="size-8" />
+                <p className="font-semibold">Drop files to attach</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div
           className="flex-none sticky min-h-16 top-0 z-10 px-4 py-2 border-b border-neutral-100 dark:border-neutral-950
             transition-colors duration-300 ease-in-out flex items-center justify-between"
@@ -1624,7 +1635,6 @@ export default function Home() {
                   <EllipsisVerticalIcon className="size-5" />
                 </button>
               </Tooltip>
-
               <DropdownMenu
                 anchorRef={threeDotMenuButtonRef}
                 open={isThreeDotMenuOpen}
@@ -1636,133 +1646,172 @@ export default function Home() {
             </div>
           </div>
         </div>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <AnimatePresence mode="wait">
+            {displayingProjectManagementId !== null ? (
+              <motion.div
+                key={`project-${displayingProjectManagementId}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="flex-1 flex flex-col overflow-hidden"
+              >
+                <ProjectManagement
+                  projectId={displayingProjectManagementId}
+                  getAuthHeaders={getAuthHeaders}
+                  onProjectUpdated={fetchAllProjects}
+                  showToast={showToast}
+                  openConfirmationModal={setConfirmationModal}
+                  onProjectSystemPromptUpdated={async () => {
+                    await fetchAllProjects();
+                    if (activeChatId) {
+                      await loadChat(activeChatId);
+                    }
+                  }}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="chat-area"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="flex-1 flex flex-col overflow-hidden"
+              >
+                <ChatArea
+                  ref={chatAreaRef}
+                  messages={messages}
+                  isLoading={isLoading}
+                  streamStarted={streamStarted}
+                  onAutoScrollChange={handleAutoScrollChange}
+                  getAuthHeaders={getAuthHeaders}
+                  activeChatId={activeChatId}
+                  editingMessage={editingMessage}
+                  setEditingMessage={setEditingMessage}
+                  onEditSave={handleEditSave}
+                  onRegenerate={handleRegenerateResponse}
+                  onPlayAudio={handlePlayAudio}
+                  audioPlaybackState={audioPlaybackState}
+                />
 
-        {displayingProjectManagementId !== null ? (
-          <ProjectManagement
-            projectId={displayingProjectManagementId}
-            getAuthHeaders={getAuthHeaders}
-            onProjectUpdated={fetchAllProjects}
-            showToast={showToast}
-            openConfirmationModal={setConfirmationModal}
-            onProjectSystemPromptUpdated={async () => {
-              await fetchAllProjects();
-              if (activeChatId) {
-                await loadChat(activeChatId);
-              }
-            }}
-          />
-        ) : (
-          <>
-            <ChatArea
-              ref={chatAreaRef}
-              messages={messages}
-              isLoading={isLoading}
-              streamStarted={streamStarted}
-              onAutoScrollChange={handleAutoScrollChange}
-              getAuthHeaders={getAuthHeaders}
-              activeChatId={activeChatId}
-              editingMessage={editingMessage}
-              setEditingMessage={setEditingMessage}
-              onEditSave={handleEditSave}
-              onRegenerate={handleRegenerateResponse}
-              onPlayAudio={handlePlayAudio}
-              audioPlaybackState={audioPlaybackState}
-            />
+                <div className="flex-none p-4">
+                  <div className="mx-auto max-w-[52rem] relative">
+                    <AnimatePresence>
+                      {isLiveSessionActive && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          transition={{ duration: 0.3 }}
+                          className="absolute bottom-full mb-4 w-full bg-neutral-100/80 dark:bg-neutral-900/80
+                            backdrop-blur-sm p-4 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800
+                            flex items-center gap-3"
+                        >
+                          <ChatBubbleLeftRightIcon
+                            className="size-6 flex-shrink-0 text-red-500 dark:text-red-400 animate-pulse"
+                          />
+                          <p className="text-sm text-neutral-800 dark:text-neutral-200 flex-1 min-h-[1.25rem]">
+                            {liveInterimText || "Listening..."}
+                          </p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    <div className="relative h-0">
+                      <AnimatePresence>
+                        {!isAutoScrollActive && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            transition={{ duration: 0.2 }}
+                            className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20"
+                          >
+                            <button
+                              onClick={handleScrollToBottomClick}
+                              className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
+                                font-medium transition-colors duration-300 ease-in-out bg-white border
+                                border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-900
+                                dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 shadow-lg"
+                            >
+                              <ArrowDownIcon className="size-5" />
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
 
-            <div className="flex-none p-4">
-              <div className="mx-auto max-w-[52rem] relative">
-                {isLiveSessionActive && (
-                  <div
-                    className="absolute bottom-full mb-4 w-full bg-neutral-100/80 dark:bg-neutral-900/80
-                      backdrop-blur-sm p-4 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 flex
-                      items-center gap-3 transition-opacity duration-300"
-                  >
-                    <ChatBubbleLeftRightIcon
-                      className="size-6 flex-shrink-0 text-red-500 dark:text-red-400 animate-pulse"
+                    <ChatInput
+                      ref={chatInputRef}
+                      onSendMessageAction={handleSendMessage}
+                      onCancelAction={handleCancel}
+                      isLoading={isLoading}
+                      messages={messages}
+                      isSearchActive={isSearchActive}
+                      onToggleSearch={setIsSearchActive}
+                      getAuthHeaders={getAuthHeaders}
+                      activeProjectId={currentChatProjectId}
+                      showToast={showToast}
+                      keySelection={keySelection}
+                      onLiveSessionStateChange={setIsLiveSessionActive}
+                      onLiveInterimText={setLiveInterimText}
+                      onTurnComplete={handleLiveSessionTurnComplete}
+                      onVideoStream={setLocalVideoStream}
+                      selectedLiveModel={selectedLiveModel}
+                      onLiveModelChange={handleLiveModelChange}
+                      selectedLanguage={selectedLanguage}
+                      onLanguageChange={setSelectedLanguage}
+                      selectedVoice={selectedVoice}
+                      onVoiceChange={setSelectedVoice}
+                      isAutoMuteEnabled={isAutoMuteEnabled}
+                      onAutoMuteToggle={setIsAutoMuteEnabled}
+                      liveMode={liveMode}
+                      onLiveModeChange={setLiveMode}
                     />
-                    <p className="text-sm text-neutral-800 dark:text-neutral-200 flex-1 min-h-[1.25rem]">
-                      {liveInterimText || "Listening..."}
-                    </p>
-                  </div>
-                )}
-                <div className="relative h-0">
-                  <div
-                    className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300
-                      ease-in-out ${isAutoScrollActive ? "opacity-0 pointer-events-none" : "opacity-100"} `}
-                  >
-                    <button
-                      onClick={handleScrollToBottomClick}
-                      className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
-                        transition-colors duration-300 ease-in-out bg-white border border-neutral-300
-                        hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-900 dark:border-neutral-800
-                        dark:text-neutral-300 dark:hover:bg-neutral-700 shadow-lg"
-                    >
-                      <ArrowDownIcon className="size-5" />
-                    </button>
                   </div>
                 </div>
-
-                <ChatInput
-                  ref={chatInputRef}
-                  onSendMessageAction={handleSendMessage}
-                  onCancelAction={handleCancel}
-                  isLoading={isLoading}
-                  messages={messages}
-                  isSearchActive={isSearchActive}
-                  onToggleSearch={setIsSearchActive}
-                  getAuthHeaders={getAuthHeaders}
-                  activeProjectId={currentChatProjectId}
-                  showToast={showToast}
-                  keySelection={keySelection}
-                  onLiveSessionStateChange={setIsLiveSessionActive}
-                  onLiveInterimText={setLiveInterimText}
-                  onTurnComplete={handleLiveSessionTurnComplete}
-                  onVideoStream={setLocalVideoStream}
-                  selectedLiveModel={selectedLiveModel}
-                  onLiveModelChange={handleLiveModelChange}
-                  selectedLanguage={selectedLanguage}
-                  onLanguageChange={setSelectedLanguage}
-                  selectedVoice={selectedVoice}
-                  onVoiceChange={setSelectedVoice}
-                  isAutoMuteEnabled={isAutoMuteEnabled}
-                  onAutoMuteToggle={setIsAutoMuteEnabled}
-                  liveMode={liveMode}
-                  onLiveModeChange={setLiveMode}
-                />
-              </div>
-            </div>
-          </>
-        )}
-      </main>
-
-      {localVideoStream && (
-        <div
-          className="fixed bottom-24 right-4 w-48 h-auto bg-black border-2 border-red-500 rounded-lg shadow-2xl z-50
-            animate-pulse"
-        >
-          <video
-            ref={(el) => {
-              if (el) el.srcObject = localVideoStream;
-            }}
-            autoPlay
-            muted
-            className="w-full h-full rounded-lg"
-          />
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs font-bold">
-            SCREEN SHARING
-          </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      )}
-
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={closeSettingsModal}
-        chatId={editingChatId}
-        initialSystemPromptValue={editingPromptInitialValue}
-        onSettingsSaved={handleSettingsSaved}
-        getAuthHeaders={getAuthHeaders}
-        showToast={showToast}
-      />
+      </main>
+      <AnimatePresence>
+        {localVideoStream && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, x: 50 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            exit={{ opacity: 0, scale: 0.8, x: 50 }}
+            className="fixed bottom-24 right-4 w-48 h-auto bg-black border-2 border-red-500 rounded-lg shadow-2xl z-50
+              animate-pulse"
+          >
+            <video
+              ref={(el) => {
+                if (el) el.srcObject = localVideoStream;
+              }}
+              autoPlay
+              muted
+              className="w-full h-full rounded-lg"
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs font-bold">
+              SCREEN SHARING
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isSettingsModalOpen && (
+          <SettingsModal
+            isOpen={isSettingsModalOpen}
+            onClose={closeSettingsModal}
+            chatId={editingChatId}
+            initialSystemPromptValue={editingPromptInitialValue}
+            onSettingsSaved={handleSettingsSaved}
+            getAuthHeaders={getAuthHeaders}
+            showToast={showToast}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

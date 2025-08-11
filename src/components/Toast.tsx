@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, FC, useCallback } from "react";
+import { FC, useCallback, useEffect, useRef } from "react";
 import { XMarkIcon, CheckCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { motion, useAnimation } from "framer-motion";
 
 export interface ToastProps {
   message: string;
@@ -11,39 +12,58 @@ export interface ToastProps {
 const AUTO_DISMISS_MS = 6000;
 
 const Toast: FC<ToastProps> = ({ message, type = "error", onClose }) => {
-  const [progress, setProgress] = useState(100);
-  const [visible, setVisible] = useState(false);
-  const timerRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number>(0);
+  const controls = useAnimation();
+  const progressControls = useAnimation();
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const remainingTimeRef = useRef(AUTO_DISMISS_MS);
+  const animationStartTimeRef = useRef(0);
 
-  const clearTimer = useCallback(() => {
-    if (timerRef.current !== null) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  const startTimer = useCallback(() => {
-    clearTimer();
-    startTimeRef.current = Date.now();
-    setProgress(100);
-    timerRef.current = window.setInterval(() => {
-      const elapsed = Date.now() - startTimeRef.current;
-      const pct = Math.max(100 - (elapsed / AUTO_DISMISS_MS) * 100, 0);
-      setProgress(pct);
-      if (pct <= 0) {
-        clearTimer();
-        setVisible(false);
-        setTimeout(onClose, 300);
-      }
-    }, 50);
-  }, [clearTimer, onClose]);
+  const handleClose = useCallback(() => {
+    controls.start("hidden").then(onClose);
+  }, [controls, onClose]);
 
   useEffect(() => {
-    startTimer();
-    requestAnimationFrame(() => setVisible(true));
-    return clearTimer;
-  }, [startTimer, clearTimer]);
+    controls.start("visible");
+    animationStartTimeRef.current = Date.now();
+    remainingTimeRef.current = AUTO_DISMISS_MS;
+
+    progressControls.start({
+      width: "0%",
+      transition: { duration: AUTO_DISMISS_MS / 1000, ease: "linear" },
+    });
+
+    timerRef.current = setTimeout(handleClose, AUTO_DISMISS_MS);
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [message, controls, progressControls, handleClose]);
+
+  const handlePause = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    progressControls.stop();
+    const elapsedTime = Date.now() - animationStartTimeRef.current;
+    remainingTimeRef.current = remainingTimeRef.current - elapsedTime;
+  }, [progressControls]);
+
+  const handleResume = useCallback(() => {
+    animationStartTimeRef.current = Date.now();
+    const remaining = remainingTimeRef.current;
+
+    if (remaining > 0) {
+      progressControls.start({
+        width: "0%",
+        transition: { duration: remaining / 1000, ease: "linear" },
+      });
+      timerRef.current = setTimeout(handleClose, remaining);
+    } else {
+      handleClose();
+    }
+  }, [progressControls, handleClose]);
 
   const isSuccess = type === "success";
   const bgColor = isSuccess ? "bg-green-500/80" : "bg-red-500/70";
@@ -53,12 +73,23 @@ const Toast: FC<ToastProps> = ({ message, type = "error", onClose }) => {
   const Icon = isSuccess ? CheckCircleIcon : ExclamationTriangleIcon;
 
   return (
-    <div
-      className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-[10000] w-[90%] max-w-md backdrop-blur-sm text-white
-        rounded-2xl shadow-lg overflow-hidden transition-all duration-300
-        ${visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"} ${bgColor} ${borderColor} border`}
-      onMouseEnter={clearTimer}
-      onMouseLeave={startTimer}
+    <motion.div
+      initial="hidden"
+      animate={controls}
+      exit="hidden"
+      variants={{
+        hidden: { opacity: 0, y: -20, scale: 0.95 },
+        visible: {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          transition: { type: "spring", stiffness: 400, damping: 25 },
+        },
+      }}
+      className={`fixed top-4 left-1/2 -translate-x-1/2 z-[10000] w-[90%] max-w-md backdrop-blur-sm text-white
+        rounded-2xl shadow-lg overflow-hidden ${bgColor} ${borderColor} border`}
+      onMouseEnter={handlePause}
+      onMouseLeave={handleResume}
       role="alert"
     >
       <div className="flex items-start justify-between px-4 py-3">
@@ -67,23 +98,16 @@ const Toast: FC<ToastProps> = ({ message, type = "error", onClose }) => {
           <span className="text-sm flex-1 max-h-[160px] overflow-y-auto break-words">{message}</span>
         </div>
         <button
-          onClick={() => {
-            clearTimer();
-            setVisible(false);
-            setTimeout(onClose, 300);
-          }}
+          onClick={handleClose}
           className={`cursor-pointer p-1.5 rounded-full ${hoverBgColor} transition-colors flex-none -mr-1 -mt-1`}
         >
           <XMarkIcon className="size-5" />
         </button>
       </div>
-      <div className="h-1 overflow-hidden">
-        <div
-          className={`h-full ${progressBgColor} transition-[width] ease-linear duration-50`}
-          style={{ width: `${progress}%` }}
-        />
+      <div className={"h-1 w-full bg-black/20 overflow-hidden"}>
+        <motion.div className={`h-full ${progressBgColor}`} initial={{ width: "100%" }} animate={progressControls} />
       </div>
-    </div>
+    </motion.div>
   );
 };
 

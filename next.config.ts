@@ -4,8 +4,9 @@ const nextConfig: NextConfig = {
   experimental: {
     useLightningcss: false,
   },
-  api: {
-    responseLimit: "20mb",
+  webpack: (config) => {
+    config.resolve.alias["drizzle-orm"] = false;
+    return config;
   },
   async headers() {
     return [

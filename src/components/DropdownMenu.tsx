@@ -2,6 +2,7 @@
 
 import React, { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 
 export interface DropdownItem {
   id?: string;
@@ -31,6 +32,11 @@ export default function DropdownMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const [menuWidth, setMenuWidth] = useState<number | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useLayoutEffect(() => {
     if (!open || !anchorRef.current || !menuRef.current) return;
@@ -94,40 +100,51 @@ export default function DropdownMenu({
     return () => window.removeEventListener("resize", handleResize);
   }, [open, extraWidthPx]);
 
-  if (!open) return null;
-
   const menu = (
-    <div
-      ref={menuRef}
-      style={{
-        position: "absolute",
-        top: `${coords.top}px`,
-        left: `${coords.left}px`,
-        zIndex: 9999,
-        ...(menuWidth != null ? { width: `${menuWidth}px` } : {}),
-      }}
-      className="border bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-lg
-        overflow-hidden transition-colors duration-300 ease-in-out"
-    >
-      <div className="max-h-60 overflow-y-auto p-2 space-y-1">
-        {items.map((item) => (
-          <button
-            key={item.id ?? item.label}
-            onClick={(e) => {
-              e.stopPropagation();
-              onCloseAction();
-              item.onClick(e);
-            }}
-            className={`cursor-pointer w-full flex items-center px-4 py-2 text-sm text-left hover:bg-neutral-100
-            dark:hover:bg-neutral-800 rounded-lg transition-colors duration-300 ease-in-out ${item.className || ""}`}
-          >
-            {item.icon && <span className="mr-2">{item.icon}</span>}
-            {item.label}
-          </button>
-        ))}
-      </div>
-    </div>
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          ref={menuRef}
+          initial={{ opacity: 0, scale: 0.95, y: -10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: -10 }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
+          style={{
+            position: "absolute",
+            top: `${coords.top}px`,
+            left: `${coords.left}px`,
+            zIndex: 9999,
+            ...(menuWidth != null ? { width: `${menuWidth}px` } : {}),
+            transformOrigin: "top",
+          }}
+          className="border bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 rounded-2xl
+            shadow-lg overflow-hidden transition-colors duration-300 ease-in-out"
+        >
+          <div className="max-h-60 overflow-y-auto p-2 space-y-1">
+            {items.map((item) => (
+              <button
+                key={item.id ?? item.label}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCloseAction();
+                  item.onClick(e);
+                }}
+                className={`cursor-pointer w-full flex items-center px-4 py-2 text-sm text-left hover:bg-neutral-100
+                dark:hover:bg-neutral-800 rounded-lg transition-colors duration-300 ease-in-out ${item.className || ""}`}
+              >
+                {item.icon && <span className="mr-2">{item.icon}</span>}
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
+
+  if (!isMounted) {
+    return null;
+  }
 
   return createPortal(menu, document.body);
 }

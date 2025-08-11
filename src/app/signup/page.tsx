@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Toast from "@/components/Toast";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -50,8 +51,13 @@ export default function SignupPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-neutral-50 dark:bg-neutral-950 p-4">
-      {error && <Toast message={error} onClose={() => setError(null)} />}
-      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-neutral-900 p-8 shadow-lg">
+      <AnimatePresence>{error && <Toast message={error} onClose={() => setError(null)} />}</AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeInOut" }}
+        className="w-full max-w-md rounded-2xl bg-white dark:bg-neutral-900 p-8 shadow-lg"
+      >
         <h2 className="mb-6 text-center text-3xl font-bold text-neutral-900 dark:text-white">
           Create Your QuantaGem Account
         </h2>
@@ -106,7 +112,8 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <button
+            <motion.button
+              whileTap={{ scale: 0.97 }}
               type="submit"
               disabled={isLoading}
               className="flex w-full justify-center rounded-xl border border-transparent bg-black dark:bg-blue-600 px-4
@@ -115,7 +122,7 @@ export default function SignupPage() {
                 disabled:cursor-not-allowed disabled:bg-neutral-400 dark:disabled:bg-blue-800"
             >
               {isLoading ? "Creating account..." : "Create Account"}
-            </button>
+            </motion.button>
           </div>
         </form>
 
@@ -125,7 +132,7 @@ export default function SignupPage() {
             Sign In
           </Link>
         </p>
-      </div>
+      </motion.div>
     </div>
   );
 }

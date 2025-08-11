@@ -256,7 +256,8 @@ const CodeBlockWithCopy: React.FC<CodeBlockWithCopyProps> = ({ children, chatAre
           onClick={handleCopy}
           style={{ top: `${buttonRelativeTop}px`, right: `${BUTTON_OFFSET_RIGHT}px` }}
           className="cursor-pointer absolute p-1 rounded-md text-neutral-400 dark:text-neutral-500 hover:bg-neutral-200
-            dark:hover:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+            dark:hover:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10
+            group-hover:scale-100 scale-95"
         >
           {copied ? <CheckIcon className="size-4 text-green-600" /> : <ClipboardDocumentListIcon className="size-4" />}
         </button>

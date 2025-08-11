@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import "./globals.css";
 import React from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { HighlightJsThemeLoader } from "@/components/HighlightJsThemeLoader";
 
 export const metadata: Metadata = {
   title: "QuantaGem",
@@ -20,10 +19,7 @@ export default function RootLayout({
         className={`antialiased bg-white dark:bg-neutral-950 text-black dark:text-white transition-colors duration-300
           ease-in-out`}
       >
-        <ThemeProvider>
-          <HighlightJsThemeLoader />
-          {children}
-        </ThemeProvider>
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

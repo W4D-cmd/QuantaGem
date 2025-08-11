@@ -5,10 +5,22 @@ import { generateAuthToken } from "@/lib/auth";
 import { RateLimiterRedis } from "rate-limiter-flexible";
 import Redis from "ioredis";
 
-const redisClient = new Redis({ host: "redis", port: 6379 });
+let redisClient: Redis | null = null;
+
+const getRedisClient = (): Redis => {
+  if (!redisClient) {
+    redisClient = new Redis({ host: "redis", port: 6379 });
+
+    redisClient.on("error", (err) => {
+      console.error("Redis Client Error", err);
+      redisClient = null;
+    });
+  }
+  return redisClient;
+};
 
 const ipLimiter = new RateLimiterRedis({
-  storeClient: redisClient,
+  storeClient: getRedisClient(),
   keyPrefix: "login_fail_ip",
   points: 5,
   duration: 60 * 20,
@@ -16,7 +28,7 @@ const ipLimiter = new RateLimiterRedis({
 });
 
 const usernameLimiter = new RateLimiterRedis({
-  storeClient: redisClient,
+  storeClient: getRedisClient(),
   keyPrefix: "login_fail_username",
   points: 5,
   duration: 60 * 20,

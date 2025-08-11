@@ -3,7 +3,6 @@ import { ChatListItem, ProjectListItem } from "@/app/page";
 import DropdownMenu from "@/components/DropdownMenu";
 import Tooltip from "@/components/Tooltip";
 import {
-  ChevronDownIcon,
   ChevronRightIcon,
   Cog6ToothIcon,
   DocumentDuplicateIcon,
@@ -14,7 +13,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import { useAutoAnimate } from "@formkit/auto-animate/react";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 
 interface SidebarProps {
   chats: ChatListItem[];
@@ -135,7 +134,7 @@ const EditableItem: React.FC<{
     <button
       onClick={onSelect}
       className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none text-neutral-900
-        dark:text-white transition-colors duration-300 ease-in-out flex items-center justify-between ${
+        dark:text-white transition-colors duration-200 ease-in-out flex items-center justify-between ${
           isActive
             ? "font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700 hover:dark:bg-neutral-700"
             : "hover:bg-neutral-200 dark:hover:bg-neutral-800"
@@ -146,12 +145,37 @@ const EditableItem: React.FC<{
   );
 };
 
-const AnimatedList: React.FC<{ children: React.ReactNode; as?: "ul" | "div" }> = ({
-  children,
-  as: Component = "ul",
-}) => {
-  const [parent] = useAutoAnimate();
-  return <Component ref={parent}>{children}</Component>;
+const animationVariants: {
+  container: Variants;
+  item: Variants;
+  accordion: Variants;
+} = {
+  container: {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05,
+      },
+    },
+  },
+  item: {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeInOut" } },
+    exit: { opacity: 0, x: -20, transition: { duration: 0.2, ease: "easeInOut" } },
+  },
+  accordion: {
+    open: {
+      opacity: 1,
+      height: "auto",
+      transition: { duration: 0.3, ease: "easeInOut" },
+    },
+    collapsed: {
+      opacity: 0,
+      height: 0,
+      transition: { duration: 0.3, ease: "easeInOut" },
+    },
+  },
 };
 
 export default function Sidebar({
@@ -176,7 +200,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<{ type: "chat" | "project"; id: number } | null>(null);
-  const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const menuAnchorRef = useRef<HTMLButtonElement | null>(null);
 
   const toggleProjectExpansion = (projectId: number) => {
     onToggleProjectExpansion((prev: Set<number>) => {
@@ -218,8 +242,8 @@ export default function Sidebar({
 
   return (
     <div
-      className="w-70 h-full bg-neutral-100 dark:bg-neutral-900 pt-2 pb-4 pl-4 pr-1 overflow-y-auto flex flex-col
-        transition-colors duration-300 ease-in-out"
+      className="w-70 h-full bg-neutral-100 dark:bg-neutral-900 pt-2 pb-4 pl-4 pr-1 overflow-y-auto overflow-x-hidden
+        flex flex-col transition-colors duration-300 ease-in-out"
     >
       <div className="flex-none mb-4">
         <div className="flex-none pr-2 flex items-center justify-between">
@@ -229,9 +253,7 @@ export default function Sidebar({
               className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors
                 duration-300 ease-in-out"
             >
-              <TrashIcon
-                className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out"
-              />
+              <TrashIcon className="size-6 text-neutral-500 dark:text-neutral-400" />
             </button>
           </Tooltip>
 
@@ -242,9 +264,7 @@ export default function Sidebar({
                 className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800
                   transition-colors duration-300 ease-in-out"
               >
-                <FolderPlusIcon
-                  className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out"
-                />
+                <FolderPlusIcon className="size-6 text-neutral-500 dark:text-neutral-400" />
               </button>
             </Tooltip>
 
@@ -254,249 +274,283 @@ export default function Sidebar({
                 className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800
                   transition-colors duration-300 ease-in-out"
               >
-                <PencilSquareIcon
-                  className="size-6 text-neutral-500 dark:text-neutral-400 transition-colors duration-300 ease-in-out"
-                />
+                <PencilSquareIcon className="size-6 text-neutral-500 dark:text-neutral-400" />
               </button>
             </Tooltip>
           </div>
         </div>
       </div>
 
-      <div className="flex-grow overflow-y-auto">
-        <AnimatedList as="div">
+      <motion.div
+        className="flex-grow overflow-y-auto pr-3 -mr-3"
+        variants={animationVariants.container}
+        initial="hidden"
+        animate="visible"
+      >
+        <AnimatePresence>
           {groupedGlobalChats.map((group) => (
-            <div key={group.label} className="mb-4">
-              <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2 pr-3">
+            <motion.div key={group.label} variants={animationVariants.item} className="mb-4">
+              <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2">
                 {group.label}
               </h3>
-              <AnimatedList>
-                {group.chats.map((chat) => (
-                  <li key={chat.id} className="mb-0.5 relative group">
-                    <EditableItem
-                      item={chat}
-                      isActive={chat.id === activeChatId}
-                      isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
-                      onSelect={() => onSelectChat(chat.id)}
-                      onStartEdit={() => handleStartEdit("chat", chat.id)}
-                      onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
-                      onCancelEdit={handleCancelEdit}
+              <ul>
+                <AnimatePresence>
+                  {group.chats.map((chat) => (
+                    <motion.li
+                      key={chat.id}
+                      variants={animationVariants.item}
+                      exit="exit"
+                      layout="position"
+                      className="mb-0.5 relative group"
                     >
-                      <span className="truncate">{chat.title}</span>
-                      <div className="relative inline-block opacity-0 group-hover:opacity-100 duration-150">
-                        <button
-                          ref={(el) => {
-                            menuButtonRefs.current[`chat-${chat.id}`] = el;
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
-                          }}
-                          className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                      <EditableItem
+                        item={chat}
+                        isActive={chat.id === activeChatId}
+                        isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
+                        onSelect={() => onSelectChat(chat.id)}
+                        onStartEdit={() => handleStartEdit("chat", chat.id)}
+                        onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
+                        onCancelEdit={handleCancelEdit}
+                      >
+                        <span className="truncate">{chat.title}</span>
+                        <div
+                          className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
+                            group-hover:translate-x-0 transition-all duration-200 ease-in-out"
                         >
-                          <EllipsisHorizontalIcon className="size-5" />
-                        </button>
-
-                        <DropdownMenu
-                          open={openMenuId === `chat-${chat.id}`}
-                          anchorRef={{ current: menuButtonRefs.current[`chat-${chat.id}`] }}
-                          onCloseAction={() => setOpenMenuId(null)}
-                          position="left"
-                          items={[
-                            {
-                              id: "rename",
-                              icon: <PencilIcon className="size-4" />,
-                              label: "Rename",
-                              onClick: () => handleStartEdit("chat", chat.id),
-                            },
-                            {
-                              id: "duplicate",
-                              icon: <DocumentDuplicateIcon className="size-4" />,
-                              label: "Duplicate",
-                              onClick: () => onDuplicateChat(chat.id),
-                            },
-                            {
-                              id: "settings",
-                              icon: <Cog6ToothIcon className="size-4" />,
-                              label: "Settings",
-                              onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
-                            },
-                            {
-                              id: "delete",
-                              icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
-                              label: "Delete",
-                              onClick: () => onDeleteChat(chat.id),
-                              className: "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
-                            },
-                          ]}
-                        />
-                      </div>
-                    </EditableItem>
-                  </li>
-                ))}
-              </AnimatedList>
-            </div>
+                          <button
+                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                              e.stopPropagation();
+                              menuAnchorRef.current = e.currentTarget;
+                              setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
+                            }}
+                            className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                          >
+                            <EllipsisHorizontalIcon className="size-5" />
+                          </button>
+                          <DropdownMenu
+                            open={openMenuId === `chat-${chat.id}`}
+                            anchorRef={menuAnchorRef}
+                            onCloseAction={() => setOpenMenuId(null)}
+                            position="left"
+                            items={[
+                              {
+                                id: "rename",
+                                icon: <PencilIcon className="size-4" />,
+                                label: "Rename",
+                                onClick: () => handleStartEdit("chat", chat.id),
+                              },
+                              {
+                                id: "duplicate",
+                                icon: <DocumentDuplicateIcon className="size-4" />,
+                                label: "Duplicate",
+                                onClick: () => onDuplicateChat(chat.id),
+                              },
+                              {
+                                id: "settings",
+                                icon: <Cog6ToothIcon className="size-4" />,
+                                label: "Settings",
+                                onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
+                              },
+                              {
+                                id: "delete",
+                                icon: <TrashIcon className="size-4 text-red-500" />,
+                                label: "Delete",
+                                onClick: () => onDeleteChat(chat.id),
+                                className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
+                              },
+                            ]}
+                          />
+                        </div>
+                      </EditableItem>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
+              </ul>
+            </motion.div>
           ))}
-        </AnimatedList>
+        </AnimatePresence>
 
         {projects.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2 pr-3">
-              Projects
-            </h3>
-            <AnimatedList>
-              {projects.map((project) => (
-                <li key={project.id} className="mb-0.5">
-                  <div className="flex items-center group">
-                    <button
-                      onClick={() => toggleProjectExpansion(project.id)}
-                      className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
-                    >
-                      {expandedProjects.has(project.id) ? (
-                        <ChevronDownIcon className="size-4 stroke-2" />
-                      ) : (
+          <motion.div key="projects-section" variants={animationVariants.item} className="mb-4">
+            <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2">Projects</h3>
+            <ul>
+              <AnimatePresence>
+                {projects.map((project) => (
+                  <motion.li
+                    key={project.id}
+                    variants={animationVariants.item}
+                    exit="exit"
+                    layout="position"
+                    className="mb-0.5"
+                  >
+                    <div className="flex items-center group">
+                      <motion.button
+                        onClick={() => toggleProjectExpansion(project.id)}
+                        className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                        animate={{ rotate: expandedProjects.has(project.id) ? 90 : 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
                         <ChevronRightIcon className="size-4 stroke-2" />
-                      )}
-                    </button>
-                    <EditableItem
-                      item={project}
-                      isActive={project.id === activeProjectId}
-                      isEditing={editingItem?.type === "project" && editingItem.id === project.id}
-                      onSelect={() => onSelectProject(project.id)}
-                      onStartEdit={() => handleStartEdit("project", project.id)}
-                      onSaveEdit={(newTitle) => handleSaveEdit("project", project.id, newTitle)}
-                      onCancelEdit={handleCancelEdit}
-                    >
-                      <span className="truncate flex items-center gap-2">
-                        <FolderOpenIcon className="size-5" /> {project.title}
-                      </span>
-                      <div className="relative inline-block opacity-0 group-hover:opacity-100 duration-150">
-                        <button
-                          ref={(el) => {
-                            menuButtonRefs.current[`project-${project.id}`] = el;
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenuId(openMenuId === `project-${project.id}` ? null : `project-${project.id}`);
-                          }}
-                          className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                      </motion.button>
+                      <EditableItem
+                        item={project}
+                        isActive={project.id === activeProjectId}
+                        isEditing={editingItem?.type === "project" && editingItem.id === project.id}
+                        onSelect={() => onSelectProject(project.id)}
+                        onStartEdit={() => handleStartEdit("project", project.id)}
+                        onSaveEdit={(newTitle) => handleSaveEdit("project", project.id, newTitle)}
+                        onCancelEdit={handleCancelEdit}
+                      >
+                        <span className="truncate flex items-center gap-2">
+                          <FolderOpenIcon className="size-5" /> {project.title}
+                        </span>
+                        <div
+                          className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
+                            group-hover:translate-x-0 transition-all duration-200 ease-in-out"
                         >
-                          <EllipsisHorizontalIcon className="size-5" />
-                        </button>
-                        <DropdownMenu
-                          open={openMenuId === `project-${project.id}`}
-                          anchorRef={{ current: menuButtonRefs.current[`project-${project.id}`] }}
-                          onCloseAction={() => setOpenMenuId(null)}
-                          position="left"
-                          items={[
-                            {
-                              id: "rename",
-                              icon: <PencilIcon className="size-4" />,
-                              label: "Rename Project",
-                              onClick: () => handleStartEdit("project", project.id),
-                            },
-                            {
-                              id: "new-chat",
-                              icon: <PencilSquareIcon className="size-4" />,
-                              label: "New Chat in Project",
-                              onClick: () => onNewChat(project.id),
-                            },
-                            {
-                              id: "delete",
-                              icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
-                              label: "Delete Project",
-                              onClick: () => onDeleteProject(project.id),
-                              className: "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
-                            },
-                          ]}
-                        />
-                      </div>
-                    </EditableItem>
-                  </div>
-                  {expandedProjects.has(project.id) && (
-                    <div className="ms-6 border-l border-neutral-300 dark:border-neutral-700 mt-1 ps-2">
-                      <AnimatedList>
-                        {getChatsForProject(project.id).length > 0 ? (
-                          getChatsForProject(project.id).map((chat) => (
-                            <li key={chat.id} className="mb-0.5 relative group">
-                              <EditableItem
-                                item={chat}
-                                isActive={chat.id === activeChatId}
-                                isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
-                                onSelect={() => onSelectChat(chat.id)}
-                                onStartEdit={() => handleStartEdit("chat", chat.id)}
-                                onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
-                                onCancelEdit={handleCancelEdit}
-                              >
-                                <span className="truncate">{chat.title}</span>
-                                <div className="relative inline-block opacity-0 group-hover:opacity-100 duration-150">
-                                  <button
-                                    ref={(el) => {
-                                      menuButtonRefs.current[`chat-${chat.id}`] = el;
-                                    }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
-                                    }}
-                                    className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
-                                  >
-                                    <EllipsisHorizontalIcon className="size-5" />
-                                  </button>
-                                  <DropdownMenu
-                                    open={openMenuId === `chat-${chat.id}`}
-                                    anchorRef={{ current: menuButtonRefs.current[`chat-${chat.id}`] }}
-                                    onCloseAction={() => setOpenMenuId(null)}
-                                    position="left"
-                                    items={[
-                                      {
-                                        id: "rename",
-                                        icon: <PencilIcon className="size-4" />,
-                                        label: "Rename",
-                                        onClick: () => handleStartEdit("chat", chat.id),
-                                      },
-                                      {
-                                        id: "duplicate",
-                                        icon: <DocumentDuplicateIcon className="size-4" />,
-                                        label: "Duplicate",
-                                        onClick: () => onDuplicateChat(chat.id),
-                                      },
-                                      {
-                                        id: "settings",
-                                        icon: <Cog6ToothIcon className="size-4" />,
-                                        label: "Settings",
-                                        onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
-                                      },
-                                      {
-                                        id: "delete",
-                                        icon: <TrashIcon className="size-4 text-red-500 dark:text-red-400" />,
-                                        label: "Delete",
-                                        onClick: () => onDeleteChat(chat.id),
-                                        className:
-                                          "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
-                                      },
-                                    ]}
-                                  />
-                                </div>
-                              </EditableItem>
-                            </li>
-                          ))
-                        ) : (
-                          <li className="text-neutral-500 dark:text-neutral-400 text-sm py-2 ps-2">
-                            No chats in this project.
-                          </li>
-                        )}
-                      </AnimatedList>
+                          <button
+                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                              e.stopPropagation();
+                              menuAnchorRef.current = e.currentTarget;
+                              setOpenMenuId(openMenuId === `project-${project.id}` ? null : `project-${project.id}`);
+                            }}
+                            className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                          >
+                            <EllipsisHorizontalIcon className="size-5" />
+                          </button>
+                          <DropdownMenu
+                            open={openMenuId === `project-${project.id}`}
+                            anchorRef={menuAnchorRef}
+                            onCloseAction={() => setOpenMenuId(null)}
+                            position="left"
+                            items={[
+                              {
+                                id: "rename",
+                                icon: <PencilIcon className="size-4" />,
+                                label: "Rename Project",
+                                onClick: () => handleStartEdit("project", project.id),
+                              },
+                              {
+                                id: "new-chat",
+                                icon: <PencilSquareIcon className="size-4" />,
+                                label: "New Chat in Project",
+                                onClick: () => onNewChat(project.id),
+                              },
+                              {
+                                id: "delete",
+                                icon: <TrashIcon className="size-4 text-red-500" />,
+                                label: "Delete Project",
+                                onClick: () => onDeleteProject(project.id),
+                                className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
+                              },
+                            ]}
+                          />
+                        </div>
+                      </EditableItem>
                     </div>
-                  )}
-                </li>
-              ))}
-            </AnimatedList>
-          </div>
+                    <AnimatePresence initial={false}>
+                      {expandedProjects.has(project.id) && (
+                        <motion.div
+                          key="content"
+                          initial="collapsed"
+                          animate="open"
+                          exit="collapsed"
+                          variants={animationVariants.accordion}
+                          className="ms-6 border-l border-neutral-300 dark:border-neutral-700 mt-1 ps-2 overflow-hidden"
+                        >
+                          <ul>
+                            <AnimatePresence>
+                              {getChatsForProject(project.id).length > 0 ? (
+                                getChatsForProject(project.id).map((chat) => (
+                                  <motion.li
+                                    key={chat.id}
+                                    variants={animationVariants.item}
+                                    exit="exit"
+                                    layout="position"
+                                    className="mb-0.5 relative group"
+                                  >
+                                    <EditableItem
+                                      item={chat}
+                                      isActive={chat.id === activeChatId}
+                                      isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
+                                      onSelect={() => onSelectChat(chat.id)}
+                                      onStartEdit={() => handleStartEdit("chat", chat.id)}
+                                      onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
+                                      onCancelEdit={handleCancelEdit}
+                                    >
+                                      <span className="truncate">{chat.title}</span>
+                                      <div
+                                        className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
+                                          group-hover:translate-x-0 transition-all duration-200 ease-in-out"
+                                      >
+                                        <button
+                                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                            e.stopPropagation();
+                                            menuAnchorRef.current = e.currentTarget;
+                                            setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
+                                          }}
+                                          className="cursor-pointer p-1 rounded-full text-neutral-500
+                                            dark:text-neutral-400"
+                                        >
+                                          <EllipsisHorizontalIcon className="size-5" />
+                                        </button>
+                                        <DropdownMenu
+                                          open={openMenuId === `chat-${chat.id}`}
+                                          anchorRef={menuAnchorRef}
+                                          onCloseAction={() => setOpenMenuId(null)}
+                                          position="left"
+                                          items={[
+                                            {
+                                              id: "rename",
+                                              icon: <PencilIcon className="size-4" />,
+                                              label: "Rename",
+                                              onClick: () => handleStartEdit("chat", chat.id),
+                                            },
+                                            {
+                                              id: "duplicate",
+                                              icon: <DocumentDuplicateIcon className="size-4" />,
+                                              label: "Duplicate",
+                                              onClick: () => onDuplicateChat(chat.id),
+                                            },
+                                            {
+                                              id: "settings",
+                                              icon: <Cog6ToothIcon className="size-4" />,
+                                              label: "Settings",
+                                              onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
+                                            },
+                                            {
+                                              id: "delete",
+                                              icon: <TrashIcon className="size-4 text-red-500" />,
+                                              label: "Delete",
+                                              onClick: () => onDeleteChat(chat.id),
+                                              className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
+                                            },
+                                          ]}
+                                        />
+                                      </div>
+                                    </EditableItem>
+                                  </motion.li>
+                                ))
+                              ) : (
+                                <li className="text-neutral-500 dark:text-neutral-400 text-sm py-2 ps-2">
+                                  No chats in this project.
+                                </li>
+                              )}
+                            </AnimatePresence>
+                          </ul>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.li>
+                ))}
+              </AnimatePresence>
+            </ul>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
 
       {userEmail && (
-        <div className="pr-3">
+        <div className="pr-3 mt-auto flex-shrink-0">
           <div
             className="mt-4 mb-0 text-center text-sm p-2 rounded-lg text-neutral-700 dark:text-neutral-200
               bg-neutral-200 dark:bg-neutral-800 transition-colors duration-300 ease-in-out"

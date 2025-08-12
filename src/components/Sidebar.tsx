@@ -242,7 +242,7 @@ export default function Sidebar({
 
   return (
     <div
-      className="w-70 h-full bg-neutral-100 dark:bg-neutral-900 pt-2 pb-4 pl-4 pr-1 overflow-y-auto overflow-x-hidden
+      className="w-70 h-full bg-neutral-100 dark:bg-neutral-900 pt-2 pb-4 pl-4 pr-1 overflow-y-hidden overflow-x-hidden
         flex flex-col transition-colors duration-300 ease-in-out"
     >
       <div className="flex-none mb-4">
@@ -282,7 +282,7 @@ export default function Sidebar({
       </div>
 
       <motion.div
-        className="flex-grow overflow-y-auto pr-3 -mr-3"
+        className="flex-grow overflow-y-auto pr-3"
         variants={animationVariants.container}
         initial="hidden"
         animate="visible"

@@ -865,7 +865,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       dark:hover:bg-neutral-700 disabled:opacity-50`}
                     >
                       <CpuChipIcon className="size-5" />
-                      <span className="capitalize">{thinkingOption === "dynamic" ? "Default" : thinkingOption}</span>
+                      <span className="capitalize">{thinkingOption}</span>
                       <ChevronDownIcon className="size-3" />
                     </button>
                   </Tooltip>

@@ -582,14 +582,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        if (modelOutput.trim() === "" && thoughtSummaryOutput.trim() === "") {
-          console.warn("Gemini model returned an empty message.");
-          const emptyMessageError = {
-            type: "error",
-            value: "Model returned an empty message. Please try again.",
-          };
-          controller.enqueue(encoder.encode(JSON.stringify(emptyMessageError) + "\n"));
-        } else {
+        if (modelOutput.trim() !== "") {
           await pool.query(
             `INSERT INTO messages (chat_session_id, role, content, parts, position, sources, thought_summary)
              VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $5, $6)`,
@@ -612,6 +605,15 @@ export async function POST(request: NextRequest) {
                AND user_id = $4`,
             [chatSessionId, model, keySelection, userId, thinkingBudget],
           );
+        } else {
+          console.warn(
+            `Gemini model returned an empty message (thoughts received: ${thoughtSummaryOutput.trim() !== ""}). Not saving to DB.`,
+          );
+          const emptyMessageError = {
+            type: "error",
+            value: "Model returned an empty message. Please try again.",
+          };
+          controller.enqueue(encoder.encode(JSON.stringify(emptyMessageError) + "\n"));
         }
         controller.close();
       },

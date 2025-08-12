@@ -32,6 +32,7 @@ import { ThinkingOption, getThinkingConfigForModel, getThinkingBudgetMap, getThi
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
 const TITLE_GENERATION_MAX_LENGTH = 30000;
 const DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts";
+const MAX_RETRIES = 5;
 
 export interface MessagePart {
   type: "text" | "file" | "scraped_url";
@@ -1108,141 +1109,150 @@ export default function Home() {
 
       chatAreaRef.current?.scrollToBottomAndEnableAutoscroll();
       setIsLoading(true);
-      setIsThinking(true);
       setStreamStarted(false);
 
       const ctrl = new AbortController();
       setController(ctrl);
 
-      try {
-        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
-        const budgetValue = budgetMap ? budgetMap[currentThinkingOption] : -1;
-
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeaders(),
-          },
-          body: JSON.stringify({
-            history: historyForAPI.map((msg) => ({ role: msg.role, parts: msg.parts })),
-            messageParts: userMessageParts,
-            chatSessionId: currentChatId,
-            model: selectedModel?.name,
-            keySelection,
-            isSearchActive: isSearchEnabled,
-            thinkingBudget: budgetValue,
-            isRegeneration,
-          }),
-          signal: ctrl.signal,
-        });
-
-        if (res.status === 401) {
-          router.replace("/login");
-          setIsLoading(false);
-          return;
+      let success = false;
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        setIsThinking(true);
+        if (ctrl.signal.aborted) {
+          showToast("Response cancelled.", "error");
+          break;
         }
 
-        if (!res.ok || !res.body) {
-          let errorData = { error: `API request failed with status ${res.status}` };
-          if (res.body) {
-            try {
-              errorData = await res.json();
-            } catch {}
-          }
-          throw new Error(errorData.error || `API request failed with status ${res.status}`);
+        if (attempt > 0) {
+          showToast(`Answer incomplete, try again... (Attempt ${attempt + 1} of ${MAX_RETRIES})`, "error");
+          setMessages((prev) =>
+            prev.map((msg, index) =>
+              index === modelMessageIndexForStream
+                ? { ...msg, parts: [{ type: "text", text: "" }], sources: [], thoughtSummary: "" }
+                : msg,
+            ),
+          );
         }
 
-        const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-        let isFirstChunk = true;
-        let textAccumulator = "";
-        let thoughtSummaryAccumulator = "";
-        let streamBuffer = "";
-        const currentSources: Array<{ title: string; uri: string }> = [];
-        let modelReturnedEmptyMessage = false;
+        try {
+          const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+          const budgetValue = budgetMap ? budgetMap[currentThinkingOption] : -1;
 
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...getAuthHeaders(),
+            },
+            body: JSON.stringify({
+              history: historyForAPI.map((msg) => ({ role: msg.role, parts: msg.parts })),
+              messageParts: userMessageParts,
+              chatSessionId: currentChatId,
+              model: selectedModel?.name,
+              keySelection,
+              isSearchActive: isSearchEnabled,
+              thinkingBudget: budgetValue,
+              isRegeneration,
+            }),
+            signal: ctrl.signal,
+          });
 
-          if (isFirstChunk) {
-            setStreamStarted(true);
-            isFirstChunk = false;
+          if (res.status === 401) {
+            router.replace("/login");
+            return;
           }
 
-          streamBuffer += value;
-          const lines = streamBuffer.split("\n");
-          streamBuffer = lines.pop() || "";
+          if (!res.ok || !res.body) {
+            let errorData = { error: `API request failed with status ${res.status}` };
+            if (res.body) {
+              try {
+                errorData = await res.json();
+              } catch {}
+            }
+            throw new Error(errorData.error || `API request failed with status ${res.status}`);
+          }
 
-          if (lines.length === 0) continue;
+          const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+          let isFirstChunk = true;
+          let textAccumulator = "";
+          let thoughtSummaryAccumulator = "";
+          let streamBuffer = "";
+          const currentSources: Array<{ title: string; uri: string }> = [];
 
-          for (const line of lines) {
-            if (line.trim() === "") continue;
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
 
-            try {
-              const parsedChunk = JSON.parse(line);
-              if (parsedChunk.type === "text") {
-                setIsThinking(false);
-                textAccumulator += parsedChunk.value;
-              } else if (parsedChunk.type === "thought") {
-                thoughtSummaryAccumulator += parsedChunk.value;
-              } else if (parsedChunk.type === "grounding") {
-                if (parsedChunk.sources && Array.isArray(parsedChunk.sources)) {
+            if (isFirstChunk) {
+              setStreamStarted(true);
+              isFirstChunk = false;
+            }
+
+            streamBuffer += value;
+            const lines = streamBuffer.split("\n");
+            streamBuffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (line.trim() === "") continue;
+              try {
+                const parsedChunk = JSON.parse(line);
+                if (parsedChunk.type === "text") {
+                  setIsThinking(false);
+                  textAccumulator += parsedChunk.value;
+                } else if (parsedChunk.type === "thought") {
+                  thoughtSummaryAccumulator += parsedChunk.value;
+                } else if (parsedChunk.type === "grounding" && parsedChunk.sources) {
                   parsedChunk.sources.forEach((s: { title: string; uri: string }) => {
-                    const exists = currentSources.some((existing) => existing.uri === s.uri);
-                    if (!exists) {
-                      currentSources.push(s);
-                    }
+                    if (!currentSources.some((existing) => existing.uri === s.uri)) currentSources.push(s);
                   });
                 }
-              } else if (parsedChunk.type === "error" && parsedChunk.value) {
-                modelReturnedEmptyMessage = true;
-                showToast(parsedChunk.value, "error");
+              } catch (jsonError) {
+                console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
               }
-            } catch (jsonError) {
-              console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
+            }
+
+            if (modelMessageIndexForStream !== null) {
+              setMessages((prev) =>
+                prev.map((msg, index) =>
+                  index === modelMessageIndexForStream
+                    ? {
+                        ...msg,
+                        parts: [{ type: "text", text: textAccumulator }],
+                        sources: [...currentSources],
+                        thoughtSummary: thoughtSummaryAccumulator,
+                      }
+                    : msg,
+                ),
+              );
             }
           }
-          if (modelMessageIndexForStream !== null) {
-            setMessages((prev) =>
-              prev.map((msg, index) => {
-                if (index === modelMessageIndexForStream) {
-                  return {
-                    ...msg,
-                    parts: [{ type: "text", text: textAccumulator }],
-                    sources: [...currentSources],
-                    thoughtSummary: thoughtSummaryAccumulator,
-                  };
-                }
-                return msg;
-              }),
-            );
-          }
-        }
 
-        if (modelReturnedEmptyMessage && modelMessageIndexForStream !== null) {
-          setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
-        } else {
-          await loadChat(currentChatId);
+          if (textAccumulator.trim() === "" && !ctrl.signal.aborted) {
+            continue;
+          } else {
+            success = true;
+            break;
+          }
+        } catch (error: unknown) {
+          if (!(error instanceof DOMException && error.name === "AbortError")) {
+            showToast(error instanceof Error ? error.message : "An unexpected error occurred.", "error");
+          }
+          break;
         }
-      } catch (error: unknown) {
+      }
+
+      if (success) {
+        await loadChat(currentChatId);
+      } else if (!ctrl.signal.aborted) {
+        showToast(`Answer could not be received after ${MAX_RETRIES} attempts. Please adjust your request.`, "error");
         if (modelMessageIndexForStream !== null) {
           setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
         }
-        const msg =
-          error instanceof DOMException && error.name === "AbortError"
-            ? "Response cancelled."
-            : error instanceof Error
-              ? error.message
-              : "An unexpected error occurred.";
-        showToast(msg, "error");
-        if (currentChatId) await loadChat(currentChatId);
-      } finally {
-        setIsLoading(false);
-        setIsThinking(false);
-        setController(null);
-        await fetchAllChats();
       }
+
+      setIsLoading(false);
+      setIsThinking(false);
+      setController(null);
+      await fetchAllChats();
     },
     [getAuthHeaders, selectedModel, keySelection, router, loadChat, fetchAllChats, showToast],
   );

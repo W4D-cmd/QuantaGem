@@ -393,61 +393,63 @@ export default function Sidebar({
                       >
                         <ChevronRightIcon className="size-4 stroke-2" />
                       </motion.button>
-                      <EditableItem
-                        item={project}
-                        isActive={project.id === activeProjectId}
-                        isEditing={editingItem?.type === "project" && editingItem.id === project.id}
-                        onSelect={() => onSelectProject(project.id)}
-                        onStartEdit={() => handleStartEdit("project", project.id)}
-                        onSaveEdit={(newTitle) => handleSaveEdit("project", project.id, newTitle)}
-                        onCancelEdit={handleCancelEdit}
-                      >
-                        <span className="truncate flex items-center gap-2">
-                          <FolderOpenIcon className="size-5" /> {project.title}
-                        </span>
-                        <div
-                          className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
-                            group-hover:translate-x-0 transition-all duration-200 ease-in-out"
+                      <div className="flex-1 min-w-0">
+                        <EditableItem
+                          item={project}
+                          isActive={project.id === activeProjectId}
+                          isEditing={editingItem?.type === "project" && editingItem.id === project.id}
+                          onSelect={() => onSelectProject(project.id)}
+                          onStartEdit={() => handleStartEdit("project", project.id)}
+                          onSaveEdit={(newTitle) => handleSaveEdit("project", project.id, newTitle)}
+                          onCancelEdit={handleCancelEdit}
                         >
-                          <button
-                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                              e.stopPropagation();
-                              menuAnchorRef.current = e.currentTarget;
-                              setOpenMenuId(openMenuId === `project-${project.id}` ? null : `project-${project.id}`);
-                            }}
-                            className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                          <span className="truncate flex items-center gap-2">
+                            <FolderOpenIcon className="size-5" /> {project.title}
+                          </span>
+                          <div
+                            className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
+                              group-hover:translate-x-0 transition-all duration-200 ease-in-out"
                           >
-                            <EllipsisHorizontalIcon className="size-5" />
-                          </button>
-                          <DropdownMenu
-                            open={openMenuId === `project-${project.id}`}
-                            anchorRef={menuAnchorRef}
-                            onCloseAction={() => setOpenMenuId(null)}
-                            position="left"
-                            items={[
-                              {
-                                id: "rename",
-                                icon: <PencilIcon className="size-4" />,
-                                label: "Rename Project",
-                                onClick: () => handleStartEdit("project", project.id),
-                              },
-                              {
-                                id: "new-chat",
-                                icon: <PencilSquareIcon className="size-4" />,
-                                label: "New Chat in Project",
-                                onClick: () => onNewChat(project.id),
-                              },
-                              {
-                                id: "delete",
-                                icon: <TrashIcon className="size-4 text-red-500" />,
-                                label: "Delete Project",
-                                onClick: () => onDeleteProject(project.id),
-                                className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
-                              },
-                            ]}
-                          />
-                        </div>
-                      </EditableItem>
+                            <button
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                e.stopPropagation();
+                                menuAnchorRef.current = e.currentTarget;
+                                setOpenMenuId(openMenuId === `project-${project.id}` ? null : `project-${project.id}`);
+                              }}
+                              className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                            >
+                              <EllipsisHorizontalIcon className="size-5" />
+                            </button>
+                            <DropdownMenu
+                              open={openMenuId === `project-${project.id}`}
+                              anchorRef={menuAnchorRef}
+                              onCloseAction={() => setOpenMenuId(null)}
+                              position="left"
+                              items={[
+                                {
+                                  id: "rename",
+                                  icon: <PencilIcon className="size-4" />,
+                                  label: "Rename Project",
+                                  onClick: () => handleStartEdit("project", project.id),
+                                },
+                                {
+                                  id: "new-chat",
+                                  icon: <PencilSquareIcon className="size-4" />,
+                                  label: "New Chat in Project",
+                                  onClick: () => onNewChat(project.id),
+                                },
+                                {
+                                  id: "delete",
+                                  icon: <TrashIcon className="size-4 text-red-500" />,
+                                  label: "Delete Project",
+                                  onClick: () => onDeleteProject(project.id),
+                                  className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
+                                },
+                              ]}
+                            />
+                          </div>
+                        </EditableItem>
+                      </div>
                     </div>
                     <AnimatePresence initial={false}>
                       {expandedProjects.has(project.id) && (

@@ -3,7 +3,7 @@
 import Sidebar from "@/components/Sidebar";
 import ChatArea, { ChatAreaHandle, AudioPlaybackState } from "@/components/ChatArea";
 import ChatInput, { ChatInputHandle, UploadedFileInfo } from "@/components/ChatInput";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ModelSelector from "@/components/ModelSelector";
 import ToggleApiKeyButton from "@/components/ToggleApiKeyButton";
 import { Model } from "@google/genai";
@@ -27,6 +27,7 @@ import ConfirmationModal from "@/components/ConfirmationModal";
 import { liveModels, LiveModel } from "@/lib/live-models";
 import { dialogVoices, standardVoices } from "@/lib/voices";
 import { motion, AnimatePresence } from "framer-motion";
+import { ThinkingOption, getThinkingConfigForModel, getThinkingBudgetMap, getThinkingValueMap } from "@/lib/thinking";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
 const TITLE_GENERATION_MAX_LENGTH = 30000;
@@ -60,6 +61,7 @@ export interface ChatListItem {
   keySelection: "free" | "paid";
   projectId: number | null;
   updatedAt: string;
+  thinkingBudget: number;
 }
 
 export interface ProjectListItem {
@@ -227,6 +229,7 @@ export default function Home() {
   const [isLiveSessionActive, setIsLiveSessionActive] = useState(false);
   const [liveInterimText, setLiveInterimText] = useState("");
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
+  const [thinkingOption, setThinkingOption] = useState<ThinkingOption>("dynamic");
 
   const [selectedLiveModel, setSelectedLiveModel] = useState<LiveModel>(liveModels[0]);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("de-DE");
@@ -248,6 +251,8 @@ export default function Home() {
   const chatInputRef = useRef<ChatInputHandle>(null);
   const prevActiveChatIdRef = useRef<number | null>(null);
   const prevDisplayingProjectManagementIdRef = useRef<number | null>(null);
+
+  const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
 
   const showToast = useCallback((message: string, type: ToastProps["type"] = "error") => {
     setToast({ message, type });
@@ -484,6 +489,11 @@ export default function Home() {
   };
 
   const handleModelChange = (model: Model) => {
+    const newModelConfig = getThinkingConfigForModel(model.name);
+    if (thinkingOption === "off" && !newModelConfig?.canBeOff) {
+      setThinkingOption("dynamic");
+    }
+
     setSelectedModel(model);
 
     if (activeChatId !== null && messages.length > 0) {
@@ -499,6 +509,28 @@ export default function Home() {
       }).catch((err) => showToast(extractErrorMessage(err), "error"));
     }
   };
+
+  const handleThinkingOptionChange = useCallback(
+    (option: ThinkingOption) => {
+      setThinkingOption(option);
+      if (activeChatId !== null) {
+        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+        const budgetValue = budgetMap ? budgetMap[option] : -1;
+
+        fetch(`/api/chats/${activeChatId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({ thinkingBudget: budgetValue }),
+        })
+          .then(() => fetchAllChats())
+          .catch((err) => showToast(extractErrorMessage(err), "error"));
+      }
+    },
+    [activeChatId, getAuthHeaders, showToast, fetchAllChats, selectedModel],
+  );
 
   const handleLiveModelChange = (model: LiveModel) => {
     setSelectedLiveModel(model);
@@ -596,7 +628,12 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        const errorData = await res.json();
+        let errorData;
+        try {
+          errorData = await res.json();
+        } catch (e) {
+          errorData = { error: `Failed to rename chat: ${res.statusText}` };
+        }
         throw new Error(errorData.error || `Failed to rename chat: ${res.statusText}`);
       }
       await fetchAllChats();
@@ -629,7 +666,12 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        const errorData = await res.json();
+        let errorData;
+        try {
+          errorData = await res.json();
+        } catch (e) {
+          errorData = { error: `Failed to delete chat: ${res.statusText}` };
+        }
         throw new Error(errorData.error || `Failed to delete chat: ${res.statusText}`);
       }
     } catch (err: unknown) {
@@ -661,7 +703,12 @@ export default function Home() {
           return;
         }
         if (!res.ok) {
-          const errorData = await res.json();
+          let errorData;
+          try {
+            errorData = await res.json();
+          } catch (e) {
+            errorData = { error: `Failed to duplicate chat: ${res.statusText}` };
+          }
           throw new Error(errorData.error || `Failed to duplicate chat: ${res.statusText}`);
         }
         const newChat: ChatListItem = await res.json();
@@ -696,7 +743,12 @@ export default function Home() {
           return null;
         }
         if (!res.ok) {
-          const errorData = await res.json();
+          let errorData;
+          try {
+            errorData = await res.json();
+          } catch (e) {
+            errorData = { error: `Failed to create new chat session: ${res.statusText}` };
+          }
           throw new Error(errorData.error || `Failed to create new chat session: ${res.statusText}`);
         }
         const newChat: ChatListItem = await res.json();
@@ -716,6 +768,7 @@ export default function Home() {
     async (projectId: number | null = null) => {
       setCurrentChatProjectId(projectId);
       setEditingMessage(null);
+      setThinkingOption("dynamic");
 
       if (projectId !== null) {
         const newTitle = `Chat ${allChats.filter((chat) => chat.projectId === projectId).length + 1}`;
@@ -761,9 +814,14 @@ export default function Home() {
             setKeySelection("free");
             setCurrentChatProjectId(null);
             setTotalTokens(null);
+            setThinkingOption("dynamic");
           }
-
-          const errorData = await res.json();
+          let errorData;
+          try {
+            errorData = await res.json();
+          } catch (e) {
+            errorData = { error: `Failed to load chat: ${res.statusText}` };
+          }
           throw new Error(errorData.error || `Failed to load chat: ${res.statusText}`);
         }
         const data: {
@@ -771,11 +829,16 @@ export default function Home() {
           systemPrompt: string;
           keySelection: "free" | "paid";
           projectId: number | null;
+          thinkingBudget: number;
+          lastModel: string;
         } = await res.json();
+
+        const modelValueMap = getThinkingValueMap(data.lastModel);
         setMessages(data.messages);
         setEditingPromptInitialValue(data.systemPrompt);
         setKeySelection(data.keySelection);
         setCurrentChatProjectId(data.projectId);
+        setThinkingOption(modelValueMap?.[data.thinkingBudget] || "dynamic");
       } catch (err: unknown) {
         const message = extractErrorMessage(err);
         showToast(message, "error");
@@ -808,6 +871,7 @@ export default function Home() {
     setEditingPromptInitialValue(null);
     setKeySelection("free");
     setTotalTokens(null);
+    setThinkingOption("dynamic");
   }, []);
 
   const handleNewProject = useCallback(async () => {
@@ -832,7 +896,12 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        const errorData = await res.json();
+        let errorData;
+        try {
+          errorData = await res.json();
+        } catch (e) {
+          errorData = { error: `Failed to create new project: ${res.statusText}` };
+        }
         throw new Error(errorData.error || `Failed to create new project: ${res.statusText}`);
       }
       const newProject: ProjectListItem = await res.json();
@@ -862,7 +931,12 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        const errorData = await res.json();
+        let errorData;
+        try {
+          errorData = await res.json();
+        } catch (e) {
+          errorData = { error: `Failed to rename project: ${res.statusText}` };
+        }
         throw new Error(errorData.error || `Failed to rename project: ${res.statusText}`);
       }
       await fetchAllChats();
@@ -896,7 +970,12 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        const errorData = await res.json();
+        let errorData;
+        try {
+          errorData = await res.json();
+        } catch (e) {
+          errorData = { error: `Failed to delete project: ${res.statusText}` };
+        }
         throw new Error(errorData.error || `Failed to delete project: ${res.statusText}`);
       }
     } catch (err: unknown) {
@@ -927,6 +1006,7 @@ export default function Home() {
         setEditingPromptInitialValue(null);
         setCurrentChatProjectId(null);
         setTotalTokens(0);
+        setThinkingOption("dynamic");
       }
       prevActiveChatIdRef.current = null;
       prevDisplayingProjectManagementIdRef.current = null;
@@ -953,6 +1033,12 @@ export default function Home() {
         } else {
           setKeySelection("free");
         }
+        const modelValueMap = getThinkingValueMap(chat?.lastModel);
+        if (chat?.thinkingBudget !== undefined && modelValueMap) {
+          setThinkingOption(modelValueMap[chat.thinkingBudget] || "dynamic");
+        } else {
+          setThinkingOption("dynamic");
+        }
 
         if (isNewChatJustCreated) {
           setIsNewChatJustCreated(false);
@@ -972,6 +1058,7 @@ export default function Home() {
         setEditingPromptInitialValue(null);
         setKeySelection("free");
         setTotalTokens(null);
+        setThinkingOption("dynamic");
         setIsNewChatJustCreated(false);
       }
       prevDisplayingProjectManagementIdRef.current = displayingProjectManagementId;
@@ -999,6 +1086,7 @@ export default function Home() {
       historyForAPI: Message[],
       currentChatId: number,
       isSearchEnabled: boolean,
+      currentThinkingOption: ThinkingOption,
       isRegeneration = false,
     ) => {
       let modelMessageIndexForStream: number | null = null;
@@ -1022,6 +1110,9 @@ export default function Home() {
       setController(ctrl);
 
       try {
+        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+        const budgetValue = budgetMap ? budgetMap[currentThinkingOption] : -1;
+
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: {
@@ -1035,6 +1126,7 @@ export default function Home() {
             model: selectedModel?.name,
             keySelection,
             isSearchActive: isSearchEnabled,
+            thinkingBudget: budgetValue,
             isRegeneration,
           }),
           signal: ctrl.signal,
@@ -1203,7 +1295,7 @@ export default function Home() {
       );
     }
 
-    await callChatApiAndStreamResponse(newUserMessageParts, historyForAPI, sessionId, sendWithSearch);
+    await callChatApiAndStreamResponse(newUserMessageParts, historyForAPI, sessionId, sendWithSearch, thinkingOption);
   };
 
   const handleLiveSessionTurnComplete = async (text: string, audioBlob: Blob | null) => {
@@ -1275,7 +1367,12 @@ export default function Home() {
       });
 
       if (!patchRes.ok) {
-        const errorData = await patchRes.json();
+        let errorData;
+        try {
+          errorData = await patchRes.json();
+        } catch (e) {
+          errorData = { error: `Failed to save edited message: ${patchRes.statusText}` };
+        }
         throw new Error(errorData.error || "Failed to save edited message.");
       }
 
@@ -1286,7 +1383,12 @@ export default function Home() {
       });
 
       if (!deleteRes.ok) {
-        const errorData = await deleteRes.json();
+        let errorData;
+        try {
+          errorData = await deleteRes.json();
+        } catch (e) {
+          errorData = { error: `Failed to delete subsequent messages: ${deleteRes.statusText}` };
+        }
         throw new Error(errorData.error || "Failed to delete subsequent messages.");
       }
 
@@ -1298,7 +1400,14 @@ export default function Home() {
       };
       setMessages([...historyForAPI, updatedUserMessage]);
 
-      await callChatApiAndStreamResponse(newUserMessageParts, historyForAPI, activeChatId, isSearchActive, true);
+      await callChatApiAndStreamResponse(
+        newUserMessageParts,
+        historyForAPI,
+        activeChatId,
+        isSearchActive,
+        thinkingOption,
+        true,
+      );
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");
       loadChat(activeChatId);
@@ -1326,14 +1435,26 @@ export default function Home() {
       );
 
       if (!deleteRes.ok) {
-        const errorData = await deleteRes.json();
+        let errorData;
+        try {
+          errorData = await deleteRes.json();
+        } catch (e) {
+          errorData = { error: `Failed to delete message for regeneration: ${deleteRes.statusText}` };
+        }
         throw new Error(errorData.error || "Failed to delete message for regeneration.");
       }
 
       const historyForAPI = messages.slice(0, userMessageIndex);
       setMessages(messages.slice(0, userMessageIndex + 1));
 
-      await callChatApiAndStreamResponse(userMessageToResend.parts, historyForAPI, activeChatId, isSearchActive, true);
+      await callChatApiAndStreamResponse(
+        userMessageToResend.parts,
+        historyForAPI,
+        activeChatId,
+        isSearchActive,
+        thinkingOption,
+        true,
+      );
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");
       loadChat(activeChatId);
@@ -1362,7 +1483,12 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        const errorData = await res.json();
+        let errorData;
+        try {
+          errorData = await res.json();
+        } catch (e) {
+          errorData = { error: `Failed to delete all chats: ${res.statusText}` };
+        }
         throw new Error(errorData.error || `Failed to delete all chats: ${res.statusText}`);
       }
     } catch (err: unknown) {
@@ -1768,6 +1894,9 @@ export default function Home() {
                       onAutoMuteToggle={setIsAutoMuteEnabled}
                       liveMode={liveMode}
                       onLiveModeChange={setLiveMode}
+                      thinkingOption={thinkingOption}
+                      onThinkingOptionChange={handleThinkingOptionChange}
+                      selectedModel={selectedModel}
                     />
                   </div>
                 </div>

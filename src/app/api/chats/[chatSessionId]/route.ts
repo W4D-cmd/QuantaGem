@@ -16,10 +16,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const chatSessionResult = await client.query(
       `SELECT title,
-              last_model    AS "lastModel",
-              system_prompt AS "systemPrompt",
-              key_selection AS "keySelection",
-              project_id    AS "projectId"
+              last_model      AS "lastModel",
+              system_prompt   AS "systemPrompt",
+              key_selection   AS "keySelection",
+              project_id      AS "projectId",
+              thinking_budget AS "thinkingBudget"
        FROM chat_sessions
        WHERE id = $1
          AND user_id = $2`,
@@ -60,12 +61,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const userId = user.id.toString();
 
   const { chatSessionId } = await params;
-  const { title, lastModel, systemPrompt, keySelection, projectId } = (await request.json()) as {
+  const { title, lastModel, systemPrompt, keySelection, projectId, thinkingBudget } = (await request.json()) as {
     title?: string;
     lastModel?: string;
     systemPrompt?: string;
     keySelection?: "free" | "paid";
     projectId?: number | null;
+    thinkingBudget?: number;
   };
 
   const sets: string[] = [];
@@ -92,6 +94,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     sets.push(`project_id = $${idx++}`);
     vals.push(projectId);
   }
+  if (thinkingBudget !== undefined) {
+    sets.push(`thinking_budget = $${idx++}`);
+    vals.push(thinkingBudget);
+  }
 
   if (!sets.length) {
     return NextResponse.json({ error: "nothing to update" }, { status: 400 });
@@ -114,10 +120,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { rows } = await pool.query(
       `SELECT id,
               title,
-              last_model    AS "lastModel",
-              system_prompt AS "systemPrompt",
-              key_selection AS "keySelection",
-              project_id    AS "projectId"
+              last_model      AS "lastModel",
+              system_prompt   AS "systemPrompt",
+              key_selection   AS "keySelection",
+              project_id      AS "projectId",
+              thinking_budget AS "thinkingBudget"
        FROM chat_sessions
        WHERE id = $1
          AND user_id = $2`,

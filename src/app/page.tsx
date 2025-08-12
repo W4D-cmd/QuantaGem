@@ -50,6 +50,7 @@ export interface Message {
   position: number;
   role: "user" | "model";
   parts: MessagePart[];
+  thoughtSummary?: string;
   sources?: Array<{ title: string; uri: string }>;
 }
 
@@ -1095,6 +1096,7 @@ export default function Home() {
           role: "model",
           parts: [{ type: "text", text: "" }],
           sources: [],
+          thoughtSummary: "",
           id: Date.now(),
           position: (prev[prev.length - 1]?.position || 0) + 2,
         };
@@ -1151,6 +1153,7 @@ export default function Home() {
         const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
         let isFirstChunk = true;
         let textAccumulator = "";
+        let thoughtSummaryAccumulator = "";
         let streamBuffer = "";
         const currentSources: Array<{ title: string; uri: string }> = [];
         let modelReturnedEmptyMessage = false;
@@ -1177,6 +1180,8 @@ export default function Home() {
               const parsedChunk = JSON.parse(line);
               if (parsedChunk.type === "text") {
                 textAccumulator += parsedChunk.value;
+              } else if (parsedChunk.type === "thought") {
+                thoughtSummaryAccumulator += parsedChunk.value;
               } else if (parsedChunk.type === "grounding") {
                 if (parsedChunk.sources && Array.isArray(parsedChunk.sources)) {
                   parsedChunk.sources.forEach((s: { title: string; uri: string }) => {
@@ -1202,6 +1207,7 @@ export default function Home() {
                     ...msg,
                     parts: [{ type: "text", text: textAccumulator }],
                     sources: [...currentSources],
+                    thoughtSummary: thoughtSummaryAccumulator,
                   };
                 }
                 return msg;

@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS messages (
   parts JSONB NOT NULL DEFAULT '[]',
   position INTEGER NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  thought_summary TEXT,
   sources JSONB NOT NULL DEFAULT '[]'
 );
 

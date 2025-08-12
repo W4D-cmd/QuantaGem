@@ -11,6 +11,7 @@ interface DbMessage {
   parts: MessagePart[];
   position: number;
   sources: Array<{ title: string; uri: string }>;
+  thought_summary: string | null;
 }
 
 async function duplicateFile(originalObjectName: string): Promise<string | null> {
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
     const newChatSessionId = newChatSession.id;
 
     const originalMessagesResult = await client.query<DbMessage>(
-      `SELECT role, content, parts, position, sources
+      `SELECT role, content, parts, position, sources, thought_summary
        FROM messages
        WHERE chat_session_id = $1
        ORDER BY position ASC`,
@@ -129,8 +130,8 @@ export async function POST(request: NextRequest) {
       }
 
       await client.query(
-        `INSERT INTO messages (chat_session_id, role, content, parts, position, sources)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO messages (chat_session_id, role, content, parts, position, sources, thought_summary)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           newChatSessionId,
           msg.role,
@@ -138,6 +139,7 @@ export async function POST(request: NextRequest) {
           hasFileParts ? JSON.stringify(newParts) : JSON.stringify(msg.parts),
           msg.position,
           JSON.stringify(msg.sources),
+          msg.thought_summary,
         ],
       );
     }

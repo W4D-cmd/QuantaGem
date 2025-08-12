@@ -8,9 +8,9 @@ interface ThinkingModelConfig {
 }
 
 const modelConfigs: Record<string, ThinkingModelConfig> = {
-  "2.5-pro": { min: 128, max: 32768, canBeOff: false, medium: 8192 },
-  "2.5-flash": { min: 0, max: 24576, canBeOff: true, medium: 8192 },
-  "2.5-flash-lite": { min: 512, max: 24576, canBeOff: true, medium: 4096 },
+  "2.5-pro": { min: 2048, max: 32768, canBeOff: false, medium: 8192 },
+  "2.5-flash": { min: 2048, max: 24576, canBeOff: true, medium: 8192 },
+  "2.5-flash-lite": { min: 1024, max: 24576, canBeOff: true, medium: 4096 },
 };
 
 export function getThinkingConfigForModel(modelName: string | null | undefined): ThinkingModelConfig | null {

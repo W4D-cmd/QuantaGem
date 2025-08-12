@@ -14,6 +14,7 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence, Variants } from "framer-motion";
+import TruncatedTooltip from "./TruncatedTooltip";
 
 interface SidebarProps {
   chats: ChatListItem[];
@@ -312,7 +313,7 @@ export default function Sidebar({
                         onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
                         onCancelEdit={handleCancelEdit}
                       >
-                        <span className="truncate">{chat.title}</span>
+                        <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
                         <div
                           className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
                             group-hover:translate-x-0 transition-all duration-200 ease-in-out"
@@ -478,7 +479,7 @@ export default function Sidebar({
                                       onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
                                       onCancelEdit={handleCancelEdit}
                                     >
-                                      <span className="truncate">{chat.title}</span>
+                                      <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
                                       <div
                                         className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
                                           group-hover:translate-x-0 transition-all duration-200 ease-in-out"

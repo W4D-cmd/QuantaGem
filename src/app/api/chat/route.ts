@@ -461,7 +461,7 @@ export async function POST(request: NextRequest) {
     const generationConfig: {
       systemInstruction?: string;
       tools?: Array<{ googleSearch: Record<string, never> }>;
-      thinkingConfig?: { thinkingBudget: number };
+      thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
     } = {};
 
     if (systemPromptText && systemPromptText.trim() !== "") {
@@ -472,11 +472,18 @@ export async function POST(request: NextRequest) {
       generationConfig.tools = [{ googleSearch: {} }];
     }
 
-    if (thinkingBudget !== undefined) {
-      const isProModel = model.includes("2.5-pro");
-      if (!isProModel || (isProModel && thinkingBudget !== 0)) {
-        generationConfig.thinkingConfig = { thinkingBudget };
+    const isThinkingSupported = model.includes("2.5-pro") || model.includes("2.5-flash");
+    if (isThinkingSupported) {
+      const effectiveThinkingConfig: { thinkingBudget?: number; includeThoughts?: boolean } = {};
+      effectiveThinkingConfig.includeThoughts = true;
+
+      if (thinkingBudget !== undefined) {
+        const isProModel = model.includes("2.5-pro");
+        if (!isProModel || (isProModel && thinkingBudget !== 0)) {
+          effectiveThinkingConfig.thinkingBudget = thinkingBudget;
+        }
       }
+      generationConfig.thinkingConfig = effectiveThinkingConfig;
     }
 
     const streamParams: {
@@ -498,17 +505,13 @@ export async function POST(request: NextRequest) {
     const readableStream = new ReadableStream({
       async start(controller) {
         let modelOutput = "";
+        let thoughtSummaryOutput = "";
         const sourcesToStore: Array<{ title: string; uri: string }> = [];
 
         for await (const chunk of streamingResult) {
-          if (chunk.text) {
-            modelOutput += chunk.text;
-            const jsonTextChunk = { type: "text", value: chunk.text };
-            controller.enqueue(encoder.encode(JSON.stringify(jsonTextChunk) + "\n"));
-          }
-
           if (chunk.candidates && chunk.candidates.length > 0) {
             const candidate = chunk.candidates[0];
+
             if (candidate.groundingMetadata) {
               const groundingMetadata: GroundingMetadata = candidate.groundingMetadata;
 
@@ -534,10 +537,26 @@ export async function POST(request: NextRequest) {
                 }
               }
             }
+
+            if (candidate.content?.parts) {
+              for (const part of candidate.content.parts) {
+                if (part.text) {
+                  if (part.thought) {
+                    thoughtSummaryOutput += part.text;
+                    const jsonChunk = { type: "thought", value: part.text };
+                    controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+                  } else {
+                    modelOutput += part.text;
+                    const jsonChunk = { type: "text", value: part.text };
+                    controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+                  }
+                }
+              }
+            }
           }
         }
 
-        if (modelOutput.trim() === "") {
+        if (modelOutput.trim() === "" && thoughtSummaryOutput.trim() === "") {
           console.warn("Gemini model returned an empty message.");
           const emptyMessageError = {
             type: "error",
@@ -546,14 +565,15 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode(JSON.stringify(emptyMessageError) + "\n"));
         } else {
           await pool.query(
-            `INSERT INTO messages (chat_session_id, role, content, parts, position, sources)
-             VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $5)`,
+            `INSERT INTO messages (chat_session_id, role, content, parts, position, sources, thought_summary)
+             VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $5, $6)`,
             [
               chatSessionId,
               "model",
               modelOutput,
               JSON.stringify([{ type: "text", text: modelOutput }]),
               JSON.stringify(sourcesToStore),
+              thoughtSummaryOutput || null,
             ],
           );
           await pool.query(

@@ -34,7 +34,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const chatSessionData = chatSessionResult.rows[0];
 
     const messagesResult = await client.query(
-      `SELECT id, position, role, parts, sources
+      `SELECT id, position, role, parts, sources, thought_summary as "thoughtSummary"
        FROM messages
        WHERE chat_session_id = $1
        ORDER BY position`,

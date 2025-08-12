@@ -11,6 +11,7 @@ import React, {
   useState,
   useCallback,
   KeyboardEvent,
+  useMemo,
 } from "react";
 import ReactMarkdown, { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -28,9 +29,11 @@ import {
   SpeakerWaveIcon,
   StopIcon,
 } from "@heroicons/react/24/outline";
+import { ChevronRightIcon } from "@heroicons/react/24/solid";
 import Tooltip from "@/components/Tooltip";
 import MessageSkeleton from "./MessageSkeleton";
 import LazyMarkdownRenderer from "./LazyMarkdownRenderer";
+import { motion, AnimatePresence } from "framer-motion";
 
 type GetAuthHeaders = () => HeadersInit;
 
@@ -57,6 +60,70 @@ interface ChatAreaProps {
 export interface ChatAreaHandle {
   scrollToBottomAndEnableAutoscroll: () => void;
 }
+
+const ThinkingLabel = memo(() => (
+  <span className="flex items-center gap-1.5">
+    Thinking
+    <div
+      className="size-3 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-600
+        dark:border-t-neutral-300 rounded-full animate-spin"
+    ></div>
+  </span>
+));
+ThinkingLabel.displayName = "ThinkingLabel";
+
+const ThinkingSummary: React.FC<{ summary: string; isStreaming: boolean }> = ({ summary, isStreaming }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const summaryHeader = useMemo(() => {
+    return (
+      <button
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="w-full cursor-pointer list-none flex items-center gap-1 font-medium text-neutral-600
+          dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors"
+      >
+        <motion.div animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
+          <ChevronRightIcon className="size-4" />
+        </motion.div>
+        {isStreaming ? <ThinkingLabel /> : "Thoughts"}
+      </button>
+    );
+  }, [isOpen, isStreaming]);
+
+  return (
+    <div className="mb-2 text-sm">
+      {summaryHeader}
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            key="content"
+            initial="collapsed"
+            animate="open"
+            exit="collapsed"
+            variants={{
+              open: { opacity: 1, height: "auto" },
+              collapsed: { opacity: 0, height: 0 },
+            }}
+            transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
+            className="overflow-hidden"
+          >
+            <div
+              className="mt-2 p-3 border border-neutral-200 dark:border-neutral-700 rounded-xl bg-neutral-50
+                dark:bg-neutral-800/50 prose dark:prose-invert prose-neutral max-w-none prose-sm"
+            >
+              <ReactMarkdown
+                remarkPlugins={[remarkMath, remarkGfm]}
+                rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeHighlight, { detect: true }]]}
+              >
+                {summary}
+              </ReactMarkdown>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 const ProtectedImage = memo(
   ({
@@ -652,6 +719,18 @@ function ChatAreaComponent(
                   </div>
                 ) : (
                   <div className={`p-4 rounded-3xl ${isUserMessage ? "bg-neutral-100 dark:bg-neutral-800" : ""}`}>
+                    {msg.role === "model" && msg.thoughtSummary && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                      >
+                        <ThinkingSummary
+                          summary={msg.thoughtSummary}
+                          isStreaming={isLoading && i === messages.length - 1}
+                        />
+                      </motion.div>
+                    )}
                     {msg.parts.map((part, j) => {
                       if (part.type === "text" && part.text) {
                         return (

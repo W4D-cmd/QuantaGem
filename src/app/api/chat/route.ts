@@ -13,6 +13,7 @@ interface ChatRequest {
   model: string;
   keySelection: "free" | "paid";
   isSearchActive?: boolean;
+  thinkingBudget?: number;
   isRegeneration?: boolean;
 }
 
@@ -213,6 +214,7 @@ export async function POST(request: NextRequest) {
     model,
     keySelection,
     isSearchActive,
+    thinkingBudget,
     isRegeneration,
   } = (await request.json()) as ChatRequest;
 
@@ -459,6 +461,7 @@ export async function POST(request: NextRequest) {
     const generationConfig: {
       systemInstruction?: string;
       tools?: Array<{ googleSearch: Record<string, never> }>;
+      thinkingConfig?: { thinkingBudget: number };
     } = {};
 
     if (systemPromptText && systemPromptText.trim() !== "") {
@@ -467,6 +470,13 @@ export async function POST(request: NextRequest) {
 
     if (isSearchActive) {
       generationConfig.tools = [{ googleSearch: {} }];
+    }
+
+    if (thinkingBudget !== undefined) {
+      const isProModel = model.includes("2.5-pro");
+      if (!isProModel || (isProModel && thinkingBudget !== 0)) {
+        generationConfig.thinkingConfig = { thinkingBudget };
+      }
     }
 
     const streamParams: {

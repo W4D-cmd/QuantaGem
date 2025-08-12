@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_model TEXT,
   system_prompt TEXT DEFAULT '',
-  key_selection TEXT DEFAULT 'free'
+  key_selection TEXT DEFAULT 'free',
+  thinking_budget INTEGER DEFAULT -1
 );
 
 CREATE TABLE IF NOT EXISTS messages (

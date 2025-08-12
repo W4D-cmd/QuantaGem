@@ -8,6 +8,7 @@ import React, {
   KeyboardEvent,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -15,6 +16,7 @@ import Tooltip from "@/components/Tooltip";
 import {
   ArrowPathIcon,
   CheckIcon,
+  CpuChipIcon,
   FolderOpenIcon,
   GlobeAltIcon as OutlineGlobeAltIcon,
   MicrophoneIcon,
@@ -23,15 +25,17 @@ import {
   XMarkIcon,
   SpeakerWaveIcon,
   SpeakerXMarkIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
 import { Message, ProjectFile } from "@/app/page";
+import { ThinkingOption, getThinkingConfigForModel } from "@/lib/thinking";
 import { ArrowUpIcon } from "@heroicons/react/20/solid";
 import { StopIcon } from "@heroicons/react/16/solid";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
 import { ToastProps } from "./Toast";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import { Content, Part } from "@google/genai";
+import { Content, Part, Model } from "@google/genai";
 import { liveModels, languageCodes, LiveModel } from "@/lib/live-models";
 import { dialogVoices, standardVoices } from "@/lib/voices";
 import LiveSessionButton from "./LiveSessionButton";
@@ -71,6 +75,9 @@ interface ChatInputProps {
   onAutoMuteToggle: (enabled: boolean) => void;
   liveMode: "audio" | "video";
   onLiveModeChange: (mode: "audio" | "video") => void;
+  thinkingOption: ThinkingOption;
+  onThinkingOptionChange: (option: ThinkingOption) => void;
+  selectedModel: Model | null;
 }
 
 export interface ChatInputHandle {
@@ -186,6 +193,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onAutoMuteToggle,
       liveMode,
       onLiveModeChange,
+      thinkingOption,
+      onThinkingOptionChange,
+      selectedModel,
     },
     ref,
   ) => {
@@ -193,7 +203,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const attachButtonRef = useRef<HTMLButtonElement>(null);
+    const thinkingButtonRef = useRef<HTMLButtonElement>(null);
     const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
+    const [isThinkingMenuOpen, setIsThinkingMenuOpen] = useState(false);
     const [selectedFiles, setSelectedFiles] = useState<UploadedFileInfo[]>([]);
     const [uploadingFiles, setUploadingFiles] = useState<
       { file: File; id: string; progress: number; error?: string }[]
@@ -212,6 +224,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [scanStatusMessage, setScanStatusMessage] = useState<string | null>(null);
 
     const [fileAnimationParent] = useAutoAnimate();
+
+    const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
 
     const {
       isConnecting: isLiveConnecting,
@@ -422,6 +436,24 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         onClick: handleOpenSourceFolder,
       },
     ];
+
+    const thinkingDropdownItems = useMemo((): DropdownItem[] => {
+      const config = getThinkingConfigForModel(selectedModel?.name);
+      if (!config) return [];
+
+      const options: ThinkingOption[] = ["dynamic", "low", "medium", "high"];
+      if (config.canBeOff) {
+        options.splice(1, 0, "off");
+      }
+
+      return options.map((option) => ({
+        id: option,
+        label: option.charAt(0).toUpperCase() + option.slice(1),
+        onClick: () => onThinkingOptionChange(option),
+        className: thinkingOption === option ? "font-semibold" : "",
+        icon: thinkingOption === option ? <CheckIcon className="size-4 text-blue-500" /> : <div className="size-4" />,
+      }));
+    }, [selectedModel, thinkingOption, onThinkingOptionChange]);
 
     useEffect(() => {
       const ta = textareaRef.current;
@@ -820,6 +852,31 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     <span>Search</span>
                   </button>
                 </Tooltip>
+                {isThinkingSupported && (
+                  <Tooltip text="Thinking Budget">
+                    <button
+                      ref={thinkingButtonRef}
+                      type="button"
+                      onClick={() => setIsThinkingMenuOpen((prev) => !prev)}
+                      disabled={isRecording || isTranscribing || isScanning || isSessionActive}
+                      className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
+                      transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
+                      text-neutral-500 dark:bg-neutral-950 dark:border-neutral-900 dark:text-neutral-300
+                      dark:hover:bg-neutral-700 disabled:opacity-50`}
+                    >
+                      <CpuChipIcon className="size-5" />
+                      <span className="capitalize">{thinkingOption === "dynamic" ? "Default" : thinkingOption}</span>
+                      <ChevronDownIcon className="size-3" />
+                    </button>
+                  </Tooltip>
+                )}
+                <DropdownMenu
+                  open={isThinkingMenuOpen}
+                  onCloseAction={() => setIsThinkingMenuOpen(false)}
+                  anchorRef={thinkingButtonRef}
+                  items={thinkingDropdownItems}
+                  position="left"
+                />
               </div>
 
               <div className="flex items-center gap-2">

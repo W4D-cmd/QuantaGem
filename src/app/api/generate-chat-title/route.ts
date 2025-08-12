@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { getUserFromToken } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
@@ -22,6 +22,29 @@ export async function POST(request: NextRequest) {
 
   const genAI = new GoogleGenAI({ apiKey });
 
+  const safetySettings = [
+    {
+      category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+      threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+      threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+      threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+      threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
+      threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+  ];
+
   try {
     const prompt = `You are a chat title generator. Your sole purpose is to provide a concise, few-word chat title (2-5 words) from user input. The title must consist ONLY of relevant keywords. Do NOT include any conversational filler, greetings, introductory phrases, alternative suggestions (e.g., "or simply"), or any additional explanations. Provide only the title itself and make sure to use the same language as the user used.
 
@@ -32,6 +55,9 @@ Title:`;
     const result = await genAI.models.generateContent({
       model: "models/gemma-3-27b-it",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        safetySettings: safetySettings,
+      },
     });
     const generatedTitle = (result.text || "").trim();
 

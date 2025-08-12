@@ -1,4 +1,4 @@
-import { Content, GoogleGenAI, GroundingMetadata, Part } from "@google/genai";
+import { Content, GoogleGenAI, GroundingMetadata, Part, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
@@ -151,6 +151,29 @@ const SOURCE_CODE_EXTENSIONS = [
   ".patch",
   ".svg",
   ".ipynb",
+];
+
+const safetySettings = [
+  {
+    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
 ];
 
 function getFileExtension(fileName?: string): string {
@@ -462,7 +485,10 @@ export async function POST(request: NextRequest) {
       systemInstruction?: string;
       tools?: Array<{ googleSearch: Record<string, never> }>;
       thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
+      safetySettings?: typeof safetySettings;
     } = {};
+
+    generationConfig.safetySettings = safetySettings;
 
     if (systemPromptText && systemPromptText.trim() !== "") {
       generationConfig.systemInstruction = systemPromptText;

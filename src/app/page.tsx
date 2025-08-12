@@ -177,7 +177,7 @@ async function generateAndSetChatTitle(
     if (!patchRes.ok) {
       let errorData;
       try {
-        errorData = await patchRes.json();
+        errorData = await res.json();
       } catch (e) {
         errorData = { error: `Failed to update chat title: ${patchRes.statusText}` };
       }
@@ -1177,6 +1177,7 @@ export default function Home() {
           let thoughtSummaryAccumulator = "";
           let streamBuffer = "";
           const currentSources: Array<{ title: string; uri: string }> = [];
+          let modelReturnedEmptyMessage = false;
 
           while (true) {
             const { value, done } = await reader.read();
@@ -1204,6 +1205,8 @@ export default function Home() {
                   parsedChunk.sources.forEach((s: { title: string; uri: string }) => {
                     if (!currentSources.some((existing) => existing.uri === s.uri)) currentSources.push(s);
                   });
+                } else if (parsedChunk.type === "error") {
+                  modelReturnedEmptyMessage = true;
                 }
               } catch (jsonError) {
                 console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
@@ -1226,7 +1229,7 @@ export default function Home() {
             }
           }
 
-          if (textAccumulator.trim() === "" && !ctrl.signal.aborted) {
+          if ((modelReturnedEmptyMessage || textAccumulator.trim() === "") && !ctrl.signal.aborted) {
             continue;
           } else {
             success = true;
@@ -1243,7 +1246,7 @@ export default function Home() {
       if (success) {
         await loadChat(currentChatId);
       } else if (!ctrl.signal.aborted) {
-        showToast(`Answer could not be received after ${MAX_RETRIES} attempts. Please adjust your request.`, "error");
+        showToast(`Response could not be received after ${MAX_RETRIES} attempts. Please adjust your request.`, "error");
         if (modelMessageIndexForStream !== null) {
           setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
         }

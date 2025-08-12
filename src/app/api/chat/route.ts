@@ -606,10 +606,11 @@ export async function POST(request: NextRequest) {
             `UPDATE chat_sessions
              SET last_model = $2,
                  key_selection = $3,
+                 thinking_budget = $5,
                  updated_at = now()
              WHERE id = $1
                AND user_id = $4`,
-            [chatSessionId, model, keySelection, userId],
+            [chatSessionId, model, keySelection, userId, thinkingBudget],
           );
         }
         controller.close();

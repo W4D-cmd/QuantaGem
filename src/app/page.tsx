@@ -197,6 +197,7 @@ export default function Home() {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const [streamStarted, setStreamStarted] = useState(false);
   const [allChats, setAllChats] = useState<ChatListItem[]>([]);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
@@ -725,7 +726,7 @@ export default function Home() {
   );
 
   const createChat = useCallback(
-    async (title: string, keySelection: "free" | "paid", projectId: number | null) => {
+    async (title: string, keySelection: "free" | "paid", projectId: number | null, thinkingBudget: number) => {
       try {
         const res = await fetch("/api/chats", {
           method: "POST",
@@ -737,6 +738,7 @@ export default function Home() {
             title: title,
             keySelection,
             projectId,
+            thinkingBudget,
           }),
         });
         if (res.status === 401) {
@@ -773,7 +775,7 @@ export default function Home() {
 
       if (projectId !== null) {
         const newTitle = `Chat ${allChats.filter((chat) => chat.projectId === projectId).length + 1}`;
-        const newChatId = await createChat(newTitle, keySelection, projectId);
+        const newChatId = await createChat(newTitle, keySelection, projectId, -1);
 
         if (newChatId) {
           setActiveChatId(newChatId);
@@ -1106,6 +1108,7 @@ export default function Home() {
 
       chatAreaRef.current?.scrollToBottomAndEnableAutoscroll();
       setIsLoading(true);
+      setIsThinking(true);
       setStreamStarted(false);
 
       const ctrl = new AbortController();
@@ -1179,6 +1182,7 @@ export default function Home() {
             try {
               const parsedChunk = JSON.parse(line);
               if (parsedChunk.type === "text") {
+                setIsThinking(false);
                 textAccumulator += parsedChunk.value;
               } else if (parsedChunk.type === "thought") {
                 thoughtSummaryAccumulator += parsedChunk.value;
@@ -1235,6 +1239,7 @@ export default function Home() {
         if (currentChatId) await loadChat(currentChatId);
       } finally {
         setIsLoading(false);
+        setIsThinking(false);
         setController(null);
         await fetchAllChats();
       }
@@ -1258,7 +1263,9 @@ export default function Home() {
           ? allChats.filter((c) => c.projectId === currentChatProjectId).length + 1
           : allChats.filter((c) => c.projectId === null).length + 1
       }`;
-      const newId = await createChat(newChatTitle, keySelection, currentChatProjectId);
+      const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+      const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
+      const newId = await createChat(newChatTitle, keySelection, currentChatProjectId, budgetValue);
       if (!newId) {
         setIsLoading(false);
         return;
@@ -1816,6 +1823,7 @@ export default function Home() {
                   ref={chatAreaRef}
                   messages={messages}
                   isLoading={isLoading}
+                  isThinking={isThinking}
                   streamStarted={streamStarted}
                   onAutoScrollChange={handleAutoScrollChange}
                   getAuthHeaders={getAuthHeaders}

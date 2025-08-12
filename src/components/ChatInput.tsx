@@ -905,48 +905,52 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     </label>
                   </div>
                 )}
-                {!isLoading && !isTranscribing && !isScanning && (
-                  <>
-                    <LiveSessionButton
-                      isSessionActive={isSessionActive}
-                      isConnecting={isLiveConnecting}
-                      liveMode={liveMode}
-                      onLiveModeChange={onLiveModeChange}
-                      onStartSession={handleStartLiveSession}
-                      onStopSession={stopSession}
-                      disabled={isLoading || isRecording || isTranscribing || isScanning}
-                      liveModels={liveModels}
-                      selectedLiveModel={selectedLiveModel}
-                      onLiveModelChange={onLiveModelChange}
-                      languages={languageCodes}
-                      selectedLanguage={selectedLanguage}
-                      onLanguageChange={onLanguageChange}
-                      dialogVoices={dialogVoices}
-                      standardVoices={standardVoices}
-                      selectedVoice={selectedVoice}
-                      onVoiceChange={onVoiceChange}
-                    />
-                    <Tooltip text={isRecording ? "Cancel recording" : "Dictate message"}>
-                      <button
-                        type="button"
-                        onClick={isRecording ? cancelRecording : startRecording}
-                        disabled={
-                          isLoading || isTranscribing || uploadingFiles.length > 0 || isScanning || isSessionActive
-                        }
-                        className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
-                          font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
-                          hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700
-                          disabled:opacity-50"
-                      >
-                        {isRecording ? (
-                          <XMarkIcon className="size-5 text-red-500" />
-                        ) : (
-                          <MicrophoneIcon className="size-5 text-neutral-500 dark:text-neutral-300" />
-                        )}
-                      </button>
-                    </Tooltip>
-                  </>
-                )}
+
+                <div className="flex h-9 items-center">
+                  {!isLoading && !isTranscribing && !isScanning && (
+                    <div className="flex items-center gap-2">
+                      <LiveSessionButton
+                        isSessionActive={isSessionActive}
+                        isConnecting={isLiveConnecting}
+                        liveMode={liveMode}
+                        onLiveModeChange={onLiveModeChange}
+                        onStartSession={handleStartLiveSession}
+                        onStopSession={stopSession}
+                        disabled={isLoading || isRecording || isTranscribing || isScanning}
+                        liveModels={liveModels}
+                        selectedLiveModel={selectedLiveModel}
+                        onLiveModelChange={onLiveModelChange}
+                        languages={languageCodes}
+                        selectedLanguage={selectedLanguage}
+                        onLanguageChange={onLanguageChange}
+                        dialogVoices={dialogVoices}
+                        standardVoices={standardVoices}
+                        selectedVoice={selectedVoice}
+                        onVoiceChange={onVoiceChange}
+                      />
+                      <Tooltip text={isRecording ? "Cancel recording" : "Dictate message"}>
+                        <button
+                          type="button"
+                          onClick={isRecording ? cancelRecording : startRecording}
+                          disabled={
+                            isLoading || isTranscribing || uploadingFiles.length > 0 || isScanning || isSessionActive
+                          }
+                          className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
+                            font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
+                            hover:bg-neutral-100 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:bg-neutral-700
+                            disabled:opacity-50"
+                        >
+                          {isRecording ? (
+                            <XMarkIcon className="size-5 text-red-500" />
+                          ) : (
+                            <MicrophoneIcon className="size-5 text-neutral-500 dark:text-neutral-300" />
+                          )}
+                        </button>
+                      </Tooltip>
+                    </div>
+                  )}
+                </div>
+
                 <button
                   type={isSessionActive || isLoading || isRecording || isTranscribing ? "button" : "submit"}
                   onClick={getMainButtonAction()}

@@ -49,12 +49,12 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
           <div className="w-4 h-4 border-3 border-neutral-300 border-t-neutral-500 rounded-full animate-spin" />
         )}
         <motion.div
+          className="ml-2 flex items-center justify-center"
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ duration: 0.2 }}
-          style={{ display: "inline-block" }}
         >
           <ChevronDownIcon
-            className="size-3 stroke-3 ml-2 text-neutral-400 dark:text-neutral-600 transition-colors duration-300
+            className="size-3 stroke-3 text-neutral-400 dark:text-neutral-600 transition-colors duration-300
               ease-in-out"
           />
         </motion.div>

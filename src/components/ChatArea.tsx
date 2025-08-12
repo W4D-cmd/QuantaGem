@@ -45,6 +45,7 @@ export interface AudioPlaybackState {
 interface ChatAreaProps {
   messages: Message[];
   isLoading: boolean;
+  isThinking: boolean;
   streamStarted: boolean;
   onAutoScrollChange?: (isAutoScrollEnabled: boolean) => void;
   getAuthHeaders: GetAuthHeaders;
@@ -338,6 +339,7 @@ export default memo(
   (prev, next) =>
     prev.messages === next.messages &&
     prev.isLoading === next.isLoading &&
+    prev.isThinking === next.isThinking &&
     prev.streamStarted === next.streamStarted &&
     prev.onAutoScrollChange === next.onAutoScrollChange &&
     prev.getAuthHeaders === next.getAuthHeaders &&
@@ -349,6 +351,7 @@ function ChatAreaComponent(
   {
     messages,
     isLoading,
+    isThinking,
     streamStarted,
     onAutoScrollChange,
     getAuthHeaders,
@@ -727,7 +730,7 @@ function ChatAreaComponent(
                       >
                         <ThinkingSummary
                           summary={msg.thoughtSummary}
-                          isStreaming={isLoading && i === messages.length - 1}
+                          isStreaming={isThinking && i === messages.length - 1}
                         />
                       </motion.div>
                     )}

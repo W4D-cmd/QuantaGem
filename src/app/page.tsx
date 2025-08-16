@@ -1092,45 +1092,47 @@ export default function Home() {
       isSearchEnabled: boolean,
       currentThinkingOption: ThinkingOption,
       isRegeneration = false,
+      placeholderIdToUpdate?: number,
     ) => {
-      let modelMessageIndexForStream: number | null = null;
-      setMessages((prev) => {
-        const placeholderMessage: Message = {
-          role: "model",
-          parts: [{ type: "text", text: "" }],
-          sources: [],
-          thoughtSummary: "",
-          id: Date.now(),
-          position: (prev[prev.length - 1]?.position || 0) + 2,
-        };
-        modelMessageIndexForStream = prev.length;
-        return [...prev, placeholderMessage];
-      });
+      if (placeholderIdToUpdate) {
+        messages.findIndex((m) => m.id === placeholderIdToUpdate);
+      }
 
-      chatAreaRef.current?.scrollToBottomAndEnableAutoscroll();
       setIsLoading(true);
       setStreamStarted(false);
+      setIsThinking(true);
 
       const ctrl = new AbortController();
       setController(ctrl);
 
       let success = false;
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        setIsThinking(true);
         if (ctrl.signal.aborted) {
           showToast("Response cancelled.", "error");
           break;
         }
 
         if (attempt > 0) {
-          showToast(`Answer incomplete, try again... (Attempt ${attempt + 1} of ${MAX_RETRIES})`, "error");
-          setMessages((prev) =>
-            prev.map((msg, index) =>
-              index === modelMessageIndexForStream
-                ? { ...msg, parts: [{ type: "text", text: "" }], sources: [], thoughtSummary: "" }
-                : msg,
-            ),
-          );
+          const backoffDelay = Math.pow(2, attempt) * 400 + Math.random() * 200;
+          await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+
+          if (ctrl.signal.aborted) {
+            showToast("Response cancelled during retry delay.", "error");
+            break;
+          }
+
+          showToast(`Response incomplete, try again... (Attempt ${attempt + 1} of ${MAX_RETRIES})`, "error");
+
+          const messageIdToUpdate = placeholderIdToUpdate;
+          if (messageIdToUpdate) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === messageIdToUpdate
+                  ? { ...msg, parts: [{ type: "text", text: "" }], sources: [], thoughtSummary: "" }
+                  : msg,
+              ),
+            );
+          }
         }
 
         try {
@@ -1212,11 +1214,11 @@ export default function Home() {
                 console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
               }
             }
-
-            if (modelMessageIndexForStream !== null) {
+            const messageIdToUpdate = placeholderIdToUpdate;
+            if (messageIdToUpdate) {
               setMessages((prev) =>
-                prev.map((msg, index) =>
-                  index === modelMessageIndexForStream
+                prev.map((msg) =>
+                  msg.id === messageIdToUpdate
                     ? {
                         ...msg,
                         parts: [{ type: "text", text: textAccumulator }],
@@ -1247,8 +1249,8 @@ export default function Home() {
         await loadChat(currentChatId);
       } else if (!ctrl.signal.aborted) {
         showToast(`Response could not be received after ${MAX_RETRIES} attempts. Please adjust your request.`, "error");
-        if (modelMessageIndexForStream !== null) {
-          setMessages((prev) => prev.filter((_, idx) => idx !== modelMessageIndexForStream));
+        if (placeholderIdToUpdate) {
+          setMessages((prev) => prev.filter((msg) => msg.id !== placeholderIdToUpdate));
         }
       }
 
@@ -1257,7 +1259,7 @@ export default function Home() {
       setController(null);
       await fetchAllChats();
     },
-    [getAuthHeaders, selectedModel, keySelection, router, loadChat, fetchAllChats, showToast],
+    [getAuthHeaders, selectedModel, keySelection, router, loadChat, fetchAllChats, showToast, messages],
   );
 
   const handleSendMessage = async (inputText: string, uploadedFiles: UploadedFileInfo[], sendWithSearch: boolean) => {
@@ -1269,6 +1271,7 @@ export default function Home() {
 
     let sessionId = activeChatId;
     let isFirstMessageForChatSession = false;
+    const currentMessages = messages;
 
     if (!sessionId) {
       const newChatTitle = `Chat ${
@@ -1285,7 +1288,7 @@ export default function Home() {
       }
       sessionId = newId;
       isFirstMessageForChatSession = true;
-    } else if (messages.length === 0) {
+    } else if (currentMessages.length === 0) {
       isFirstMessageForChatSession = true;
     }
 
@@ -1293,35 +1296,38 @@ export default function Home() {
     if (inputText.trim()) {
       newUserMessageParts.push({ type: "text", text: inputText.trim() });
     }
-
-    uploadedFiles.forEach((file) => {
-      newUserMessageParts.push({ type: "file", ...file });
-    });
-
-    const historyForAPI = [...messages];
+    uploadedFiles.forEach((file) => newUserMessageParts.push({ type: "file", ...file }));
 
     const newUserMessage: Message = {
       role: "user",
       parts: newUserMessageParts,
       id: Date.now(),
-      position: (historyForAPI[historyForAPI.length - 1]?.position || 0) + 1,
+      position: (currentMessages[currentMessages.length - 1]?.position || 0) + 1,
+    };
+    const placeholderMessage: Message = {
+      role: "model",
+      parts: [{ type: "text", text: "" }],
+      sources: [],
+      thoughtSummary: "",
+      id: Date.now() + 1,
+      position: newUserMessage.position + 1,
     };
 
-    setMessages((prev) => [...prev, newUserMessage]);
+    setMessages([...currentMessages, newUserMessage, placeholderMessage]);
 
     if (isFirstMessageForChatSession && inputText.trim()) {
-      generateAndSetChatTitle(
-        sessionId,
-        inputText.trim(),
-        keySelection,
-        getAuthHeaders,
-        router,
-        showToast,
-        fetchAllChats,
-      );
+      generateAndSetChatTitle(sessionId, inputText, keySelection, getAuthHeaders, router, showToast, fetchAllChats);
     }
 
-    await callChatApiAndStreamResponse(newUserMessageParts, historyForAPI, sessionId, sendWithSearch, thinkingOption);
+    await callChatApiAndStreamResponse(
+      newUserMessageParts,
+      currentMessages,
+      sessionId,
+      sendWithSearch,
+      thinkingOption,
+      false,
+      placeholderMessage.id,
+    );
   };
 
   const handleLiveSessionTurnComplete = async (text: string, audioBlob: Blob | null) => {
@@ -1424,7 +1430,17 @@ export default function Home() {
         ...messageToEdit,
         parts: newUserMessageParts,
       };
-      setMessages([...historyForAPI, updatedUserMessage]);
+
+      const placeholderMessage: Message = {
+        role: "model",
+        parts: [{ type: "text", text: "" }],
+        sources: [],
+        thoughtSummary: "",
+        id: Date.now() + 1,
+        position: updatedUserMessage.position + 1,
+      };
+
+      setMessages([...historyForAPI, updatedUserMessage, placeholderMessage]);
 
       await callChatApiAndStreamResponse(
         newUserMessageParts,
@@ -1433,6 +1449,7 @@ export default function Home() {
         isSearchActive,
         thinkingOption,
         true,
+        placeholderMessage.id,
       );
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");
@@ -1471,7 +1488,18 @@ export default function Home() {
       }
 
       const historyForAPI = messages.slice(0, userMessageIndex);
-      setMessages(messages.slice(0, userMessageIndex + 1));
+      const currentMessages = messages.slice(0, userMessageIndex + 1);
+
+      const placeholderMessage: Message = {
+        role: "model",
+        parts: [{ type: "text", text: "" }],
+        sources: [],
+        thoughtSummary: "",
+        id: Date.now() + 1,
+        position: userMessageToResend.position + 1,
+      };
+
+      setMessages([...currentMessages, placeholderMessage]);
 
       await callChatApiAndStreamResponse(
         userMessageToResend.parts,
@@ -1480,6 +1508,7 @@ export default function Home() {
         isSearchActive,
         thinkingOption,
         true,
+        placeholderMessage.id,
       );
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");

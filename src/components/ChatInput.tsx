@@ -510,9 +510,25 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           const filtered = projectFiles.filter((file) =>
             file.fileName.replace(/\s/g, "").toLowerCase().includes(cleanedSearchText),
           );
-          setFilteredProjectFiles(filtered);
-          setShowFileSuggestions(filtered.length > 0);
-          setHighlightedSuggestionIndex(filtered.length > 0 ? 0 : -1);
+
+          const finalFilteredList: ProjectFile[] = [];
+
+          if ("all".includes(cleanedSearchText) && projectFiles.length > 0) {
+            const allFilesOption: ProjectFile = {
+              id: -1,
+              fileName: "All",
+              mimeType: "action/add-all",
+              size: projectFiles.length,
+              objectName: "special-all-files-action",
+            };
+            finalFilteredList.push(allFilesOption);
+          }
+
+          finalFilteredList.push(...filtered);
+
+          setFilteredProjectFiles(finalFilteredList);
+          setShowFileSuggestions(finalFilteredList.length > 0);
+          setHighlightedSuggestionIndex(finalFilteredList.length > 0 ? 0 : -1);
         } else {
           setShowFileSuggestions(false);
           setFilteredProjectFiles([]);
@@ -523,8 +539,30 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const selectFileSuggestion = (file: ProjectFile) => {
       const hashIndex = input.lastIndexOf("#");
-      if (hashIndex !== -1) {
-        const prefix = input.substring(0, hashIndex);
+      if (hashIndex === -1) {
+        setShowFileSuggestions(false);
+        return;
+      }
+
+      const prefix = input.substring(0, hashIndex);
+
+      if (file.id === -1) {
+        const currentlySelected = new Set(selectedFiles.map((f) => f.objectName));
+        const filesToAdd = projectFiles
+          .filter((pf) => !currentlySelected.has(pf.objectName))
+          .map((pf) => ({
+            objectName: pf.objectName,
+            fileName: pf.fileName,
+            mimeType: pf.mimeType,
+            size: pf.size,
+            isProjectFile: true,
+            projectFileId: pf.id,
+          }));
+
+        if (filesToAdd.length > 0) {
+          setSelectedFiles((prev) => [...prev, ...filesToAdd]);
+        }
+      } else {
         setSelectedFiles((prev) => {
           if (!prev.some((sf) => sf.objectName === file.objectName)) {
             const newFilePart = {
@@ -535,12 +573,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               isProjectFile: true,
               projectFileId: file.id,
             };
-            setInput(prefix);
             return [...prev, newFilePart];
           }
           return prev;
         });
       }
+
+      setInput(prefix);
       setShowFileSuggestions(false);
       setFilteredProjectFiles([]);
       setHighlightedSuggestionIndex(-1);
@@ -685,22 +724,25 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 overflow-hidden z-20"
             >
               <ul className="max-h-48 overflow-y-auto">
-                {filteredProjectFiles.map((file, index) => (
-                  <li
-                    key={file.id}
-                    className={`px-4 py-2 cursor-pointer text-sm flex justify-between items-center ${
-                      index === highlightedSuggestionIndex
-                        ? "bg-blue-100 dark:bg-blue-700 text-blue-900 dark:text-white"
-                        : "hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200"
-                    }`}
-                    onClick={() => selectFileSuggestion(file)}
-                  >
-                    <span>
-                      {file.fileName} ({`${(file.size / 1024).toFixed(1)} KB`})
-                    </span>
-                    <span className="text-neutral-500 dark:text-neutral-400 text-xs">{file.mimeType}</span>
-                  </li>
-                ))}
+                {filteredProjectFiles.map((file, index) => {
+                  const isAllOption = file.id === -1;
+                  return (
+                    <li
+                      key={file.id}
+                      className={`px-4 py-2 cursor-pointer text-sm flex justify-between items-center ${
+                        index === highlightedSuggestionIndex
+                          ? "bg-blue-100 dark:bg-blue-700 text-blue-900 dark:text-white"
+                          : "hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200"
+                      }`}
+                      onClick={() => selectFileSuggestion(file)}
+                    >
+                      <span className={isAllOption ? "font-bold" : ""}>{isAllOption ? "#All" : file.fileName}</span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400 ml-2">
+                        {isAllOption ? `Add all ${file.size} files` : `${(file.size / 1024).toFixed(1)} KB`}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

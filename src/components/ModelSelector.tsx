@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Model } from "@google/genai";
 import Tooltip from "@/components/Tooltip";
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { motion, AnimatePresence } from "framer-motion";
+import { customModels } from "@/lib/custom-models";
 
 export interface Props {
   models: Model[];
@@ -15,6 +16,7 @@ export interface Props {
 
 export default function ModelSelector({ models, selected, onChangeAction }: Props) {
   const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -33,6 +35,17 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
     const sel = listRef.current.querySelector('[data-selected="true"]');
     sel?.scrollIntoView({ block: "center" });
   }, [open]);
+
+  const displayedModels = useMemo(() => {
+    if (!models || models.length === 0) {
+      return [];
+    }
+    if (showAll) {
+      return models;
+    }
+    const availableModelMap = new Map(models.map((m) => [m.name, m]));
+    return customModels.map((cm) => availableModelMap.get(cm.modelId)).filter((m): m is Model => !!m);
+  }, [models, showAll]);
 
   return (
     <div className="relative" ref={ref}>
@@ -76,10 +89,28 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
               className="px-4 py-2 flex items-center justify-between text-neutral-500 dark:text-neutral-400
                 transition-colors duration-300 ease-in-out"
             >
-              <span>Model</span>
+              <span className="font-semibold text-sm">Model</span>
+              <label className="flex items-center cursor-pointer">
+                <span className="mr-2 text-xs text-neutral-500 dark:text-neutral-400">Show all models</span>
+                <div className="relative inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={showAll}
+                    onChange={() => setShowAll(!showAll)}
+                  />
+                  <div
+                    className="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer dark:bg-neutral-700
+                      peer-checked:after:translate-x-full peer-checked:after:border-white after:content-['']
+                      after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300
+                      after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-neutral-600
+                      peer-checked:bg-blue-600"
+                  ></div>
+                </div>
+              </label>
             </div>
             <div ref={listRef} className="max-h-96 overflow-y-auto p-2 space-y-1" style={{ scrollbarGutter: "stable" }}>
-              {models.map((m) => (
+              {displayedModels.map((m) => (
                 <Tooltip key={m.name} text={m.description ?? ""}>
                   <button
                     data-selected={m.name === selected?.name}
@@ -88,10 +119,10 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
                       onChangeAction(m);
                       setOpen(false);
                     }}
-                    className="w-full flex items-center justify-between px-4 py-2 hover:bg-neutral-100
+                    className="w-full flex items-start justify-between gap-4 px-4 py-2 hover:bg-neutral-100
                       dark:hover:bg-neutral-800 rounded-lg transition-colors duration-300 ease-in-out cursor-pointer"
                   >
-                    <div className="flex flex-col">
+                    <div className="flex flex-col text-left">
                       <span
                         className="font-medium text-neutral-600 dark:text-neutral-300 transition-colors duration-300
                           ease-in-out"
@@ -108,9 +139,9 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
                         {m.outputTokenLimit}
                       </div>
                     </div>
-                    {m.name === selected?.name && (
-                      <CheckCircleIcon className="size-4 transition-colors duration-300 ease-in-out" />
-                    )}
+                    <div className="w-4 h-4 flex-shrink-0 self-center">
+                      {m.name === selected?.name && <CheckCircleIcon className="size-4" />}
+                    </div>
                   </button>
                 </Tooltip>
               ))}

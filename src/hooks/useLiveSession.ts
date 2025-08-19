@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Blob as GenaiBlob, Content, GoogleGenAI, Part, Session } from "@google/genai";
+import { Blob as GenaiBlob, Content, GoogleGenAI, Session } from "@google/genai";
 import { getLiveConnectConfig, LiveModel } from "@/lib/live-models";
 
 const MIN_CHUNKS_TO_PLAY = 5;
@@ -64,24 +64,16 @@ interface UseLiveSessionProps {
   isAutoMuteEnabled: boolean;
 }
 
-interface ConnectionParams {
-  history: Content[];
-  liveModel: LiveModel;
-  languageCode: string;
-  voiceName: string;
-  options: { streamVideo: boolean };
-}
-
 const createWavBlob = (audioChunks: ArrayBuffer[], sampleRate: number): Blob => {
   const totalLength = audioChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
   const buffer = new ArrayBuffer(44 + totalLength);
   const view = new DataView(buffer);
 
-  view.setUint32(0, 0x52494646, false); // "RIFF"
+  view.setUint32(0, 0x52494646, false);
   view.setUint32(4, 36 + totalLength, true);
-  view.setUint32(8, 0x57415645, false); // "WAVE"
+  view.setUint32(8, 0x57415645, false);
 
-  view.setUint32(12, 0x666d7420, false); // "fmt "
+  view.setUint32(12, 0x666d7420, false);
   view.setUint32(16, 16, true);
   view.setUint16(20, 1, true);
   view.setUint16(22, 1, true);
@@ -90,7 +82,7 @@ const createWavBlob = (audioChunks: ArrayBuffer[], sampleRate: number): Blob => 
   view.setUint16(32, 2, true);
   view.setUint16(34, 16, true);
 
-  view.setUint32(36, 0x64617461, false); // "data"
+  view.setUint32(36, 0x64617461, false);
   view.setUint32(40, totalLength, true);
 
   const audioData = new Uint8Array(buffer, 44);
@@ -135,21 +127,20 @@ export const useLiveSession = ({
   const lastPlaybackSampleRateRef = useRef(OUTPUT_SAMPLE_RATE);
 
   const sessionHandleRef = useRef<string | null>(null);
-  const lastConnectionParamsRef = useRef<ConnectionParams | null>(null);
+  const lastHistoryRef = useRef<Content[]>([]);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const manualStopRef = useRef(false);
-
-  const isSessionActiveRef = useRef(isSessionActive);
-  useEffect(() => {
-    isSessionActiveRef.current = isSessionActive;
-  }, [isSessionActive]);
 
   useEffect(() => {
     if (!microphoneStreamRef.current) return;
     const audioTrack = microphoneStreamRef.current.getAudioTracks()[0];
     if (!audioTrack) return;
 
-    audioTrack.enabled = !(isAutoMuteEnabled && isModelSpeaking);
+    if (isAutoMuteEnabled && isModelSpeaking) {
+      audioTrack.enabled = false;
+    } else {
+      audioTrack.enabled = true;
+    }
   }, [isAutoMuteEnabled, isModelSpeaking]);
 
   const stopCurrentPlayback = useCallback(() => {
@@ -157,7 +148,7 @@ export const useLiveSession = ({
       try {
         source.stop();
       } catch (e) {
-        console.warn("Audio source stop error:", e);
+        console.log(e);
       }
       source.disconnect();
     });
@@ -167,41 +158,35 @@ export const useLiveSession = ({
     setIsModelSpeaking(false);
 
     if (playbackAudioContextRef.current && playbackAudioContextRef.current.state !== "closed") {
-      playbackAudioContextRef.current.close().catch((e) => console.warn("Playback context close error:", e));
+      playbackAudioContextRef.current.close();
     }
     playbackAudioContextRef.current = null;
     nextPlayTimeRef.current = 0;
   }, []);
 
-  const cleanupResources = useCallback(
-    (preserveStreams = false) => {
-      if (!preserveStreams) {
-        microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
-        microphoneStreamRef.current = null;
-        videoStreamRef.current?.getTracks().forEach((track) => track.stop());
-        videoStreamRef.current = null;
-        onVideoStream(null);
-        if (videoFrameIntervalRef.current) {
-          clearInterval(videoFrameIntervalRef.current);
-          videoFrameIntervalRef.current = null;
-        }
-      }
+  const cleanupResources = useCallback(() => {
+    microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
+    microphoneStreamRef.current = null;
+    videoStreamRef.current?.getTracks().forEach((track) => track.stop());
+    videoStreamRef.current = null;
+    onVideoStream(null);
+    if (videoFrameIntervalRef.current) {
+      clearInterval(videoFrameIntervalRef.current);
+      videoFrameIntervalRef.current = null;
+    }
 
-      if (audioWorkletNodeRef.current) {
-        audioWorkletNodeRef.current.port.onmessage = null;
-        audioWorkletNodeRef.current.disconnect();
-        audioWorkletNodeRef.current = null;
-      }
+    if (audioWorkletNodeRef.current) {
+      audioWorkletNodeRef.current.port.onmessage = null;
+      audioWorkletNodeRef.current.disconnect();
+      audioWorkletNodeRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      audioContextRef.current.close();
+    }
+    audioContextRef.current = null;
 
-      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-        audioContextRef.current.close().catch((e) => console.warn("Audio context close error:", e));
-      }
-      audioContextRef.current = null;
-
-      stopCurrentPlayback();
-    },
-    [onVideoStream, stopCurrentPlayback],
-  );
+    stopCurrentPlayback();
+  }, [onVideoStream, stopCurrentPlayback]);
 
   const stopSession = useCallback(() => {
     manualStopRef.current = true;
@@ -213,7 +198,7 @@ export const useLiveSession = ({
       sessionRef.current.close();
       sessionRef.current = null;
     }
-    cleanupResources(false);
+    cleanupResources();
     setIsSessionActive(false);
     setIsModelSpeaking(false);
     onStateChange(false);
@@ -221,7 +206,6 @@ export const useLiveSession = ({
     accumulatedTextRef.current = "";
     audioBufferChunksRef.current = [];
     sessionHandleRef.current = null;
-    lastConnectionParamsRef.current = null;
   }, [cleanupResources, onStateChange, onInterimText]);
 
   const processAndPlayAudio = useCallback((forcePlay = false) => {
@@ -266,144 +250,6 @@ export const useLiveSession = ({
     };
   }, []);
 
-  const connect = useCallback(async () => {
-    if (!lastConnectionParamsRef.current || manualStopRef.current) return;
-    setIsConnecting(true);
-
-    const { history, liveModel, languageCode, voiceName } = lastConnectionParamsRef.current;
-
-    try {
-      const tokenRes = await fetch("/api/live/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ keySelection }),
-      });
-      if (!tokenRes.ok) throw new Error("Could not fetch authentication token.");
-      const { token } = await tokenRes.json();
-      const ai = new GoogleGenAI({ apiKey: token, apiVersion: "v1alpha" });
-
-      const currentConfig = getLiveConnectConfig(liveModel, languageCode, voiceName, sessionHandleRef.current);
-
-      const liveSession = await ai.live.connect({
-        model: liveModel.name,
-        config: currentConfig,
-        callbacks: {
-          onopen: () => {
-            setIsConnecting(false);
-            setIsSessionActive(true);
-            onStateChange(true);
-            console.log("Live session (re)connected.");
-          },
-          onmessage: (message) => {
-            if (message.sessionResumptionUpdate?.resumable && message.sessionResumptionUpdate.newHandle) {
-              sessionHandleRef.current = message.sessionResumptionUpdate.newHandle;
-              console.log("Received new session handle:", sessionHandleRef.current);
-            }
-            if (message.goAway?.timeLeft) {
-              console.log(`Connection will close in ${message.goAway.timeLeft}. Scheduling reconnection...`);
-              if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-              const timeoutSeconds = parseInt(message.goAway.timeLeft, 10);
-              if (!isNaN(timeoutSeconds) && timeoutSeconds > 5) {
-                reconnectTimeoutRef.current = setTimeout(connect, (timeoutSeconds - 5) * 1000);
-              }
-            }
-            if (message.serverContent?.interrupted) {
-              stopCurrentPlayback();
-            }
-            if (message.serverContent?.modelTurn?.parts) {
-              const part = message.serverContent.modelTurn.parts[0];
-              if (part.text) {
-                accumulatedTextRef.current += part.text;
-                onInterimText(accumulatedTextRef.current);
-              }
-              if (part.inlineData?.data) {
-                const mimeType = part.inlineData.mimeType;
-                const rateMatch = mimeType?.match(/rate=(\d+)/);
-                const incomingSampleRate = rateMatch ? parseInt(rateMatch[1], 10) : OUTPUT_SAMPLE_RATE;
-                lastPlaybackSampleRateRef.current = incomingSampleRate;
-                if (
-                  !playbackAudioContextRef.current ||
-                  playbackAudioContextRef.current.sampleRate !== incomingSampleRate
-                ) {
-                  if (playbackAudioContextRef.current) playbackAudioContextRef.current.close();
-                  playbackAudioContextRef.current = new window.AudioContext({ sampleRate: incomingSampleRate });
-                  nextPlayTimeRef.current = playbackAudioContextRef.current.currentTime;
-                }
-                const raw = window.atob(part.inlineData.data);
-                const rawLength = raw.length;
-                const array = new Uint8Array(new ArrayBuffer(rawLength));
-                for (let i = 0; i < rawLength; i++) array[i] = raw.charCodeAt(i);
-                const int16Array = new Int16Array(array.buffer);
-                audioBufferChunksRef.current.push(int16Array.buffer.slice(0));
-                const float32Array = new Float32Array(int16Array.length);
-                for (let i = 0; i < int16Array.length; i++) float32Array[i] = int16Array[i] / 32767.0;
-                if (playbackQueueRef.current.length === 0 && !isPlayingRef.current) {
-                  nextPlayTimeRef.current = playbackAudioContextRef.current.currentTime;
-                }
-                playbackQueueRef.current.push(float32Array);
-                processAndPlayAudio();
-              }
-            } else if (message.serverContent?.turnComplete) {
-              processAndPlayAudio(true);
-              const audioBlob =
-                audioBufferChunksRef.current.length > 0
-                  ? createWavBlob(audioBufferChunksRef.current, lastPlaybackSampleRateRef.current)
-                  : null;
-              onTurnComplete(accumulatedTextRef.current, audioBlob);
-              accumulatedTextRef.current = "";
-              audioBufferChunksRef.current = [];
-              onInterimText("");
-            }
-          },
-          onerror: (e) => {
-            console.error("Live session error:", e);
-            showToast(e.message, "error");
-            stopSession();
-          },
-          onclose: (e) => {
-            console.log("Live session closed:", e.code, e.reason);
-            setIsSessionActive(false);
-            if (sessionRef.current) {
-              sessionRef.current = null;
-            }
-            if (!manualStopRef.current) {
-              console.log("Attempting to reconnect...");
-              if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-              reconnectTimeoutRef.current = setTimeout(connect, 1000);
-            }
-          },
-        },
-      });
-
-      sessionRef.current = liveSession;
-
-      if (history && history.length > 0 && !sessionHandleRef.current) {
-        const historyString = history
-          .map((c: Content) => {
-            const partsText = c.parts?.map((p: Part) => p.text || "").join(" ") || "";
-            return `${c.role}: ${partsText.trim()}`;
-          })
-          .join("\n");
-        const contextPrompt = `Here is our conversation history so far. Use this as context for my next live audio input. Do not respond to this message, just wait for my voice.\n\n--- HISTORY ---\n${historyString}\n--- END HISTORY ---`;
-        sessionRef.current.sendClientContent({ turns: contextPrompt });
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      showToast(message, "error");
-      stopSession();
-    }
-  }, [
-    getAuthHeaders,
-    keySelection,
-    showToast,
-    onStateChange,
-    onInterimText,
-    onTurnComplete,
-    processAndPlayAudio,
-    stopSession,
-    stopCurrentPlayback,
-  ]);
-
   const startSession = useCallback(
     async (
       history: Content[],
@@ -414,7 +260,133 @@ export const useLiveSession = ({
     ) => {
       if (isConnecting || isSessionActive) return;
       manualStopRef.current = false;
-      lastConnectionParamsRef.current = { history, liveModel, languageCode, voiceName, options };
+      lastHistoryRef.current = history;
+
+      const connect = async () => {
+        if (sessionRef.current) {
+          sessionRef.current.close();
+          sessionRef.current = null;
+        }
+        if (manualStopRef.current) return;
+        setIsConnecting(true);
+
+        stopCurrentPlayback();
+
+        try {
+          const tokenRes = await fetch("/api/live/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+            body: JSON.stringify({ keySelection }),
+          });
+          if (!tokenRes.ok) throw new Error("Could not fetch authentication token.");
+          const { token } = await tokenRes.json();
+
+          const ai = new GoogleGenAI({ apiKey: token, apiVersion: "v1alpha" });
+
+          const currentConfig = getLiveConnectConfig(liveModel, languageCode, voiceName, sessionHandleRef.current);
+
+          const liveSession = await ai.live.connect({
+            model: liveModel.name,
+            config: currentConfig,
+            callbacks: {
+              onopen: () => {
+                setIsConnecting(false);
+                setIsSessionActive(true);
+                onStateChange(true);
+              },
+              onmessage: (message) => {
+                if (message.sessionResumptionUpdate?.resumable && message.sessionResumptionUpdate.newHandle) {
+                  sessionHandleRef.current = message.sessionResumptionUpdate.newHandle;
+                }
+                if (message.goAway?.timeLeft) {
+                  console.log(`Connection will close in ${message.goAway.timeLeft}. Reconnecting...`);
+                  sessionRef.current = null;
+                  if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+                  reconnectTimeoutRef.current = setTimeout(connect, 1000);
+                }
+                if (message.serverContent?.interrupted) {
+                  stopCurrentPlayback();
+                }
+                if (message.serverContent?.modelTurn?.parts) {
+                  const part = message.serverContent.modelTurn.parts[0];
+                  if (part.text) {
+                    accumulatedTextRef.current += part.text;
+                    onInterimText(accumulatedTextRef.current);
+                  }
+                  if (part.inlineData?.data) {
+                    const mimeType = part.inlineData.mimeType;
+                    const rateMatch = mimeType?.match(/rate=(\d+)/);
+                    const incomingSampleRate = rateMatch ? parseInt(rateMatch[1], 10) : OUTPUT_SAMPLE_RATE;
+                    lastPlaybackSampleRateRef.current = incomingSampleRate;
+                    if (
+                      !playbackAudioContextRef.current ||
+                      playbackAudioContextRef.current.sampleRate !== incomingSampleRate
+                    ) {
+                      if (playbackAudioContextRef.current) playbackAudioContextRef.current.close();
+                      playbackAudioContextRef.current = new window.AudioContext({ sampleRate: incomingSampleRate });
+                      nextPlayTimeRef.current = playbackAudioContextRef.current.currentTime;
+                    }
+                    const raw = window.atob(part.inlineData.data);
+                    const rawLength = raw.length;
+                    const array = new Uint8Array(new ArrayBuffer(rawLength));
+                    for (let i = 0; i < rawLength; i++) array[i] = raw.charCodeAt(i);
+                    const int16Array = new Int16Array(array.buffer);
+                    audioBufferChunksRef.current.push(int16Array.buffer);
+                    const float32Array = new Float32Array(int16Array.length);
+                    for (let i = 0; i < int16Array.length; i++) float32Array[i] = int16Array[i] / 32767.0;
+                    if (playbackQueueRef.current.length === 0 && !isPlayingRef.current) {
+                      nextPlayTimeRef.current = playbackAudioContextRef.current.currentTime;
+                    }
+                    playbackQueueRef.current.push(float32Array);
+                    processAndPlayAudio();
+                  }
+                } else if (message.serverContent?.turnComplete) {
+                  processAndPlayAudio(true);
+
+                  const audioBlob =
+                    audioBufferChunksRef.current.length > 0
+                      ? createWavBlob(audioBufferChunksRef.current, lastPlaybackSampleRateRef.current)
+                      : null;
+                  onTurnComplete(accumulatedTextRef.current, audioBlob);
+                  accumulatedTextRef.current = "";
+                  audioBufferChunksRef.current = [];
+                  onInterimText("");
+                }
+              },
+              onerror: (e) => {
+                console.error("Live session error:", e);
+                showToast(e.message, "error");
+                stopSession();
+              },
+              onclose: (e) => {
+                console.log("Live session closed:", e.code, e.reason);
+                sessionRef.current = null;
+                if (!manualStopRef.current && sessionHandleRef.current) {
+                  if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+                  reconnectTimeoutRef.current = setTimeout(connect, 1000);
+                }
+              },
+            },
+          });
+
+          sessionRef.current = liveSession;
+
+          if (history && history.length > 0 && !sessionHandleRef.current) {
+            const historyString = history
+              .map((c) => {
+                const partsText = c.parts?.map((p) => p.text || "").join(" ") || "";
+                return `${c.role}: ${partsText.trim()}`;
+              })
+              .join("\n");
+            const contextPrompt = `Here is our conversation history so far. Use this as context for my next live audio input. Do not respond to this message, just wait for my voice.\n\n--- HISTORY ---\n${historyString}\n--- END HISTORY ---`;
+            sessionRef.current.sendClientContent({ turns: contextPrompt });
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          showToast(message, "error");
+          stopSession();
+        }
+      };
 
       try {
         const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -427,7 +399,6 @@ export const useLiveSession = ({
         }
 
         audioContextRef.current = new window.AudioContext();
-        await audioContextRef.current.resume();
         const source = audioContextRef.current.createMediaStreamSource(audioStream);
         const processorBlob = new Blob([resamplingProcessor], { type: "application/javascript" });
         const processorUrl = URL.createObjectURL(processorBlob);
@@ -438,17 +409,16 @@ export const useLiveSession = ({
         audioWorkletNodeRef.current = workletNode;
 
         workletNode.port.onmessage = (event) => {
-          if (isSessionActiveRef.current && sessionRef.current) {
-            const pcm16Buffer = event.data;
-            let binary = "";
-            const bytes = new Uint8Array(pcm16Buffer);
-            for (let i = 0; i < bytes.byteLength; i++) {
-              binary += String.fromCharCode(bytes[i]);
-            }
-            const base64Audio = btoa(binary);
-            const media: GenaiBlob = { data: base64Audio, mimeType: `audio/pcm;rate=${TARGET_SAMPLE_RATE}` };
-            sessionRef.current.sendRealtimeInput({ media });
+          if (!sessionRef.current) return;
+          const pcm16Buffer = event.data;
+          let binary = "";
+          const bytes = new Uint8Array(pcm16Buffer);
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
           }
+          const base64Audio = btoa(binary);
+          const media: GenaiBlob = { data: base64Audio, mimeType: `audio/pcm;rate=${TARGET_SAMPLE_RATE}` };
+          sessionRef.current.sendRealtimeInput({ media });
         };
 
         source.connect(workletNode);
@@ -461,19 +431,18 @@ export const useLiveSession = ({
           const video = document.createElement("video");
           video.srcObject = videoStreamRef.current;
           video.muted = true;
-          video.play().catch((e) => console.error("Video play error:", e));
+          video.play();
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
           videoFrameIntervalRef.current = setInterval(() => {
-            if (isSessionActiveRef.current && sessionRef.current && ctx && video.videoWidth > 0) {
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-              const base64Data = dataUrl.split(",")[1];
-              const media: GenaiBlob = { data: base64Data, mimeType: "image/jpeg" };
-              sessionRef.current.sendRealtimeInput({ media });
-            }
+            if (!sessionRef.current || !ctx) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 1.0);
+            const base64Data = dataUrl.split(",")[1];
+            const media: GenaiBlob = { data: base64Data, mimeType: "image/jpeg" };
+            sessionRef.current.sendRealtimeInput({ media });
           }, 1000 / VIDEO_FRAME_RATE);
         }
 
@@ -484,7 +453,20 @@ export const useLiveSession = ({
         stopSession();
       }
     },
-    [isConnecting, isSessionActive, onVideoStream, showToast, stopSession, connect],
+    [
+      isConnecting,
+      isSessionActive,
+      onVideoStream,
+      showToast,
+      stopSession,
+      getAuthHeaders,
+      keySelection,
+      onStateChange,
+      onInterimText,
+      stopCurrentPlayback,
+      onTurnComplete,
+      processAndPlayAudio,
+    ],
   );
 
   return { isConnecting, isSessionActive, startSession, stopSession };

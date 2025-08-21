@@ -1271,7 +1271,6 @@ export default function Home() {
 
     let sessionId = activeChatId;
     let isFirstMessageForChatSession = false;
-    const currentMessages = messages;
 
     if (!sessionId) {
       const newChatTitle = `Chat ${
@@ -1288,7 +1287,7 @@ export default function Home() {
       }
       sessionId = newId;
       isFirstMessageForChatSession = true;
-    } else if (currentMessages.length === 0) {
+    } else if (messages.length === 0) {
       isFirstMessageForChatSession = true;
     }
 
@@ -1302,7 +1301,7 @@ export default function Home() {
       role: "user",
       parts: newUserMessageParts,
       id: Date.now(),
-      position: (currentMessages[currentMessages.length - 1]?.position || 0) + 1,
+      position: (messages[messages.length - 1]?.position || 0) + 1,
     };
     const placeholderMessage: Message = {
       role: "model",
@@ -1313,7 +1312,25 @@ export default function Home() {
       position: newUserMessage.position + 1,
     };
 
-    setMessages([...currentMessages, newUserMessage, placeholderMessage]);
+    setMessages((prevMessages) => [...prevMessages, newUserMessage, placeholderMessage]);
+
+    try {
+      const saveRes = await fetch(`/api/chats/${sessionId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ parts: newUserMessageParts }),
+      });
+
+      if (!saveRes.ok) {
+        setMessages((prev) => prev.slice(0, -2));
+        const errorData = await saveRes.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to save your message to the database.");
+      }
+    } catch (err) {
+      showToast(extractErrorMessage(err), "error");
+      setMessages((prev) => prev.slice(0, -2));
+      return;
+    }
 
     if (isFirstMessageForChatSession && inputText.trim()) {
       generateAndSetChatTitle(sessionId, inputText, keySelection, getAuthHeaders, router, showToast, fetchAllChats);
@@ -1321,7 +1338,7 @@ export default function Home() {
 
     await callChatApiAndStreamResponse(
       newUserMessageParts,
-      currentMessages,
+      [...messages, newUserMessage],
       sessionId,
       sendWithSearch,
       thinkingOption,

@@ -6,19 +6,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: [
-          "ui-sans-serif",
-          "-apple-system",
-          "system-ui",
-          "Segoe UI",
-          "Helvetica",
-          "Apple Color Emoji",
-          "Arial",
-          "sans-serif",
-          "Segoe UI Emoji",
-          "Segoe UI Symbol",
-        ],
-        mono: ["ui-monospace", "SFMono-Regular", "SF Mono", "Menlo", "Consolas", "Liberation Mono", "monospace"],
+        sans: ["var(--font-sans)"],
+        mono: ["var(--font-mono)"],
       },
     },
   },

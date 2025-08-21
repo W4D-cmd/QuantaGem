@@ -42,3 +42,11 @@ html.dark .max-h-60.overflow-y-auto,
 html.dark .max-h-96.overflow-y-auto {
   scrollbar-color: #555 transparent;
 }
+
+.prose pre {
+  font-size: 0.8125rem;
+}
+
+.prose :not(pre) > code {
+  font-size: 0.8125rem;
+}

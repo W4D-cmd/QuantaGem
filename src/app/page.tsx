@@ -988,19 +988,128 @@ export default function Home() {
       const ctrl = new AbortController();
       setController(ctrl);
 
-      let accumulatedModelResponse = {
-        parts: [{ type: "text" as const, text: "" }],
-        thoughtSummary: "",
-        sources: [] as Array<{ title: string; uri: string }>,
+      const performFetch = async () => {
+        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+        const budgetValue = budgetMap ? budgetMap[currentThinkingOption] : -1;
+
+        return fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({
+            history: historyForAPI.map((msg) => ({ role: msg.role, parts: msg.parts })),
+            messageParts: userMessageParts,
+            chatSessionId: currentChatId,
+            model: selectedModel?.name,
+            keySelection,
+            isSearchActive: isSearchEnabled,
+            thinkingBudget: budgetValue,
+            isRegeneration,
+          }),
+          signal: ctrl.signal,
+        });
       };
 
-      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        if (ctrl.signal.aborted) {
-          showToast("Response cancelled.", "error");
+      const processSuccessfulResponse = async (res: Response) => {
+        if (!res.body) {
+          showToast("Received an empty response from the server.", "error");
           return null;
         }
 
-        if (attempt > 0) {
+        const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+        let isFirstChunk = true;
+        let textAccumulator = "";
+        let thoughtSummaryAccumulator = "";
+        let streamBuffer = "";
+        const currentSources: Array<{ title: string; uri: string }> = [];
+        let modelReturnedEmptyMessage = false;
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          if (isFirstChunk) {
+            setStreamStarted(true);
+            isFirstChunk = false;
+          }
+
+          streamBuffer += value;
+          const lines = streamBuffer.split("\n");
+          streamBuffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (line.trim() === "") continue;
+            try {
+              const parsedChunk = JSON.parse(line);
+              if (parsedChunk.type === "text") {
+                setIsThinking(false);
+                textAccumulator += parsedChunk.value;
+              } else if (parsedChunk.type === "thought") {
+                thoughtSummaryAccumulator += parsedChunk.value;
+              } else if (parsedChunk.type === "grounding" && parsedChunk.sources) {
+                parsedChunk.sources.forEach((s: { title: string; uri: string }) => {
+                  if (!currentSources.some((existing) => existing.uri === s.uri)) currentSources.push(s);
+                });
+              } else if (parsedChunk.type === "error") {
+                modelReturnedEmptyMessage = true;
+              }
+            } catch (jsonError) {
+              console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
+            }
+          }
+          if (placeholderIdToUpdate) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === placeholderIdToUpdate
+                  ? {
+                      ...msg,
+                      parts: [{ type: "text", text: textAccumulator }],
+                      sources: [...currentSources],
+                      thoughtSummary: thoughtSummaryAccumulator,
+                    }
+                  : msg,
+              ),
+            );
+          }
+        }
+
+        if ((modelReturnedEmptyMessage || textAccumulator.trim() === "") && !ctrl.signal.aborted) {
+          return null;
+        }
+
+        const resultParts: MessagePart[] = [{ type: "text", text: textAccumulator }];
+
+        return {
+          parts: resultParts,
+          thoughtSummary: thoughtSummaryAccumulator,
+          sources: currentSources,
+        };
+      };
+
+      try {
+        const res = await performFetch();
+
+        if (!res.ok) {
+          await showApiErrorToast(res, showToast);
+          const isClientError = res.status >= 400 && res.status < 500;
+          if (isClientError) {
+            return null;
+          }
+        } else {
+          const result = await processSuccessfulResponse(res);
+          if (result) {
+            return result;
+          }
+        }
+
+        for (let attempt = 1; attempt < MAX_RETRIES; attempt++) {
+          if (ctrl.signal.aborted) {
+            showToast("Response cancelled.", "error");
+            return null;
+          }
+
           const backoffDelay = Math.pow(2, attempt) * 400 + Math.random() * 200;
           await new Promise((resolve) => setTimeout(resolve, backoffDelay));
 
@@ -1020,130 +1129,51 @@ export default function Home() {
               ),
             );
           }
-        }
 
-        try {
-          const budgetMap = getThinkingBudgetMap(selectedModel?.name);
-          const budgetValue = budgetMap ? budgetMap[currentThinkingOption] : -1;
+          const retryRes = await performFetch();
 
-          const res = await fetch("/api/chat", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...getAuthHeaders(),
-            },
-            body: JSON.stringify({
-              history: historyForAPI.map((msg) => ({ role: msg.role, parts: msg.parts })),
-              messageParts: userMessageParts,
-              chatSessionId: currentChatId,
-              model: selectedModel?.name,
-              keySelection,
-              isSearchActive: isSearchEnabled,
-              thinkingBudget: budgetValue,
-              isRegeneration,
-            }),
-            signal: ctrl.signal,
-          });
-
-          if (!res.ok) {
-            await showApiErrorToast(res, showToast);
-            const isClientError = res.status >= 400 && res.status < 500;
+          if (!retryRes.ok) {
+            await showApiErrorToast(retryRes, showToast);
+            const isClientError = retryRes.status >= 400 && retryRes.status < 500;
             if (isClientError) {
               return null;
             }
             continue;
           }
 
-          if (!res.body) {
-            showToast("Received an empty response from the server.", "error");
-            continue;
+          const result = await processSuccessfulResponse(retryRes);
+          if (result) {
+            return result;
           }
-
-          const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-          let isFirstChunk = true;
-          let textAccumulator = "";
-          let thoughtSummaryAccumulator = "";
-          let streamBuffer = "";
-          const currentSources: Array<{ title: string; uri: string }> = [];
-          let modelReturnedEmptyMessage = false;
-
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            if (isFirstChunk) {
-              setStreamStarted(true);
-              isFirstChunk = false;
-            }
-
-            streamBuffer += value;
-            const lines = streamBuffer.split("\n");
-            streamBuffer = lines.pop() || "";
-
-            for (const line of lines) {
-              if (line.trim() === "") continue;
-              try {
-                const parsedChunk = JSON.parse(line);
-                if (parsedChunk.type === "text") {
-                  setIsThinking(false);
-                  textAccumulator += parsedChunk.value;
-                } else if (parsedChunk.type === "thought") {
-                  thoughtSummaryAccumulator += parsedChunk.value;
-                } else if (parsedChunk.type === "grounding" && parsedChunk.sources) {
-                  parsedChunk.sources.forEach((s: { title: string; uri: string }) => {
-                    if (!currentSources.some((existing) => existing.uri === s.uri)) currentSources.push(s);
-                  });
-                } else if (parsedChunk.type === "error") {
-                  modelReturnedEmptyMessage = true;
-                }
-              } catch (jsonError) {
-                console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
-              }
-            }
-            if (placeholderIdToUpdate) {
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === placeholderIdToUpdate
-                    ? {
-                        ...msg,
-                        parts: [{ type: "text", text: textAccumulator }],
-                        sources: [...currentSources],
-                        thoughtSummary: thoughtSummaryAccumulator,
-                      }
-                    : msg,
-                ),
-              );
-            }
-          }
-
-          if ((modelReturnedEmptyMessage || textAccumulator.trim() === "") && !ctrl.signal.aborted) {
-            continue;
-          } else {
-            accumulatedModelResponse = {
-              parts: [{ type: "text", text: textAccumulator }],
-              thoughtSummary: thoughtSummaryAccumulator,
-              sources: currentSources,
-            };
-            setIsThinking(false);
-            setController(null);
-            return accumulatedModelResponse;
-          }
-        } catch (error: unknown) {
-          if (!(error instanceof DOMException && error.name === "AbortError")) {
-            showToast(error instanceof Error ? error.message : "An unexpected error occurred.", "error");
-          }
-          return null;
         }
-      }
 
-      if (!ctrl.signal.aborted) {
-        showToast(`Response could not be received after ${MAX_RETRIES} attempts. Please adjust your request.`, "error");
+        if (!ctrl.signal.aborted) {
+          showToast(
+            `Response could not be received after ${MAX_RETRIES} attempts. Please adjust your request.`,
+            "error",
+          );
+        }
+        return null;
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          showToast(error instanceof Error ? error.message : "An unexpected error occurred.", "error");
+        }
+        return null;
+      } finally {
+        setIsThinking(false);
+        setController(null);
       }
-      setIsThinking(false);
-      setController(null);
-      return null;
     },
-    [getAuthHeaders, selectedModel, keySelection, router, showToast, messages],
+    [
+      getAuthHeaders,
+      selectedModel,
+      keySelection,
+      showToast,
+      setStreamStarted,
+      setIsThinking,
+      setController,
+      setMessages,
+    ],
   );
 
   const handleSendMessage = async (inputText: string, uploadedFiles: UploadedFileInfo[], sendWithSearch: boolean) => {

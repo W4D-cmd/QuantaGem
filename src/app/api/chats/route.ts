@@ -30,30 +30,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(rows);
 }
 
-export async function POST(request: NextRequest) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
-  }
-  const userId = user.id.toString();
-
-  const { title, keySelection: initialKeySelection, projectId, thinkingBudget } = await request.json();
-  const actualKeySelection = initialKeySelection || "free";
-  const actualThinkingBudget = typeof thinkingBudget === "number" ? thinkingBudget : -1;
-
-  if (projectId && typeof projectId !== "number") {
-    return NextResponse.json({ error: "Invalid projectId format" }, { status: 400 });
-  }
-
-  const { rows } = await pool.query(
-    `INSERT INTO chat_sessions (user_id, title, last_model, key_selection, project_id, thinking_budget)
-     VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection", project_id AS "projectId", updated_at as "updatedAt", thinking_budget as "thinkingBudget"`,
-    [userId, title, "", actualKeySelection, projectId, actualThinkingBudget],
-  );
-  return NextResponse.json(rows[0]);
-}
-
 export async function DELETE(request: NextRequest) {
   const user = await getUserFromToken(request);
   if (!user) {

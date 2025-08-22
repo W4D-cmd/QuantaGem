@@ -4,58 +4,6 @@ import { getUserFromToken } from "@/lib/auth";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ chatSessionId: string }> }) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
-  }
-  const userId = user.id.toString();
-
-  const { chatSessionId } = await params;
-  const { parts } = (await request.json()) as { parts: MessagePart[] };
-
-  if (!parts || parts.length === 0) {
-    return NextResponse.json({ error: "Cannot save an empty message." }, { status: 400 });
-  }
-
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-
-    const chatOwnerCheck = await client.query(`SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2`, [
-      chatSessionId,
-      userId,
-    ]);
-
-    if (chatOwnerCheck.rowCount === 0) {
-      await client.query("ROLLBACK");
-      return NextResponse.json({ error: "Chat session not found or not owned by user" }, { status: 404 });
-    }
-
-    const content = parts
-      .filter((p) => p.type === "text" && p.text)
-      .map((p) => p.text)
-      .join(" ");
-
-    const { rows } = await client.query(
-      `INSERT INTO messages (chat_session_id, role, content, parts, position)
-       VALUES ($1, 'user', $2, $3, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1))
-         RETURNING *`,
-      [chatSessionId, content, JSON.stringify(parts)],
-    );
-
-    await client.query("COMMIT");
-    return NextResponse.json(rows[0], { status: 201 });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error(`Error saving new message for chat session ${chatSessionId}:`, error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-    return NextResponse.json({ error: "Failed to save message", details: errorMessage }, { status: 500 });
-  } finally {
-    client.release();
-  }
-}
-
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {

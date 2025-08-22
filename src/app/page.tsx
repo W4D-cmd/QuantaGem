@@ -217,7 +217,6 @@ export default function Home() {
   const [allProjects, setAllProjects] = useState<ProjectListItem[]>([]);
   const [displayingProjectManagementId, setDisplayingProjectManagementId] = useState<number | null>(null);
   const [currentChatProjectId, setCurrentChatProjectId] = useState<number | null>(null);
-  const [isNewChatJustCreated, setIsNewChatJustCreated] = useState(false);
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
   const [totalTokens, setTotalTokens] = useState<number | null>(null);
   const [isCountingTokens, setIsCountingTokens] = useState(false);
@@ -726,78 +725,22 @@ export default function Home() {
     [getAuthHeaders, router, fetchAllChats, setActiveChatId, setDisplayingProjectManagementId, showToast],
   );
 
-  const createChat = useCallback(
-    async (title: string, keySelection: "free" | "paid", projectId: number | null, thinkingBudget: number) => {
-      try {
-        const res = await fetch("/api/chats", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeaders(),
-          },
-          body: JSON.stringify({
-            title: title,
-            keySelection,
-            projectId,
-            thinkingBudget,
-          }),
-        });
-        if (res.status === 401) {
-          router.replace("/login");
-          return null;
-        }
-        if (!res.ok) {
-          let errorData;
-          try {
-            errorData = await res.json();
-          } catch (e) {
-            errorData = { error: `Failed to create new chat session: ${res.statusText}` };
-          }
-          throw new Error(errorData.error || `Failed to create new chat session: ${res.statusText}`);
-        }
-        const newChat: ChatListItem = await res.json();
-        setAllChats((prev) => [newChat, ...prev]);
-        setActiveChatId(newChat.id);
-        setIsNewChatJustCreated(true);
-        return newChat.id;
-      } catch (err) {
-        showToast(extractErrorMessage(err), "error");
-        return null;
-      }
-    },
-    [getAuthHeaders, router, setAllChats, setActiveChatId, showToast, setIsNewChatJustCreated],
-  );
-
-  const handleNewChat = useCallback(
-    async (projectId: number | null = null) => {
-      setCurrentChatProjectId(projectId);
-      setEditingMessage(null);
-      setThinkingOption("dynamic");
-
-      if (projectId !== null) {
-        const newTitle = `Chat ${allChats.filter((chat) => chat.projectId === projectId).length + 1}`;
-        const newChatId = await createChat(newTitle, keySelection, projectId, -1);
-
-        if (newChatId) {
-          setActiveChatId(newChatId);
-          setDisplayingProjectManagementId(null);
-
-          setExpandedProjects((prev: Set<number>) => {
-            const newSet = new Set(prev);
-            newSet.add(projectId);
-            return newSet;
-          });
-        } else {
-          setActiveChatId(null);
-          setDisplayingProjectManagementId(projectId);
-        }
-      } else {
-        setActiveChatId(null);
-        setDisplayingProjectManagementId(null);
-      }
-    },
-    [allChats, keySelection, createChat],
-  );
+  const handleNewChat = useCallback(async (projectId: number | null = null) => {
+    setActiveChatId(null);
+    setEditingMessage(null);
+    setMessages([]);
+    setCurrentChatProjectId(projectId);
+    setDisplayingProjectManagementId(null);
+    setTotalTokens(0);
+    setThinkingOption("dynamic");
+    if (projectId) {
+      setExpandedProjects((prev: Set<number>) => {
+        const newSet = new Set(prev);
+        newSet.add(projectId);
+        return newSet;
+      });
+    }
+  }, []);
 
   const loadChat = useCallback(
     async (chatId: number) => {
@@ -1014,7 +957,6 @@ export default function Home() {
       }
       prevActiveChatIdRef.current = null;
       prevDisplayingProjectManagementIdRef.current = null;
-      setIsNewChatJustCreated(false);
       return;
     }
 
@@ -1044,14 +986,10 @@ export default function Home() {
           setThinkingOption("dynamic");
         }
 
-        if (isNewChatJustCreated) {
-          setIsNewChatJustCreated(false);
-        } else {
-          setIsLoading(true);
-          loadChat(activeChatId).finally(() => {
-            setIsLoading(false);
-          });
-        }
+        setIsLoading(true);
+        loadChat(activeChatId).finally(() => {
+          setIsLoading(false);
+        });
       }
       prevActiveChatIdRef.current = activeChatId;
       prevDisplayingProjectManagementIdRef.current = null;
@@ -1063,21 +1001,11 @@ export default function Home() {
         setKeySelection("free");
         setTotalTokens(null);
         setThinkingOption("dynamic");
-        setIsNewChatJustCreated(false);
       }
       prevDisplayingProjectManagementIdRef.current = displayingProjectManagementId;
       prevActiveChatIdRef.current = null;
     }
-  }, [
-    activeChatId,
-    displayingProjectManagementId,
-    allChats,
-    models,
-    selectedModel,
-    loadChat,
-    isLoading,
-    isNewChatJustCreated,
-  ]);
+  }, [activeChatId, displayingProjectManagementId, allChats, models, selectedModel, loadChat, isLoading]);
 
   const handleCancel = () => {
     controller?.abort();
@@ -1088,28 +1016,36 @@ export default function Home() {
     async (
       userMessageParts: MessagePart[],
       historyForAPI: Message[],
-      currentChatId: number,
+      currentChatId: number | null,
       isSearchEnabled: boolean,
       currentThinkingOption: ThinkingOption,
       isRegeneration = false,
       placeholderIdToUpdate?: number,
-    ) => {
+    ): Promise<{
+      parts: MessagePart[];
+      thoughtSummary: string;
+      sources: Array<{ title: string; uri: string }>;
+    } | null> => {
       if (placeholderIdToUpdate) {
         messages.findIndex((m) => m.id === placeholderIdToUpdate);
       }
 
-      setIsLoading(true);
       setStreamStarted(false);
       setIsThinking(true);
 
       const ctrl = new AbortController();
       setController(ctrl);
 
-      let success = false;
+      let accumulatedModelResponse = {
+        parts: [{ type: "text" as const, text: "" }],
+        thoughtSummary: "",
+        sources: [] as Array<{ title: string; uri: string }>,
+      };
+
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         if (ctrl.signal.aborted) {
           showToast("Response cancelled.", "error");
-          break;
+          return null;
         }
 
         if (attempt > 0) {
@@ -1118,16 +1054,15 @@ export default function Home() {
 
           if (ctrl.signal.aborted) {
             showToast("Response cancelled during retry delay.", "error");
-            break;
+            return null;
           }
 
           showToast(`Response incomplete, try again... (Attempt ${attempt + 1} of ${MAX_RETRIES})`, "error");
 
-          const messageIdToUpdate = placeholderIdToUpdate;
-          if (messageIdToUpdate) {
+          if (placeholderIdToUpdate) {
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === messageIdToUpdate
+                msg.id === placeholderIdToUpdate
                   ? { ...msg, parts: [{ type: "text", text: "" }], sources: [], thoughtSummary: "" }
                   : msg,
               ),
@@ -1160,7 +1095,7 @@ export default function Home() {
 
           if (res.status === 401) {
             router.replace("/login");
-            return;
+            return null;
           }
 
           if (!res.ok || !res.body) {
@@ -1214,11 +1149,10 @@ export default function Home() {
                 console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
               }
             }
-            const messageIdToUpdate = placeholderIdToUpdate;
-            if (messageIdToUpdate) {
+            if (placeholderIdToUpdate) {
               setMessages((prev) =>
                 prev.map((msg) =>
-                  msg.id === messageIdToUpdate
+                  msg.id === placeholderIdToUpdate
                     ? {
                         ...msg,
                         parts: [{ type: "text", text: textAccumulator }],
@@ -1234,8 +1168,14 @@ export default function Home() {
           if ((modelReturnedEmptyMessage || textAccumulator.trim() === "") && !ctrl.signal.aborted) {
             continue;
           } else {
-            success = true;
-            break;
+            accumulatedModelResponse = {
+              parts: [{ type: "text", text: textAccumulator }],
+              thoughtSummary: thoughtSummaryAccumulator,
+              sources: currentSources,
+            };
+            setIsThinking(false);
+            setController(null);
+            return accumulatedModelResponse;
           }
         } catch (error: unknown) {
           if (!(error instanceof DOMException && error.name === "AbortError")) {
@@ -1245,21 +1185,14 @@ export default function Home() {
         }
       }
 
-      if (success) {
-        await loadChat(currentChatId);
-      } else if (!ctrl.signal.aborted) {
+      if (!ctrl.signal.aborted) {
         showToast(`Response could not be received after ${MAX_RETRIES} attempts. Please adjust your request.`, "error");
-        if (placeholderIdToUpdate) {
-          setMessages((prev) => prev.filter((msg) => msg.id !== placeholderIdToUpdate));
-        }
       }
-
-      setIsLoading(false);
       setIsThinking(false);
       setController(null);
-      await fetchAllChats();
+      return null;
     },
-    [getAuthHeaders, selectedModel, keySelection, router, loadChat, fetchAllChats, showToast, messages],
+    [getAuthHeaders, selectedModel, keySelection, router, showToast, messages],
   );
 
   const handleSendMessage = async (inputText: string, uploadedFiles: UploadedFileInfo[], sendWithSearch: boolean) => {
@@ -1268,28 +1201,7 @@ export default function Home() {
       showToast("No model selected or available. Please check model list or API key.", "error");
       return;
     }
-
-    let sessionId = activeChatId;
-    let isFirstMessageForChatSession = false;
-
-    if (!sessionId) {
-      const newChatTitle = `Chat ${
-        currentChatProjectId
-          ? allChats.filter((c) => c.projectId === currentChatProjectId).length + 1
-          : allChats.filter((c) => c.projectId === null).length + 1
-      }`;
-      const budgetMap = getThinkingBudgetMap(selectedModel?.name);
-      const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
-      const newId = await createChat(newChatTitle, keySelection, currentChatProjectId, budgetValue);
-      if (!newId) {
-        setIsLoading(false);
-        return;
-      }
-      sessionId = newId;
-      isFirstMessageForChatSession = true;
-    } else if (messages.length === 0) {
-      isFirstMessageForChatSession = true;
-    }
+    const isNewChat = activeChatId === null;
 
     const newUserMessageParts: MessagePart[] = [];
     if (inputText.trim()) {
@@ -1312,39 +1224,61 @@ export default function Home() {
       position: newUserMessage.position + 1,
     };
 
+    const previousMessages = [...messages];
     setMessages((prevMessages) => [...prevMessages, newUserMessage, placeholderMessage]);
+    setIsLoading(true);
 
-    try {
-      const saveRes = await fetch(`/api/chats/${sessionId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ parts: newUserMessageParts }),
-      });
-
-      if (!saveRes.ok) {
-        setMessages((prev) => prev.slice(0, -2));
-        const errorData = await saveRes.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to save your message to the database.");
-      }
-    } catch (err) {
-      showToast(extractErrorMessage(err), "error");
-      setMessages((prev) => prev.slice(0, -2));
-      return;
-    }
-
-    if (isFirstMessageForChatSession && inputText.trim()) {
-      generateAndSetChatTitle(sessionId, inputText, keySelection, getAuthHeaders, router, showToast, fetchAllChats);
-    }
-
-    await callChatApiAndStreamResponse(
+    const modelResponse = await callChatApiAndStreamResponse(
       newUserMessageParts,
-      [...messages, newUserMessage],
-      sessionId,
+      [...previousMessages, newUserMessage],
+      activeChatId,
       sendWithSearch,
       thinkingOption,
       false,
       placeholderMessage.id,
     );
+
+    if (modelResponse) {
+      try {
+        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+        const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
+
+        const persistRes = await fetch("/api/chats/persist-turn", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+          body: JSON.stringify({
+            chatSessionId: activeChatId,
+            userMessageParts: newUserMessageParts,
+            modelMessageParts: modelResponse.parts,
+            modelThoughtSummary: modelResponse.thoughtSummary || null,
+            modelSources: modelResponse.sources,
+            keySelection,
+            modelName: selectedModel.name,
+            projectId: currentChatProjectId,
+            thinkingBudget: budgetValue,
+          }),
+        });
+
+        if (!persistRes.ok) {
+          const errorData = await persistRes.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to save conversation to the database.");
+        }
+
+        const { newChatId } = await persistRes.json();
+        await fetchAllChats();
+        setActiveChatId(newChatId);
+
+        if (isNewChat && inputText.trim()) {
+          generateAndSetChatTitle(newChatId, inputText, keySelection, getAuthHeaders, router, showToast, fetchAllChats);
+        }
+      } catch (err) {
+        showToast(extractErrorMessage(err), "error");
+        setMessages(previousMessages);
+      }
+    } else {
+      setMessages(previousMessages);
+    }
+    setIsLoading(false);
   };
 
   const handleLiveSessionTurnComplete = async (text: string, audioBlob: Blob | null) => {
@@ -1459,7 +1393,7 @@ export default function Home() {
 
       setMessages([...historyForAPI, updatedUserMessage, placeholderMessage]);
 
-      await callChatApiAndStreamResponse(
+      const modelResponse = await callChatApiAndStreamResponse(
         newUserMessageParts,
         historyForAPI,
         activeChatId,
@@ -1468,9 +1402,28 @@ export default function Home() {
         true,
         placeholderMessage.id,
       );
+
+      if (modelResponse) {
+        const persistRes = await fetch(`/api/chats/${activeChatId}/append-model-message`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+          body: JSON.stringify({
+            modelMessageParts: modelResponse.parts,
+            modelThoughtSummary: modelResponse.thoughtSummary || null,
+            modelSources: modelResponse.sources,
+          }),
+        });
+
+        if (!persistRes.ok) {
+          const errorData = await persistRes.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to save model response after edit.");
+        }
+      }
+
+      await loadChat(activeChatId);
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");
-      loadChat(activeChatId);
+      await loadChat(activeChatId);
     } finally {
       setIsLoading(false);
     }
@@ -1504,8 +1457,8 @@ export default function Home() {
         throw new Error(errorData.error || "Failed to delete message for regeneration.");
       }
 
-      const historyForAPI = messages.slice(0, userMessageIndex);
-      const currentMessages = messages.slice(0, userMessageIndex + 1);
+      const historyForAPI = messages.slice(0, userMessageIndex + 1);
+      const currentMessages = messages.slice(0, modelMessageIndex);
 
       const placeholderMessage: Message = {
         role: "model",
@@ -1518,7 +1471,7 @@ export default function Home() {
 
       setMessages([...currentMessages, placeholderMessage]);
 
-      await callChatApiAndStreamResponse(
+      const modelResponse = await callChatApiAndStreamResponse(
         userMessageToResend.parts,
         historyForAPI,
         activeChatId,
@@ -1527,9 +1480,27 @@ export default function Home() {
         true,
         placeholderMessage.id,
       );
+
+      if (modelResponse) {
+        const persistRes = await fetch(`/api/chats/${activeChatId}/append-model-message`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+          body: JSON.stringify({
+            modelMessageParts: modelResponse.parts,
+            modelThoughtSummary: modelResponse.thoughtSummary || null,
+            modelSources: modelResponse.sources,
+          }),
+        });
+
+        if (!persistRes.ok) {
+          const errorData = await persistRes.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to save regenerated model response.");
+        }
+      }
+      await loadChat(activeChatId);
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");
-      loadChat(activeChatId);
+      await loadChat(activeChatId);
     } finally {
       setIsLoading(false);
     }

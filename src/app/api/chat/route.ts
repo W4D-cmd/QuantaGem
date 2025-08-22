@@ -281,9 +281,6 @@ export async function POST(request: NextRequest) {
   if (!apiKey) {
     return NextResponse.json({ error: `${keySelection.toUpperCase()}_GOOGLE_API_KEY not configured` }, { status: 500 });
   }
-  if (!chatSessionId) {
-    return NextResponse.json({ error: "chatSessionId missing" }, { status: 400 });
-  }
   if (!model) {
     return NextResponse.json({ error: "model missing" }, { status: 400 });
   }
@@ -441,23 +438,25 @@ export async function POST(request: NextRequest) {
 
     let systemPromptText: string | null = null;
     try {
-      const chatSettingsResult = await pool.query(
-        "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
-        [chatSessionId, userId],
-      );
-
-      const chatSpecificPrompt = chatSettingsResult.rows[0]?.system_prompt?.trim();
-      const associatedProjectId = chatSettingsResult.rows[0]?.project_id;
-
-      if (chatSpecificPrompt) {
-        systemPromptText = chatSpecificPrompt;
-      } else if (associatedProjectId) {
-        const projectSettingsResult = await pool.query(
-          "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
-          [associatedProjectId, userId],
+      if (chatSessionId) {
+        const chatSettingsResult = await pool.query(
+          "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
+          [chatSessionId, userId],
         );
-        if (projectSettingsResult.rows.length > 0 && projectSettingsResult.rows[0].system_prompt?.trim() !== "") {
-          systemPromptText = projectSettingsResult.rows[0].system_prompt;
+
+        const chatSpecificPrompt = chatSettingsResult.rows[0]?.system_prompt?.trim();
+        const associatedProjectId = chatSettingsResult.rows[0]?.project_id;
+
+        if (chatSpecificPrompt) {
+          systemPromptText = chatSpecificPrompt;
+        } else if (associatedProjectId) {
+          const projectSettingsResult = await pool.query(
+            "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
+            [associatedProjectId, userId],
+          );
+          if (projectSettingsResult.rows.length > 0 && projectSettingsResult.rows[0].system_prompt?.trim() !== "") {
+            systemPromptText = projectSettingsResult.rows[0].system_prompt;
+          }
         }
       }
 
@@ -574,30 +573,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        if (modelOutput.trim() !== "") {
-          await pool.query(
-            `INSERT INTO messages (chat_session_id, role, content, parts, position, sources, thought_summary)
-             VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $5, $6)`,
-            [
-              chatSessionId,
-              "model",
-              modelOutput,
-              JSON.stringify([{ type: "text", text: modelOutput }]),
-              JSON.stringify(sourcesToStore),
-              thoughtSummaryOutput || null,
-            ],
-          );
-          await pool.query(
-            `UPDATE chat_sessions
-             SET last_model = $2,
-                 key_selection = $3,
-                 thinking_budget = $5,
-                 updated_at = now()
-             WHERE id = $1
-               AND user_id = $4`,
-            [chatSessionId, model, keySelection, userId, thinkingBudget],
-          );
-        } else {
+        if (modelOutput.trim() === "") {
           console.warn(
             `Gemini model returned an empty message (thoughts received: ${thoughtSummaryOutput.trim() !== ""}). Not saving to DB.`,
           );

@@ -3,12 +3,9 @@ import { pool } from "@/lib/db";
 import { getUserFromToken } from "@/lib/auth";
 import { MessagePart } from "@/app/page";
 
-interface PersistTurnRequest {
+interface PersistUserMessageRequest {
   chatSessionId: number | null;
   userMessageParts: MessagePart[];
-  modelMessageParts: MessagePart[];
-  modelThoughtSummary: string | null;
-  modelSources: Array<{ title: string; uri: string }>;
   keySelection: "free" | "paid";
   modelName: string;
   projectId: number | null;
@@ -22,17 +19,8 @@ export async function POST(request: NextRequest) {
   }
   const userId = user.id.toString();
 
-  const {
-    chatSessionId,
-    userMessageParts,
-    modelMessageParts,
-    modelThoughtSummary,
-    modelSources,
-    keySelection,
-    modelName,
-    projectId,
-    thinkingBudget,
-  } = (await request.json()) as PersistTurnRequest;
+  const { chatSessionId, userMessageParts, keySelection, modelName, projectId, thinkingBudget } =
+    (await request.json()) as PersistUserMessageRequest;
 
   const client = await pool.connect();
   try {
@@ -68,32 +56,14 @@ export async function POST(request: NextRequest) {
       .map((p) => p.text)
       .join(" ");
 
-    const modelContent = modelMessageParts
-      .filter((p) => p.type === "text" && p.text)
-      .map((p) => p.text)
-      .join(" ");
-
     const userMessageResult = await client.query(
       `INSERT INTO messages (chat_session_id, role, content, parts, position)
        VALUES ($1, 'user', $2, $3, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1))
        RETURNING id, position, role, parts, sources, thought_summary as "thoughtSummary"`,
       [currentChatId, userContent, JSON.stringify(userMessageParts)],
     );
-    const savedUserMessage = userMessageResult.rows[0];
 
-    const modelMessageResult = await client.query(
-      `INSERT INTO messages (chat_session_id, role, content, parts, position, sources, thought_summary)
-       VALUES ($1, 'model', $2, $3, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $4, $5)
-       RETURNING id, position, role, parts, sources, thought_summary as "thoughtSummary"`,
-      [
-        currentChatId,
-        modelContent,
-        JSON.stringify(modelMessageParts),
-        JSON.stringify(modelSources),
-        modelThoughtSummary,
-      ],
-    );
-    const savedModelMessage = modelMessageResult.rows[0];
+    const savedUserMessage = userMessageResult.rows[0];
 
     await client.query(`UPDATE chat_sessions SET updated_at = now(), last_model = $2 WHERE id = $1 AND user_id = $3`, [
       currentChatId,
@@ -106,13 +76,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       newChatId: currentChatId,
       userMessage: savedUserMessage,
-      modelMessage: savedModelMessage,
     });
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("Error persisting conversation turn:", error);
+    console.error("Error persisting user message:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-    return NextResponse.json({ error: "Failed to save conversation", details: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: "Failed to save user message", details: errorMessage }, { status: 500 });
   } finally {
     client.release();
   }

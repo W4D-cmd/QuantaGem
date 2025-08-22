@@ -28,6 +28,7 @@ import { liveModels, LiveModel } from "@/lib/live-models";
 import { dialogVoices, standardVoices } from "@/lib/voices";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThinkingOption, getThinkingConfigForModel, getThinkingBudgetMap, getThinkingValueMap } from "@/lib/thinking";
+import { showApiErrorToast } from "@/lib/errors";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
 const TITLE_GENERATION_MAX_LENGTH = 30000;
@@ -150,13 +151,8 @@ async function generateAndSetChatTitle(
       return;
     }
     if (!res.ok) {
-      let errorData;
-      try {
-        errorData = await res.json();
-      } catch (e) {
-        errorData = { error: `Failed to generate title: ${res.statusText}` };
-      }
-      throw new Error(errorData.error || `Failed to generate title: ${res.statusText}`);
+      await showApiErrorToast(res, showToast);
+      return;
     }
 
     const { title } = await res.json();
@@ -175,13 +171,8 @@ async function generateAndSetChatTitle(
       return;
     }
     if (!patchRes.ok) {
-      let errorData;
-      try {
-        errorData = await res.json();
-      } catch (e) {
-        errorData = { error: `Failed to update chat title: ${patchRes.statusText}` };
-      }
-      throw new Error(errorData.error || `Failed to update chat title: ${patchRes.statusText}`);
+      await showApiErrorToast(patchRes, showToast);
+      return;
     }
 
     await fetchAllChats();
@@ -339,8 +330,9 @@ export default function Home() {
         });
 
         if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.error || "Failed to count tokens");
+          await showApiErrorToast(res, showToast);
+          setTotalTokens(null);
+          return;
         }
 
         const { totalTokens } = await res.json();
@@ -352,7 +344,7 @@ export default function Home() {
         setIsCountingTokens(false);
       }
     },
-    [getAuthHeaders],
+    [getAuthHeaders, showToast],
   );
 
   useEffect(() => {
@@ -370,7 +362,10 @@ export default function Home() {
         router.replace("/login");
         return;
       }
-      if (!res.ok) throw new Error("Failed to fetch projects.");
+      if (!res.ok) {
+        await showApiErrorToast(res, showToast);
+        return;
+      }
       const list: ProjectListItem[] = await res.json();
       setAllProjects(list);
     } catch (err: unknown) {
@@ -408,7 +403,9 @@ export default function Home() {
           return;
         }
         if (!res.ok) {
-          throw new Error("Failed to fetch user information.");
+          await showApiErrorToast(res, showToast);
+          router.replace("/login");
+          return;
         }
         const data = await res.json();
         setUserEmail(data.email);
@@ -464,20 +461,16 @@ export default function Home() {
         router.replace("/login");
         return;
       }
-      if (!res.ok) throw new Error("Failed to fetch chats.");
+      if (!res.ok) {
+        await showApiErrorToast(res, showToast);
+        return;
+      }
       const list: ChatListItem[] = await res.json();
       setAllChats(list);
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");
     }
   }, [getAuthHeaders, router, showToast]);
-
-  useEffect(() => {
-    if (userEmail) {
-      fetchAllChats();
-      fetchAllProjects();
-    }
-  }, [fetchAllChats, fetchAllProjects, userEmail]);
 
   useEffect(() => {
     if (userEmail) {
@@ -579,17 +572,17 @@ export default function Home() {
       .then(async (res) => {
         if (res.status === 401) {
           router.replace("/login");
-          throw new Error("Unauthorized to fetch models.");
+          return;
         }
         if (!res.ok) {
-          const errorData = await res.json().catch(() => ({
-            error: `Failed to fetch models: HTTP ${res.status}`,
-          }));
-          throw new Error(errorData.error || `Failed to fetch models: HTTP ${res.status}`);
+          await showApiErrorToast(res, showToast);
+          return [];
         }
         return res.json();
       })
-      .then((list: Model[]) => {
+      .then((list: Model[] | undefined) => {
+        if (!list) return;
+
         setModels(list);
         if (list.length === 0) {
           setSelectedModel(null);
@@ -606,12 +599,12 @@ export default function Home() {
         });
       })
       .catch((err) => {
-        showToast(extractErrorMessage(err), "error");
         if (err.message.includes("Unauthorized")) {
-        } else {
-          setModels([]);
-          setSelectedModel(null);
+          return;
         }
+        showToast(extractErrorMessage(err), "error");
+        setModels([]);
+        setSelectedModel(null);
       });
   }, [keySelection, getAuthHeaders, router, userEmail, showToast]);
 
@@ -630,20 +623,13 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        let errorData;
-        try {
-          errorData = await res.json();
-        } catch (e) {
-          errorData = { error: `Failed to rename chat: ${res.statusText}` };
-        }
-        throw new Error(errorData.error || `Failed to rename chat: ${res.statusText}`);
+        await showApiErrorToast(res, showToast);
+        return;
       }
       await fetchAllChats();
       showToast("Chat renamed.", "success");
     } catch (err: unknown) {
-      const message = extractErrorMessage(err);
-      showToast(message, "error");
-      return;
+      showToast(extractErrorMessage(err), "error");
     }
     setAllChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, title: newTitle } : c)));
   };
@@ -668,17 +654,11 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        let errorData;
-        try {
-          errorData = await res.json();
-        } catch (e) {
-          errorData = { error: `Failed to delete chat: ${res.statusText}` };
-        }
-        throw new Error(errorData.error || `Failed to delete chat: ${res.statusText}`);
+        await showApiErrorToast(res, showToast);
+        return;
       }
     } catch (err: unknown) {
-      const message = extractErrorMessage(err);
-      showToast(message, "error");
+      showToast(extractErrorMessage(err), "error");
       return;
     }
 
@@ -705,13 +685,8 @@ export default function Home() {
           return;
         }
         if (!res.ok) {
-          let errorData;
-          try {
-            errorData = await res.json();
-          } catch (e) {
-            errorData = { error: `Failed to duplicate chat: ${res.statusText}` };
-          }
-          throw new Error(errorData.error || `Failed to duplicate chat: ${res.statusText}`);
+          await showApiErrorToast(res, showToast);
+          return;
         }
         const newChat: ChatListItem = await res.json();
         await fetchAllChats();
@@ -763,13 +738,8 @@ export default function Home() {
             setTotalTokens(null);
             setThinkingOption("dynamic");
           }
-          let errorData;
-          try {
-            errorData = await res.json();
-          } catch (e) {
-            errorData = { error: `Failed to load chat: ${res.statusText}` };
-          }
-          throw new Error(errorData.error || `Failed to load chat: ${res.statusText}`);
+          await showApiErrorToast(res, showToast);
+          return;
         }
         const data: {
           messages: Message[];
@@ -787,8 +757,7 @@ export default function Home() {
         setCurrentChatProjectId(data.projectId);
         setThinkingOption(modelValueMap?.[data.thinkingBudget] || "dynamic");
       } catch (err: unknown) {
-        const message = extractErrorMessage(err);
-        showToast(message, "error");
+        showToast(extractErrorMessage(err), "error");
       } finally {
         setIsLoading(false);
       }
@@ -843,13 +812,8 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        let errorData;
-        try {
-          errorData = await res.json();
-        } catch (e) {
-          errorData = { error: `Failed to create new project: ${res.statusText}` };
-        }
-        throw new Error(errorData.error || `Failed to create new project: ${res.statusText}`);
+        await showApiErrorToast(res, showToast);
+        return;
       }
       const newProject: ProjectListItem = await res.json();
       setAllProjects((prev) => [newProject, ...prev]);
@@ -878,19 +842,13 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        let errorData;
-        try {
-          errorData = await res.json();
-        } catch (e) {
-          errorData = { error: `Failed to rename project: ${res.statusText}` };
-        }
-        throw new Error(errorData.error || `Failed to rename project: ${res.statusText}`);
+        await showApiErrorToast(res, showToast);
+        return;
       }
       await fetchAllChats();
       showToast("Project renamed.", "success");
     } catch (err: unknown) {
-      const message = extractErrorMessage(err);
-      showToast(message, "error");
+      showToast(extractErrorMessage(err), "error");
       return;
     }
     setAllProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, title: newTitle } : p)));
@@ -917,17 +875,11 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        let errorData;
-        try {
-          errorData = await res.json();
-        } catch (e) {
-          errorData = { error: `Failed to delete project: ${res.statusText}` };
-        }
-        throw new Error(errorData.error || `Failed to delete project: ${res.statusText}`);
+        await showApiErrorToast(res, showToast);
+        return;
       }
     } catch (err: unknown) {
-      const message = extractErrorMessage(err);
-      showToast(message, "error");
+      showToast(extractErrorMessage(err), "error");
       return;
     }
 
@@ -1057,7 +1009,7 @@ export default function Home() {
             return null;
           }
 
-          showToast(`Response incomplete, try again... (Attempt ${attempt + 1} of ${MAX_RETRIES})`, "error");
+          showToast(`Response incomplete, trying again... (Attempt ${attempt + 1} of ${MAX_RETRIES})`, "error");
 
           if (placeholderIdToUpdate) {
             setMessages((prev) =>
@@ -1093,19 +1045,18 @@ export default function Home() {
             signal: ctrl.signal,
           });
 
-          if (res.status === 401) {
-            router.replace("/login");
-            return null;
+          if (!res.ok) {
+            await showApiErrorToast(res, showToast);
+            const isClientError = res.status >= 400 && res.status < 500;
+            if (isClientError) {
+              return null;
+            }
+            continue;
           }
 
-          if (!res.ok || !res.body) {
-            let errorData = { error: `API request failed with status ${res.status}` };
-            if (res.body) {
-              try {
-                errorData = await res.json();
-              } catch {}
-            }
-            throw new Error(errorData.error || `API request failed with status ${res.status}`);
+          if (!res.body) {
+            showToast("Received an empty response from the server.", "error");
+            continue;
           }
 
           const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -1181,7 +1132,7 @@ export default function Home() {
           if (!(error instanceof DOMException && error.name === "AbortError")) {
             showToast(error instanceof Error ? error.message : "An unexpected error occurred.", "error");
           }
-          break;
+          return null;
         }
       }
 
@@ -1209,18 +1160,20 @@ export default function Home() {
     }
     uploadedFiles.forEach((file) => newUserMessageParts.push({ type: "file", ...file }));
 
+    const tempUserMessageId = Date.now();
     const newUserMessage: Message = {
       role: "user",
       parts: newUserMessageParts,
-      id: Date.now(),
+      id: tempUserMessageId,
       position: (messages[messages.length - 1]?.position || 0) + 1,
     };
+    const tempModelMessageId = tempUserMessageId + 1;
     const placeholderMessage: Message = {
       role: "model",
       parts: [{ type: "text", text: "" }],
       sources: [],
       thoughtSummary: "",
-      id: Date.now() + 1,
+      id: tempModelMessageId,
       position: newUserMessage.position + 1,
     };
 
@@ -1260,13 +1213,21 @@ export default function Home() {
         });
 
         if (!persistRes.ok) {
-          const errorData = await persistRes.json().catch(() => ({}));
-          throw new Error(errorData.error || "Failed to save conversation to the database.");
+          await showApiErrorToast(persistRes, showToast);
+          throw new Error("Failed to save conversation to the database.");
         }
 
-        const { newChatId } = await persistRes.json();
+        const { newChatId, userMessage: savedUserMessage, modelMessage: savedModelMessage } = await persistRes.json();
         await fetchAllChats();
         setActiveChatId(newChatId);
+
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.id === tempUserMessageId) return savedUserMessage;
+            if (msg.id === tempModelMessageId) return savedModelMessage;
+            return msg;
+          }),
+        );
 
         if (isNewChat && inputText.trim()) {
           generateAndSetChatTitle(newChatId, inputText, keySelection, getAuthHeaders, router, showToast, fetchAllChats);
@@ -1276,7 +1237,48 @@ export default function Home() {
         setMessages(previousMessages);
       }
     } else {
-      setMessages(previousMessages);
+      try {
+        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+        const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
+
+        const persistUserMsgRes = await fetch("/api/chats/persist-user-message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+          body: JSON.stringify({
+            chatSessionId: activeChatId,
+            userMessageParts: newUserMessageParts,
+            keySelection,
+            modelName: selectedModel.name,
+            projectId: currentChatProjectId,
+            thinkingBudget: budgetValue,
+          }),
+        });
+
+        if (!persistUserMsgRes.ok) {
+          await showApiErrorToast(persistUserMsgRes, showToast);
+          setMessages(previousMessages);
+          return;
+        }
+
+        const { newChatId, userMessage: savedUserMessage } = await persistUserMsgRes.json();
+        await fetchAllChats();
+        setActiveChatId(newChatId);
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.id === tempUserMessageId) return savedUserMessage;
+            if (msg.id === tempModelMessageId) return { ...msg, id: 0 };
+            return msg;
+          }),
+        );
+        setMessages((prev) => prev.filter((msg) => msg.id !== 0));
+
+        if (isNewChat && inputText.trim()) {
+          generateAndSetChatTitle(newChatId, inputText, keySelection, getAuthHeaders, router, showToast, fetchAllChats);
+        }
+      } catch (err) {
+        setMessages(previousMessages);
+        showToast(extractErrorMessage(err), "error");
+      }
     }
     setIsLoading(false);
   };
@@ -1350,13 +1352,8 @@ export default function Home() {
       });
 
       if (!patchRes.ok) {
-        let errorData;
-        try {
-          errorData = await patchRes.json();
-        } catch (e) {
-          errorData = { error: `Failed to save edited message: ${patchRes.statusText}` };
-        }
-        throw new Error(errorData.error || "Failed to save edited message.");
+        await showApiErrorToast(patchRes, showToast);
+        throw new Error("Failed to save edited message.");
       }
 
       const modelMessagePosition = messageToEdit.position + 1;
@@ -1366,13 +1363,8 @@ export default function Home() {
       });
 
       if (!deleteRes.ok) {
-        let errorData;
-        try {
-          errorData = await deleteRes.json();
-        } catch (e) {
-          errorData = { error: `Failed to delete subsequent messages: ${deleteRes.statusText}` };
-        }
-        throw new Error(errorData.error || "Failed to delete subsequent messages.");
+        await showApiErrorToast(deleteRes, showToast);
+        throw new Error("Failed to delete subsequent messages.");
       }
 
       const historyForAPI = messages.slice(0, index);
@@ -1415,14 +1407,16 @@ export default function Home() {
         });
 
         if (!persistRes.ok) {
-          const errorData = await persistRes.json().catch(() => ({}));
-          throw new Error(errorData.error || "Failed to save model response after edit.");
+          await showApiErrorToast(persistRes, showToast);
+          throw new Error("Failed to save model response after edit.");
         }
       }
 
       await loadChat(activeChatId);
     } catch (err: unknown) {
-      showToast(extractErrorMessage(err), "error");
+      if (err instanceof Error && !err.message.startsWith("Failed to")) {
+        showToast(extractErrorMessage(err), "error");
+      }
       await loadChat(activeChatId);
     } finally {
       setIsLoading(false);
@@ -1448,13 +1442,8 @@ export default function Home() {
       );
 
       if (!deleteRes.ok) {
-        let errorData;
-        try {
-          errorData = await deleteRes.json();
-        } catch (e) {
-          errorData = { error: `Failed to delete message for regeneration: ${deleteRes.statusText}` };
-        }
-        throw new Error(errorData.error || "Failed to delete message for regeneration.");
+        await showApiErrorToast(deleteRes, showToast);
+        throw new Error("Failed to delete message for regeneration.");
       }
 
       const historyForAPI = messages.slice(0, userMessageIndex + 1);
@@ -1493,13 +1482,15 @@ export default function Home() {
         });
 
         if (!persistRes.ok) {
-          const errorData = await persistRes.json().catch(() => ({}));
-          throw new Error(errorData.error || "Failed to save regenerated model response.");
+          await showApiErrorToast(persistRes, showToast);
+          throw new Error("Failed to save regenerated model response.");
         }
       }
       await loadChat(activeChatId);
     } catch (err: unknown) {
-      showToast(extractErrorMessage(err), "error");
+      if (err instanceof Error && !err.message.startsWith("Failed to")) {
+        showToast(extractErrorMessage(err), "error");
+      }
       await loadChat(activeChatId);
     } finally {
       setIsLoading(false);
@@ -1526,17 +1517,11 @@ export default function Home() {
         return;
       }
       if (!res.ok) {
-        let errorData;
-        try {
-          errorData = await res.json();
-        } catch (e) {
-          errorData = { error: `Failed to delete all chats: ${res.statusText}` };
-        }
-        throw new Error(errorData.error || `Failed to delete all chats: ${res.statusText}`);
+        await showApiErrorToast(res, showToast);
+        return;
       }
     } catch (err: unknown) {
-      const message = extractErrorMessage(err);
-      showToast(message, "error");
+      showToast(extractErrorMessage(err), "error");
       return;
     }
 
@@ -1585,8 +1570,8 @@ export default function Home() {
         });
 
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || "Failed to generate audio.");
+          await showApiErrorToast(res, showToast);
+          return;
         }
 
         const { audioContent } = await res.json();
@@ -1675,7 +1660,8 @@ export default function Home() {
     try {
       const res = await fetch("/api/auth/logout", { method: "POST" });
       if (!res.ok) {
-        throw new Error("Logout failed.");
+        await showApiErrorToast(res, showToast);
+        return;
       }
       localStorage.removeItem("__session");
       router.push("/login");

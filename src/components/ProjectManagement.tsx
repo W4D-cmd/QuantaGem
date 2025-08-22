@@ -4,6 +4,7 @@ import React, { useState, useEffect, ChangeEvent, useCallback, useRef } from "re
 import { ToastProps } from "./Toast";
 import { ProjectFile } from "@/app/page";
 import { ArrowUpTrayIcon, DocumentArrowDownIcon, XCircleIcon } from "@heroicons/react/24/outline";
+import { showApiErrorToast } from "@/lib/errors";
 
 interface ProjectManagementProps {
   projectId: number;
@@ -42,8 +43,8 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
         headers: getAuthHeaders(),
       });
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to fetch project details: ${res.statusText}`);
+        await showApiErrorToast(res, showToast);
+        return;
       }
       const data = await res.json();
       setProjectTitle(data.title);
@@ -81,8 +82,8 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
         }),
       });
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to save project settings: ${res.statusText}`);
+        await showApiErrorToast(res, showToast);
+        return;
       }
       setInitialProjectSystemPrompt(projectSystemPrompt);
       onProjectUpdated();
@@ -184,8 +185,8 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
         headers: getAuthHeaders(),
       });
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to delete file: ${res.statusText}`);
+        await showApiErrorToast(res, showToast);
+        return;
       }
       setProjectFiles((prev) => prev.filter((file) => file.id !== fileId));
       showToast(`File "${fileName}" deleted successfully.`, "success");

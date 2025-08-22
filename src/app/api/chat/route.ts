@@ -590,32 +590,36 @@ export async function POST(request: NextRequest) {
     return new Response(readableStream, {
       headers: { "Content-Type": "application/jsonl; charset=utf-8" },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error in Gemini API call or DB operation:", error);
-    let detailedError = error instanceof Error ? error.message : String(error);
-    if (error instanceof Error && error.message.includes("got status: 400 Bad Request.")) {
-      try {
-        const match = error.message.match(/{.*}/s);
-        if (match && match[0]) {
-          const jsonError = JSON.parse(match[0]);
-          if (jsonError.error && jsonError.error.message) {
-            try {
-              const nestedJsonError = JSON.parse(jsonError.error.message);
-              if (nestedJsonError.error && nestedJsonError.error.message) {
-                detailedError = `Gemini API Error: ${nestedJsonError.error.message}`;
-              } else {
-                detailedError = `Gemini API Error: ${jsonError.error.message}`;
-              }
-            } catch (e_nested_parsing) {
-              console.warn("Failed to parse nested Gemini error message string:", e_nested_parsing);
-              detailedError = `Gemini API Error: ${jsonError.error.message}`;
+
+    let detailedError = "An unknown error occurred during the API call.";
+    let status = 500;
+
+    if (typeof error === "object" && error !== null) {
+      if ("status" in error && typeof (error as { status: unknown }).status === "number") {
+        status = (error as { status: number }).status;
+      }
+
+      if ("message" in error && typeof (error as { message: unknown }).message === "string") {
+        let errorMessage = (error as { message: string }).message;
+        try {
+          const match = errorMessage.match(/{.*}/s);
+          if (match && match[0]) {
+            const jsonError = JSON.parse(match[0]);
+            if (jsonError.error && jsonError.error.message) {
+              errorMessage = jsonError.error.message;
             }
           }
+        } catch (e) {
+          console.warn("Could not parse nested JSON from error message.");
         }
-      } catch (e_main_parsing) {
-        console.warn("Failed to parse main Gemini error message string:", e_main_parsing);
+        detailedError = errorMessage;
       }
+    } else {
+      detailedError = String(error);
     }
-    return NextResponse.json({ error: detailedError }, { status: 500 });
+
+    return NextResponse.json({ error: detailedError }, { status });
   }
 }

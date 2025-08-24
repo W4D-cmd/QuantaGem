@@ -403,9 +403,10 @@ export default function Sidebar({
                           onSaveEdit={(newTitle) => handleSaveEdit("project", project.id, newTitle)}
                           onCancelEdit={handleCancelEdit}
                         >
-                          <span className="truncate flex items-center gap-2">
-                            <FolderOpenIcon className="size-5" /> {project.title}
-                          </span>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <FolderOpenIcon className="size-5 flex-shrink-0" />
+                            <TruncatedTooltip title={project.title}>{project.title}</TruncatedTooltip>
+                          </div>
                           <div
                             className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
                               group-hover:translate-x-0 transition-all duration-200 ease-in-out"

@@ -15,6 +15,7 @@ interface ChatRequest {
   isSearchActive?: boolean;
   thinkingBudget?: number;
   isRegeneration?: boolean;
+  systemPrompt?: string;
 }
 
 const SUPPORTED_GEMINI_MIME_TYPES = [
@@ -239,6 +240,7 @@ export async function POST(request: NextRequest) {
     isSearchActive,
     thinkingBudget,
     isRegeneration,
+    systemPrompt: newChatSystemPrompt,
   } = (await request.json()) as ChatRequest;
 
   const newMessageAppParts: MessagePart[] = [...originalNewMessageAppParts];
@@ -438,7 +440,9 @@ export async function POST(request: NextRequest) {
 
     let systemPromptText: string | null = null;
     try {
-      if (chatSessionId) {
+      if (newChatSystemPrompt && newChatSystemPrompt.trim() !== "") {
+        systemPromptText = newChatSystemPrompt;
+      } else if (chatSessionId) {
         const chatSettingsResult = await pool.query(
           "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
           [chatSessionId, userId],

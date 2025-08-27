@@ -29,6 +29,7 @@ import { dialogVoices, standardVoices } from "@/lib/voices";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThinkingOption, getThinkingConfigForModel, getThinkingBudgetMap, getThinkingValueMap } from "@/lib/thinking";
 import { showApiErrorToast } from "@/lib/errors";
+import NewChatScreen from "@/components/NewChatScreen";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
 const TITLE_GENERATION_MAX_LENGTH = 30000;
@@ -223,6 +224,7 @@ export default function Home() {
   const [liveInterimText, setLiveInterimText] = useState("");
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
   const [thinkingOption, setThinkingOption] = useState<ThinkingOption>("dynamic");
+  const [newChatSystemPrompt, setNewChatSystemPrompt] = useState<string>("");
 
   const [selectedLiveModel, setSelectedLiveModel] = useState<LiveModel>(liveModels[0]);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("de-DE");
@@ -708,6 +710,7 @@ export default function Home() {
     setDisplayingProjectManagementId(null);
     setTotalTokens(0);
     setThinkingOption("dynamic");
+    setNewChatSystemPrompt("");
     if (projectId) {
       setExpandedProjects((prev: Set<number>) => {
         const newSet = new Set(prev);
@@ -903,7 +906,6 @@ export default function Home() {
       if (!isLoading) {
         setMessages([]);
         setEditingPromptInitialValue(null);
-        setCurrentChatProjectId(null);
         setTotalTokens(0);
         setThinkingOption("dynamic");
       }
@@ -973,6 +975,7 @@ export default function Home() {
       currentThinkingOption: ThinkingOption,
       isRegeneration = false,
       placeholderIdToUpdate?: number,
+      systemPromptForNewChat?: string,
     ): Promise<{
       parts: MessagePart[];
       thoughtSummary: string;
@@ -1007,6 +1010,7 @@ export default function Home() {
             isSearchActive: isSearchEnabled,
             thinkingBudget: budgetValue,
             isRegeneration,
+            systemPrompt: systemPromptForNewChat,
           }),
           signal: ctrl.signal,
         });
@@ -1213,12 +1217,13 @@ export default function Home() {
 
     const modelResponse = await callChatApiAndStreamResponse(
       newUserMessageParts,
-      [...previousMessages, newUserMessage],
+      previousMessages,
       activeChatId,
       sendWithSearch,
       thinkingOption,
       false,
       placeholderMessage.id,
+      isNewChat ? newChatSystemPrompt : undefined,
     );
 
     if (modelResponse) {
@@ -1239,6 +1244,7 @@ export default function Home() {
             modelName: selectedModel.name,
             projectId: currentChatProjectId,
             thinkingBudget: budgetValue,
+            systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
           }),
         });
 
@@ -1281,6 +1287,7 @@ export default function Home() {
             modelName: selectedModel.name,
             projectId: currentChatProjectId,
             thinkingBudget: budgetValue,
+            systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
           }),
         });
 
@@ -1865,22 +1872,31 @@ export default function Home() {
                 transition={{ duration: 0.2 }}
                 className="flex-1 flex flex-col overflow-hidden"
               >
-                <ChatArea
-                  ref={chatAreaRef}
-                  messages={messages}
-                  isLoading={isLoading}
-                  isThinking={isThinking}
-                  streamStarted={streamStarted}
-                  onAutoScrollChange={handleAutoScrollChange}
-                  getAuthHeaders={getAuthHeaders}
-                  activeChatId={activeChatId}
-                  editingMessage={editingMessage}
-                  setEditingMessage={setEditingMessage}
-                  onEditSave={handleEditSave}
-                  onRegenerate={handleRegenerateResponse}
-                  onPlayAudio={handlePlayAudio}
-                  audioPlaybackState={audioPlaybackState}
-                />
+                {messages.length > 0 ? (
+                  <ChatArea
+                    ref={chatAreaRef}
+                    messages={messages}
+                    isLoading={isLoading}
+                    isThinking={isThinking}
+                    streamStarted={streamStarted}
+                    onAutoScrollChange={handleAutoScrollChange}
+                    getAuthHeaders={getAuthHeaders}
+                    activeChatId={activeChatId}
+                    editingMessage={editingMessage}
+                    setEditingMessage={setEditingMessage}
+                    onEditSave={handleEditSave}
+                    onRegenerate={handleRegenerateResponse}
+                    onPlayAudio={handlePlayAudio}
+                    audioPlaybackState={audioPlaybackState}
+                  />
+                ) : (
+                  <NewChatScreen
+                    systemPrompt={newChatSystemPrompt}
+                    onSystemPromptChange={setNewChatSystemPrompt}
+                    projectId={currentChatProjectId}
+                    projects={allProjects}
+                  />
+                )}
 
                 <div className="flex-none p-4">
                   <div className="mx-auto max-w-[52rem] relative">

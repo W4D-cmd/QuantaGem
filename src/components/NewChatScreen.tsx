@@ -51,7 +51,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({ systemPrompt, onSystemPro
             className="mx-auto flex items-center justify-center size-16 rounded-full bg-blue-100 dark:bg-blue-900/50
               mb-6"
           >
-            <SparklesIcon className="size-8 text-blue-600 dark:text-blue-400" />
+            <SparklesIcon className="size-8 text-blue-600/80 dark:text-blue-400/90" />
           </div>
 
           <h1 className="text-3xl font-bold text-neutral-800 dark:text-neutral-200 mb-2">Start a new conversation</h1>

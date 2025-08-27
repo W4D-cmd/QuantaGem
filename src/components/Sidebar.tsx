@@ -32,7 +32,6 @@ interface SidebarProps {
   onRenameProject: (projectId: number, newTitle: string) => void;
   onDeleteProject: (projectId: number) => void;
   onDuplicateChat: (chatId: number) => void;
-  userEmail: string | null;
   expandedProjects: Set<number>;
   onToggleProjectExpansion: React.Dispatch<React.SetStateAction<Set<number>>>;
 }
@@ -195,7 +194,6 @@ export default function Sidebar({
   onRenameProject,
   onDeleteProject,
   onDuplicateChat,
-  userEmail,
   expandedProjects,
   onToggleProjectExpansion,
 }: SidebarProps) {
@@ -244,7 +242,8 @@ export default function Sidebar({
   return (
     <div
       className="w-70 h-full bg-neutral-100 dark:bg-neutral-900 pt-2 pb-4 pl-4 pr-1 overflow-y-hidden overflow-x-hidden
-        flex flex-col transition-colors duration-300 ease-in-out"
+        flex flex-col transition-colors duration-300 ease-in-out border-r border-neutral-200 dark:border-neutral-800
+        shadow-xl z-10"
     >
       <div className="flex-none mb-4">
         <div className="flex-none pr-2 flex items-center justify-between">
@@ -552,18 +551,6 @@ export default function Sidebar({
           </motion.div>
         )}
       </motion.div>
-
-      {userEmail && (
-        <div className="pr-3 mt-auto flex-shrink-0">
-          <div
-            className="mt-4 mb-0 text-center text-sm p-2 rounded-lg text-neutral-700 dark:text-neutral-200
-              bg-neutral-200 dark:bg-neutral-800 transition-colors duration-300 ease-in-out"
-          >
-            Logged in as: <br />
-            <span className="font-semibold">{userEmail}</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

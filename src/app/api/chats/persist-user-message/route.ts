@@ -10,6 +10,7 @@ interface PersistUserMessageRequest {
   modelName: string;
   projectId: number | null;
   thinkingBudget: number;
+  systemPrompt?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
   }
   const userId = user.id.toString();
 
-  const { chatSessionId, userMessageParts, keySelection, modelName, projectId, thinkingBudget } =
+  const { chatSessionId, userMessageParts, keySelection, modelName, projectId, thinkingBudget, systemPrompt } =
     (await request.json()) as PersistUserMessageRequest;
 
   const client = await pool.connect();
@@ -36,9 +37,9 @@ export async function POST(request: NextRequest) {
           .split("\n")[0] || "New Chat";
 
       const newChatResult = await client.query(
-        `INSERT INTO chat_sessions (user_id, title, last_model, key_selection, project_id, thinking_budget)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [userId, title, modelName, keySelection, projectId, thinkingBudget],
+        `INSERT INTO chat_sessions (user_id, title, last_model, key_selection, project_id, thinking_budget, system_prompt)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [userId, title, modelName, keySelection, projectId, thinkingBudget, systemPrompt || ""],
       );
       currentChatId = newChatResult.rows[0].id;
     } else {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     const userMessageResult = await client.query(
       `INSERT INTO messages (chat_session_id, role, content, parts, position)
        VALUES ($1, 'user', $2, $3, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1))
-       RETURNING id, position, role, parts, sources, thought_summary as "thoughtSummary"`,
+         RETURNING id, position, role, parts, sources, thought_summary as "thoughtSummary"`,
       [currentChatId, userContent, JSON.stringify(userMessageParts)],
     );
 

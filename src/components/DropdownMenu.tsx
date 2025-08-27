@@ -19,6 +19,7 @@ interface Props {
   position?: "left" | "right";
   anchorRef: { current: HTMLElement | null };
   extraWidthPx?: number;
+  header?: ReactNode;
 }
 
 export default function DropdownMenu({
@@ -28,6 +29,7 @@ export default function DropdownMenu({
   position = "left",
   anchorRef,
   extraWidthPx = 24,
+  header,
 }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
@@ -120,6 +122,12 @@ export default function DropdownMenu({
           className="border bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 rounded-2xl
             shadow-lg overflow-hidden transition-colors duration-300 ease-in-out"
         >
+          {header && (
+            <>
+              {header}
+              <div className="h-px bg-neutral-200 dark:bg-neutral-800 my-1 mx-2" />
+            </>
+          )}
           <div className="max-h-60 overflow-y-auto p-2 space-y-1">
             {items.map((item) => (
               <button

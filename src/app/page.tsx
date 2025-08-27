@@ -1723,6 +1723,13 @@ export default function Home() {
     },
   ];
 
+  const menuHeader = userEmail ? (
+    <div className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-200">
+      <p className="text-xs text-neutral-500 dark:text-neutral-400">Logged in as</p>
+      <p className="font-semibold truncate">{userEmail}</p>
+    </div>
+  ) : null;
+
   return (
     <div className="flex h-screen overflow-hidden">
       <AnimatePresence>{toast && <Toast {...toast} onClose={handleCloseToast} />}</AnimatePresence>
@@ -1750,7 +1757,6 @@ export default function Home() {
         onRenameProject={handleRenameProject}
         onDeleteProject={confirmDeleteProject}
         onDuplicateChat={handleDuplicateChat}
-        userEmail={userEmail}
         expandedProjects={expandedProjects}
         onToggleProjectExpansion={setExpandedProjects}
       />
@@ -1834,6 +1840,7 @@ export default function Home() {
                 items={threeDotMenuItems}
                 position="right"
                 extraWidthPx={10}
+                header={menuHeader}
               />
             </div>
           </div>

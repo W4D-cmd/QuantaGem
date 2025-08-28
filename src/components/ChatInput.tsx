@@ -507,9 +507,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           const searchText = value.substring(hashIndex + 1);
           const cleanedSearchText = searchText.replace(/\s/g, "").toLowerCase();
 
-          const filtered = projectFiles.filter((file) =>
-            file.fileName.replace(/\s/g, "").toLowerCase().includes(cleanedSearchText),
-          );
+          const filtered = projectFiles
+            .filter((file) => file.fileName.replace(/\s/g, "").toLowerCase().includes(cleanedSearchText))
+            .sort((a, b) => a.fileName.localeCompare(b.fileName));
 
           const finalFilteredList: ProjectFile[] = [];
 

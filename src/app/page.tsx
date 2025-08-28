@@ -702,23 +702,30 @@ export default function Home() {
     [getAuthHeaders, router, fetchAllChats, setActiveChatId, setDisplayingProjectManagementId, showToast],
   );
 
-  const handleNewChat = useCallback(async (projectId: number | null = null) => {
-    setActiveChatId(null);
-    setEditingMessage(null);
-    setMessages([]);
-    setCurrentChatProjectId(projectId);
-    setDisplayingProjectManagementId(null);
-    setTotalTokens(0);
-    setThinkingOption("dynamic");
-    setNewChatSystemPrompt("");
-    if (projectId) {
-      setExpandedProjects((prev: Set<number>) => {
-        const newSet = new Set(prev);
-        newSet.add(projectId);
-        return newSet;
-      });
-    }
-  }, []);
+  const handleNewChat = useCallback(
+    async (projectId: number | null = null) => {
+      setActiveChatId(null);
+      setEditingMessage(null);
+      setMessages([]);
+      setCurrentChatProjectId(projectId);
+      setDisplayingProjectManagementId(null);
+      setTotalTokens(0);
+      setThinkingOption("dynamic");
+
+      if (projectId) {
+        const project = allProjects.find((p) => p.id === projectId);
+        setNewChatSystemPrompt(project?.systemPrompt || "");
+        setExpandedProjects((prev: Set<number>) => {
+          const newSet = new Set(prev);
+          newSet.add(projectId);
+          return newSet;
+        });
+      } else {
+        setNewChatSystemPrompt("");
+      }
+    },
+    [allProjects],
+  );
 
   const loadChat = useCallback(
     async (chatId: number) => {
@@ -976,6 +983,7 @@ export default function Home() {
       isRegeneration = false,
       placeholderIdToUpdate?: number,
       systemPromptForNewChat?: string,
+      projectIdForNewChat?: number | null,
     ): Promise<{
       parts: MessagePart[];
       thoughtSummary: string;
@@ -1011,6 +1019,7 @@ export default function Home() {
             thinkingBudget: budgetValue,
             isRegeneration,
             systemPrompt: systemPromptForNewChat,
+            projectId: projectIdForNewChat,
           }),
           signal: ctrl.signal,
         });
@@ -1224,6 +1233,7 @@ export default function Home() {
       false,
       placeholderMessage.id,
       isNewChat ? newChatSystemPrompt : undefined,
+      isNewChat ? currentChatProjectId : null,
     );
 
     if (modelResponse) {

@@ -16,6 +16,7 @@ interface ChatRequest {
   thinkingBudget?: number;
   isRegeneration?: boolean;
   systemPrompt?: string;
+  projectId?: number | null;
 }
 
 const SUPPORTED_GEMINI_MIME_TYPES = [
@@ -240,6 +241,7 @@ export async function POST(request: NextRequest) {
     isSearchActive,
     thinkingBudget,
     isRegeneration,
+    projectId,
     systemPrompt: newChatSystemPrompt,
   } = (await request.json()) as ChatRequest;
 
@@ -440,35 +442,47 @@ export async function POST(request: NextRequest) {
 
     let systemPromptText: string | null = null;
     try {
+      // Priorität 1: Prompt aus dem NewChatScreen
       if (newChatSystemPrompt && newChatSystemPrompt.trim() !== "") {
         systemPromptText = newChatSystemPrompt;
-      } else if (chatSessionId) {
+      }
+      // Priorität 2: Prompt aus einem bestehenden Chat oder dessen Projekt
+      else if (chatSessionId) {
         const chatSettingsResult = await pool.query(
           "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
           [chatSessionId, userId],
         );
+        const chatSettings = chatSettingsResult.rows[0];
 
-        const chatSpecificPrompt = chatSettingsResult.rows[0]?.system_prompt?.trim();
-        const associatedProjectId = chatSettingsResult.rows[0]?.project_id;
-
-        if (chatSpecificPrompt) {
-          systemPromptText = chatSpecificPrompt;
-        } else if (associatedProjectId) {
+        if (chatSettings?.system_prompt?.trim()) {
+          systemPromptText = chatSettings.system_prompt;
+        } else if (chatSettings?.project_id) {
           const projectSettingsResult = await pool.query(
             "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
-            [associatedProjectId, userId],
+            [chatSettings.project_id, userId],
           );
-          if (projectSettingsResult.rows.length > 0 && projectSettingsResult.rows[0].system_prompt?.trim() !== "") {
+          if (projectSettingsResult.rows[0]?.system_prompt?.trim()) {
             systemPromptText = projectSettingsResult.rows[0].system_prompt;
           }
         }
       }
+      // Priorität 3: Prompt aus dem Projekt für einen neuen Chat
+      else if (projectId) {
+        const projectSettingsResult = await pool.query(
+          "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
+          [projectId, userId],
+        );
+        if (projectSettingsResult.rows[0]?.system_prompt?.trim()) {
+          systemPromptText = projectSettingsResult.rows[0].system_prompt;
+        }
+      }
 
+      // Priorität 4 (Fallback): Globaler System-Prompt
       if (!systemPromptText) {
         const globalSettingsResult = await pool.query("SELECT system_prompt FROM user_settings WHERE user_id = $1", [
           userId,
         ]);
-        if (globalSettingsResult.rows.length > 0 && globalSettingsResult.rows[0].system_prompt?.trim() !== "") {
+        if (globalSettingsResult.rows[0]?.system_prompt?.trim()) {
           systemPromptText = globalSettingsResult.rows[0].system_prompt;
         }
       }

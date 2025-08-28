@@ -3,10 +3,8 @@
 import Sidebar from "@/components/Sidebar";
 import ChatArea, { ChatAreaHandle, AudioPlaybackState } from "@/components/ChatArea";
 import ChatInput, { ChatInputHandle, UploadedFileInfo } from "@/components/ChatInput";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import ModelSelector from "@/components/ModelSelector";
-import ToggleApiKeyButton from "@/components/ToggleApiKeyButton";
-import { Model } from "@google/genai";
 import Tooltip from "@/components/Tooltip";
 import Toast, { ToastProps } from "@/components/Toast";
 import DropdownMenu, { DropdownItem } from "@/components/DropdownMenu";
@@ -27,11 +25,11 @@ import ConfirmationModal from "@/components/ConfirmationModal";
 import { liveModels, LiveModel } from "@/lib/live-models";
 import { dialogVoices, standardVoices } from "@/lib/voices";
 import { motion, AnimatePresence } from "framer-motion";
-import { ThinkingOption, getThinkingConfigForModel, getThinkingBudgetMap, getThinkingValueMap } from "@/lib/thinking";
 import { showApiErrorToast } from "@/lib/errors";
 import NewChatScreen from "@/components/NewChatScreen";
+import { OAIModel } from "@/lib/custom-models";
 
-const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
+const DEFAULT_MODEL_NAME = "google/gemini-2.5-flash";
 const TITLE_GENERATION_MAX_LENGTH = 30000;
 const DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 const MAX_RETRIES = 5;
@@ -126,7 +124,6 @@ function createWavHeader(dataLength: number): ArrayBuffer {
 async function generateAndSetChatTitle(
   chatSessionId: number,
   userMessageContent: string,
-  keySelection: "free" | "paid",
   getAuthHeaders: () => HeadersInit,
   router: AppRouterInstance,
   showToast: (message: string, type?: ToastProps["type"]) => void,
@@ -144,7 +141,7 @@ async function generateAndSetChatTitle(
         "Content-Type": "application/json",
         ...getAuthHeaders(),
       },
-      body: JSON.stringify({ userMessageContent: truncatedContent, keySelection }),
+      body: JSON.stringify({ userMessageContent: truncatedContent }),
     });
 
     if (res.status === 401) {
@@ -195,9 +192,8 @@ export default function Home() {
   const [allChats, setAllChats] = useState<ChatListItem[]>([]);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [controller, setController] = useState<AbortController | null>(null);
-  const [models, setModels] = useState<Model[]>([]);
-  const [selectedModel, setSelectedModel] = useState<Model | null>(null);
-  const [keySelection, setKeySelection] = useState<"free" | "paid">("free");
+  const [models, setModels] = useState<OAIModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState<OAIModel | null>(null);
   const [toast, setToast] = useState<Omit<ToastProps, "onClose"> | null>(null);
   const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -223,7 +219,6 @@ export default function Home() {
   const [isLiveSessionActive, setIsLiveSessionActive] = useState(false);
   const [liveInterimText, setLiveInterimText] = useState("");
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
-  const [thinkingOption, setThinkingOption] = useState<ThinkingOption>("dynamic");
   const [newChatSystemPrompt, setNewChatSystemPrompt] = useState<string>("");
 
   const [selectedLiveModel, setSelectedLiveModel] = useState<LiveModel>(liveModels[0]);
@@ -246,8 +241,6 @@ export default function Home() {
   const chatInputRef = useRef<ChatInputHandle>(null);
   const prevActiveChatIdRef = useRef<number | null>(null);
   const prevDisplayingProjectManagementIdRef = useRef<number | null>(null);
-
-  const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
 
   const showToast = useCallback((message: string, type: ToastProps["type"] = "error") => {
     setToast({ message, type });
@@ -305,12 +298,7 @@ export default function Home() {
   };
 
   const fetchTokenCount = useCallback(
-    async (
-      currentMessages: Message[],
-      currentModel: Model | null,
-      currentKeySelection: "free" | "paid",
-      currentChatId: number | null,
-    ) => {
+    async (currentMessages: Message[], currentModel: OAIModel | null, currentChatId: number | null) => {
       if (!currentModel || !currentChatId || currentMessages.length === 0) {
         setTotalTokens(0);
         return;
@@ -325,8 +313,7 @@ export default function Home() {
           },
           body: JSON.stringify({
             history: currentMessages,
-            model: currentModel.name,
-            keySelection: currentKeySelection,
+            model: currentModel.id,
             chatSessionId: currentChatId,
           }),
         });
@@ -352,10 +339,10 @@ export default function Home() {
   useEffect(() => {
     const previousIsLoading = sessionStorage.getItem("isLoading") === "true";
     if (previousIsLoading && !isLoading && activeChatId && messages.length > 0) {
-      fetchTokenCount(messages, selectedModel, keySelection, activeChatId);
+      fetchTokenCount(messages, selectedModel, activeChatId);
     }
     sessionStorage.setItem("isLoading", isLoading.toString());
-  }, [isLoading, activeChatId, messages, selectedModel, keySelection, fetchTokenCount]);
+  }, [isLoading, activeChatId, messages, selectedModel, fetchTokenCount]);
 
   const fetchAllProjects = useCallback(async () => {
     try {
@@ -485,16 +472,11 @@ export default function Home() {
     chatAreaRef.current?.scrollToBottomAndEnableAutoscroll();
   };
 
-  const handleModelChange = (model: Model) => {
-    const newModelConfig = getThinkingConfigForModel(model.name);
-    if (thinkingOption === "off" && !newModelConfig?.canBeOff) {
-      setThinkingOption("dynamic");
-    }
-
+  const handleModelChange = (model: OAIModel) => {
     setSelectedModel(model);
 
     if (activeChatId !== null && messages.length > 0) {
-      const modelName = model.name ?? "";
+      const modelName = model.id ?? "";
       setAllChats((prev) => prev.map((c) => (c.id === activeChatId ? { ...c, lastModel: modelName } : c)));
       fetch(`/api/chats/${activeChatId}`, {
         method: "PATCH",
@@ -506,28 +488,6 @@ export default function Home() {
       }).catch((err) => showToast(extractErrorMessage(err), "error"));
     }
   };
-
-  const handleThinkingOptionChange = useCallback(
-    (option: ThinkingOption) => {
-      setThinkingOption(option);
-      if (activeChatId !== null) {
-        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
-        const budgetValue = budgetMap ? budgetMap[option] : -1;
-
-        fetch(`/api/chats/${activeChatId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeaders(),
-          },
-          body: JSON.stringify({ thinkingBudget: budgetValue }),
-        })
-          .then(() => fetchAllChats())
-          .catch((err) => showToast(extractErrorMessage(err), "error"));
-      }
-    },
-    [activeChatId, getAuthHeaders, showToast, fetchAllChats, selectedModel],
-  );
 
   const handleLiveModelChange = (model: LiveModel) => {
     setSelectedLiveModel(model);
@@ -542,33 +502,10 @@ export default function Home() {
     }
   };
 
-  const handleKeySelectionToggle = useCallback(() => {
-    setKeySelection((prev) => {
-      const newSelection = prev === "free" ? "paid" : "free";
-
-      if (activeChatId !== null) {
-        setAllChats((prevChats) =>
-          prevChats.map((c) => (c.id === activeChatId ? { ...c, keySelection: newSelection } : c)),
-        );
-        fetch(`/api/chats/${activeChatId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeaders(),
-          },
-          body: JSON.stringify({ keySelection: newSelection }),
-        })
-          .then(() => fetchAllChats())
-          .catch((err) => showToast(extractErrorMessage(err), "error"));
-      }
-      return newSelection;
-    });
-  }, [activeChatId, fetchAllChats, getAuthHeaders, showToast]);
-
   useEffect(() => {
     if (!userEmail) return;
 
-    fetch(`/api/models?keySelection=${keySelection}`, {
+    fetch(`/api/models`, {
       headers: getAuthHeaders(),
     })
       .then(async (res) => {
@@ -582,7 +519,7 @@ export default function Home() {
         }
         return res.json();
       })
-      .then((list: Model[] | undefined) => {
+      .then((list: OAIModel[] | undefined) => {
         if (!list) return;
 
         setModels(list);
@@ -592,10 +529,10 @@ export default function Home() {
         }
         setSelectedModel((current) => {
           if (current) {
-            const stillExists = list.find((m) => m.name === current.name);
+            const stillExists = list.find((m) => m.id === current.id);
             if (stillExists) return stillExists;
           }
-          const defaultModel = list.find((m) => m.name === DEFAULT_MODEL_NAME);
+          const defaultModel = list.find((m) => m.id === DEFAULT_MODEL_NAME);
           if (defaultModel) return defaultModel;
           return list[0] || null;
         });
@@ -608,7 +545,7 @@ export default function Home() {
         setModels([]);
         setSelectedModel(null);
       });
-  }, [keySelection, getAuthHeaders, router, userEmail, showToast]);
+  }, [getAuthHeaders, router, userEmail, showToast]);
 
   const handleRenameChat = async (chatId: number, newTitle: string) => {
     try {
@@ -710,7 +647,6 @@ export default function Home() {
       setCurrentChatProjectId(projectId);
       setDisplayingProjectManagementId(null);
       setTotalTokens(0);
-      setThinkingOption("dynamic");
 
       if (projectId) {
         const project = allProjects.find((p) => p.id === projectId);
@@ -743,10 +679,8 @@ export default function Home() {
             setActiveChatId(null);
             setMessages([]);
             setEditingPromptInitialValue(null);
-            setKeySelection("free");
             setCurrentChatProjectId(null);
             setTotalTokens(null);
-            setThinkingOption("dynamic");
           }
           await showApiErrorToast(res, showToast);
           return;
@@ -754,18 +688,13 @@ export default function Home() {
         const data: {
           messages: Message[];
           systemPrompt: string;
-          keySelection: "free" | "paid";
           projectId: number | null;
-          thinkingBudget: number;
           lastModel: string;
         } = await res.json();
 
-        const modelValueMap = getThinkingValueMap(data.lastModel);
         setMessages(data.messages);
         setEditingPromptInitialValue(data.systemPrompt);
-        setKeySelection(data.keySelection);
         setCurrentChatProjectId(data.projectId);
-        setThinkingOption(modelValueMap?.[data.thinkingBudget] || "dynamic");
       } catch (err: unknown) {
         showToast(extractErrorMessage(err), "error");
       } finally {
@@ -778,7 +707,6 @@ export default function Home() {
       setActiveChatId,
       setMessages,
       setEditingPromptInitialValue,
-      setKeySelection,
       setCurrentChatProjectId,
       showToast,
     ],
@@ -795,16 +723,13 @@ export default function Home() {
     setCurrentChatProjectId(null);
     setMessages([]);
     setEditingPromptInitialValue(null);
-    setKeySelection("free");
     setTotalTokens(null);
-    setThinkingOption("dynamic");
   }, []);
 
   const handleNewProject = useCallback(async () => {
     setActiveChatId(null);
     setMessages([]);
     setEditingPromptInitialValue(null);
-    setKeySelection("free");
     setTotalTokens(null);
     setIsLoading(true);
     try {
@@ -901,7 +826,6 @@ export default function Home() {
       setCurrentChatProjectId(null);
       setMessages([]);
       setEditingPromptInitialValue(null);
-      setKeySelection("free");
       setTotalTokens(null);
     }
     showToast("Project deleted.", "success");
@@ -914,7 +838,6 @@ export default function Home() {
         setMessages([]);
         setEditingPromptInitialValue(null);
         setTotalTokens(0);
-        setThinkingOption("dynamic");
       }
       prevActiveChatIdRef.current = null;
       prevDisplayingProjectManagementIdRef.current = null;
@@ -925,26 +848,15 @@ export default function Home() {
       if (activeChatId !== prevActiveChatIdRef.current) {
         const chat = allChats.find((c) => c.id === activeChatId);
         if (chat?.lastModel) {
-          const modelForThisChat = models.find((m) => m.name === chat.lastModel);
-          if (modelForThisChat && selectedModel?.name !== modelForThisChat.name) {
+          const modelForThisChat = models.find((m) => m.id === chat.lastModel);
+          if (modelForThisChat && selectedModel?.id !== modelForThisChat.id) {
             setSelectedModel(modelForThisChat);
           }
         } else if (chat && !chat.lastModel) {
           if (!selectedModel && models.length > 0) {
-            const defaultModel = models.find((m) => m.name === DEFAULT_MODEL_NAME) || models[0];
+            const defaultModel = models.find((m) => m.id === DEFAULT_MODEL_NAME) || models[0];
             if (defaultModel) setSelectedModel(defaultModel);
           }
-        }
-        if (chat?.keySelection) {
-          setKeySelection(chat.keySelection);
-        } else {
-          setKeySelection("free");
-        }
-        const modelValueMap = getThinkingValueMap(chat?.lastModel);
-        if (chat?.thinkingBudget !== undefined && modelValueMap) {
-          setThinkingOption(modelValueMap[chat.thinkingBudget] || "dynamic");
-        } else {
-          setThinkingOption("dynamic");
         }
 
         setIsLoading(true);
@@ -959,9 +871,7 @@ export default function Home() {
         setCurrentChatProjectId(null);
         setMessages([]);
         setEditingPromptInitialValue(null);
-        setKeySelection("free");
         setTotalTokens(null);
-        setThinkingOption("dynamic");
       }
       prevDisplayingProjectManagementIdRef.current = displayingProjectManagementId;
       prevActiveChatIdRef.current = null;
@@ -979,7 +889,6 @@ export default function Home() {
       historyForAPI: Message[],
       currentChatId: number | null,
       isSearchEnabled: boolean,
-      currentThinkingOption: ThinkingOption,
       isRegeneration = false,
       placeholderIdToUpdate?: number,
       systemPromptForNewChat?: string,
@@ -1000,9 +909,6 @@ export default function Home() {
       setController(ctrl);
 
       const performFetch = async () => {
-        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
-        const budgetValue = budgetMap ? budgetMap[currentThinkingOption] : -1;
-
         return fetch("/api/chat", {
           method: "POST",
           headers: {
@@ -1013,10 +919,8 @@ export default function Home() {
             history: historyForAPI.map((msg) => ({ role: msg.role, parts: msg.parts })),
             messageParts: userMessageParts,
             chatSessionId: currentChatId,
-            model: selectedModel?.name,
-            keySelection,
+            model: selectedModel?.id,
             isSearchActive: isSearchEnabled,
-            thinkingBudget: budgetValue,
             isRegeneration,
             systemPrompt: systemPromptForNewChat,
             projectId: projectIdForNewChat,
@@ -1177,16 +1081,7 @@ export default function Home() {
         setController(null);
       }
     },
-    [
-      getAuthHeaders,
-      selectedModel,
-      keySelection,
-      showToast,
-      setStreamStarted,
-      setIsThinking,
-      setController,
-      setMessages,
-    ],
+    [getAuthHeaders, selectedModel, showToast, setStreamStarted, setIsThinking, setController, setMessages],
   );
 
   const handleSendMessage = async (inputText: string, uploadedFiles: UploadedFileInfo[], sendWithSearch: boolean) => {
@@ -1229,7 +1124,6 @@ export default function Home() {
       previousMessages,
       activeChatId,
       sendWithSearch,
-      thinkingOption,
       false,
       placeholderMessage.id,
       isNewChat ? newChatSystemPrompt : undefined,
@@ -1238,9 +1132,6 @@ export default function Home() {
 
     if (modelResponse) {
       try {
-        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
-        const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
-
         const persistRes = await fetch("/api/chats/persist-turn", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -1250,10 +1141,8 @@ export default function Home() {
             modelMessageParts: modelResponse.parts,
             modelThoughtSummary: modelResponse.thoughtSummary || null,
             modelSources: modelResponse.sources,
-            keySelection,
-            modelName: selectedModel.name,
+            modelName: selectedModel.id,
             projectId: currentChatProjectId,
-            thinkingBudget: budgetValue,
             systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
           }),
         });
@@ -1276,7 +1165,7 @@ export default function Home() {
         );
 
         if (isNewChat && inputText.trim()) {
-          generateAndSetChatTitle(newChatId, inputText, keySelection, getAuthHeaders, router, showToast, fetchAllChats);
+          generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
         }
       } catch (err) {
         showToast(extractErrorMessage(err), "error");
@@ -1284,19 +1173,14 @@ export default function Home() {
       }
     } else {
       try {
-        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
-        const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
-
         const persistUserMsgRes = await fetch("/api/chats/persist-user-message", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...getAuthHeaders() },
           body: JSON.stringify({
             chatSessionId: activeChatId,
             userMessageParts: newUserMessageParts,
-            keySelection,
-            modelName: selectedModel.name,
+            modelName: selectedModel.id,
             projectId: currentChatProjectId,
-            thinkingBudget: budgetValue,
             systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
           }),
         });
@@ -1320,7 +1204,7 @@ export default function Home() {
         setMessages((prev) => prev.filter((msg) => msg.id !== 0));
 
         if (isNewChat && inputText.trim()) {
-          generateAndSetChatTitle(newChatId, inputText, keySelection, getAuthHeaders, router, showToast, fetchAllChats);
+          generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
         }
       } catch (err) {
         setMessages(previousMessages);
@@ -1437,7 +1321,6 @@ export default function Home() {
         historyForAPI,
         activeChatId,
         isSearchActive,
-        thinkingOption,
         true,
         placeholderMessage.id,
       );
@@ -1512,7 +1395,6 @@ export default function Home() {
         historyForAPI,
         activeChatId,
         isSearchActive,
-        thinkingOption,
         true,
         placeholderMessage.id,
       );
@@ -1577,7 +1459,6 @@ export default function Home() {
       setActiveChatId(null);
       setMessages([]);
       setEditingPromptInitialValue(null);
-      setKeySelection("free");
       setTotalTokens(null);
     }
     showToast("All global chats deleted.", "success");
@@ -1613,7 +1494,7 @@ export default function Home() {
         const res = await fetch("/api/tts", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-          body: JSON.stringify({ text: textToPlay, voice: ttsVoice, keySelection, model: ttsModel }),
+          body: JSON.stringify({ text: textToPlay, voice: ttsVoice, model: ttsModel }),
         });
 
         if (!res.ok) {
@@ -1659,7 +1540,7 @@ export default function Home() {
         setAudioPlaybackState({ messageId: null, status: "idle" });
       }
     },
-    [audioPlaybackState, getAuthHeaders, keySelection, showToast, ttsVoice, ttsModel],
+    [audioPlaybackState, getAuthHeaders, showToast, ttsVoice, ttsModel],
   );
 
   const openGlobalSettingsModal = () => {
@@ -1802,11 +1683,6 @@ export default function Home() {
             <>
               <ModelSelector models={models} selected={selectedModel} onChangeAction={handleModelChange} />
 
-              <div className="flex items-center ml-4">
-                <Tooltip text="Switch between free and paid API key">
-                  <ToggleApiKeyButton selectedKey={keySelection} onToggleAction={handleKeySelectionToggle} />
-                </Tooltip>
-              </div>
               <div className="flex items-center ml-4">
                 <Tooltip text="Total tokens for this chat session">
                   <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
@@ -1972,7 +1848,6 @@ export default function Home() {
                       getAuthHeaders={getAuthHeaders}
                       activeProjectId={currentChatProjectId}
                       showToast={showToast}
-                      keySelection={keySelection}
                       onLiveSessionStateChange={setIsLiveSessionActive}
                       onLiveInterimText={setLiveInterimText}
                       onTurnComplete={handleLiveSessionTurnComplete}
@@ -1987,8 +1862,6 @@ export default function Home() {
                       onAutoMuteToggle={setIsAutoMuteEnabled}
                       liveMode={liveMode}
                       onLiveModeChange={setLiveMode}
-                      thinkingOption={thinkingOption}
-                      onThinkingOptionChange={handleThinkingOptionChange}
                       selectedModel={selectedModel}
                     />
                   </div>

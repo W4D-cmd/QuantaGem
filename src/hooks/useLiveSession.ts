@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Blob as GenaiBlob, Content, GoogleGenAI, Session } from "@google/genai";
 import { getLiveConnectConfig, LiveModel } from "@/lib/live-models";
 
-const MIN_CHUNKS_TO_PLAY = 5;
+const MIN_CHUNKS_TO_PLAY = 50;
 const TARGET_SAMPLE_RATE = 16000;
 const OUTPUT_SAMPLE_RATE = 24000;
 const VIDEO_FRAME_RATE = 1;

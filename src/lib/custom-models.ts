@@ -1,12 +1,19 @@
 export interface CustomModelEntry {
-  displayName: string;
   modelId: string;
 }
 
+export interface OAIModel {
+  id: string;
+  name: string;
+  description?: string;
+  context_length?: number;
+  max_completion_tokens?: number;
+}
+
 export const customModels: CustomModelEntry[] = [
-  { displayName: "Gemini 2.5 Pro", modelId: "models/gemini-2.5-pro" },
-  { displayName: "Gemini 2.5 Flash", modelId: "models/gemini-2.5-flash" },
-  { displayName: "Gemini 2.5 Flash-Lite", modelId: "models/gemini-2.5-flash-lite" },
-  { displayName: "Gemini 2.0 Flash", modelId: "models/gemini-2.0-flash" },
-  { displayName: "Gemini 2.0 Flash-Lite", modelId: "models/gemini-2.0-flash-lite" },
+  { modelId: "google/gemini-2.5-pro" },
+  { modelId: "google/gemini-2.5-flash" },
+  { modelId: "google/gemini-2.5-flash-lite" },
+  { modelId: "google/gemini-2.0-flash-001" },
+  { modelId: "google/gemini-2.0-flash-lite-001" },
 ];

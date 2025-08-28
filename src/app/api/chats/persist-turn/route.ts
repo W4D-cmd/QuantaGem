@@ -9,10 +9,8 @@ interface PersistTurnRequest {
   modelMessageParts: MessagePart[];
   modelThoughtSummary: string | null;
   modelSources: Array<{ title: string; uri: string }>;
-  keySelection: "free" | "paid";
   modelName: string;
   projectId: number | null;
-  thinkingBudget: number;
   systemPrompt?: string;
 }
 
@@ -29,10 +27,8 @@ export async function POST(request: NextRequest) {
     modelMessageParts,
     modelThoughtSummary,
     modelSources,
-    keySelection,
     modelName,
     projectId,
-    thinkingBudget,
     systemPrompt,
   } = (await request.json()) as PersistTurnRequest;
 
@@ -50,9 +46,9 @@ export async function POST(request: NextRequest) {
           .split("\n")[0] || "New Chat";
 
       const newChatResult = await client.query(
-        `INSERT INTO chat_sessions (user_id, title, last_model, key_selection, project_id, thinking_budget, system_prompt)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        [userId, title, modelName, keySelection, projectId, thinkingBudget, systemPrompt || ""],
+        `INSERT INTO chat_sessions (user_id, title, last_model, project_id, system_prompt)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [userId, title, modelName, projectId, systemPrompt || ""],
       );
       currentChatId = newChatResult.rows[0].id;
     } else {

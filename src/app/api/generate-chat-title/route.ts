@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { getUserFromToken } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
@@ -8,42 +7,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
 
-  const { userMessageContent, keySelection } = await request.json();
+  const { userMessageContent } = await request.json();
 
   if (!userMessageContent || typeof userMessageContent !== "string") {
     return NextResponse.json({ error: "User message content is required" }, { status: 400 });
   }
 
-  const apiKey = keySelection === "paid" ? process.env.PAID_GOOGLE_API_KEY : process.env.FREE_GOOGLE_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
+  const baseUrl = process.env.OPENAI_API_BASE_URL;
 
-  if (!apiKey) {
-    return NextResponse.json({ error: "FREE_GOOGLE_API_KEY not configured" }, { status: 500 });
+  if (!apiKey || !baseUrl) {
+    return NextResponse.json({ error: "OpenAI API key or base URL not configured" }, { status: 500 });
   }
-
-  const genAI = new GoogleGenAI({ apiKey });
-
-  const safetySettings = [
-    {
-      category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-  ];
 
   try {
     const prompt = `You are a chat title generator. Your sole purpose is to provide a concise, few-word chat title (2-5 words) from user input. The title must consist ONLY of relevant keywords. Do NOT include any conversational filler, greetings, introductory phrases, alternative suggestions (e.g., "or simply"), or any additional explanations. Provide only the title itself and make sure to use the same language as the user used.
@@ -52,32 +27,32 @@ export async function POST(request: NextRequest) {
 
 Title:`;
 
-    const result = await genAI.models.generateContent({
-      model: "models/gemma-3-27b-it",
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: {
-        safetySettings: safetySettings,
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
       },
+      body: JSON.stringify({
+        model: "google/gemma-3-27b-it",
+        messages: [{ role: "user", content: prompt }],
+        stream: false,
+        max_tokens: 20,
+      }),
     });
-    const generatedTitle = (result.text || "").trim();
+
+    if (!response.ok) {
+      const errorBody = await response.json();
+      throw new Error(errorBody.error?.message || `API Error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    const generatedTitle = (result.choices?.[0]?.message?.content || "").trim().replace(/^"|"$/g, "");
 
     return NextResponse.json({ title: generatedTitle });
   } catch (error) {
     console.error("Error generating chat title:", error);
-    let detailedError = error instanceof Error ? error.message : String(error);
-    if (error instanceof Error && error.message.includes("got status: 400 Bad Request.")) {
-      try {
-        const match = error.message.match(/{.*}/s);
-        if (match && match[0]) {
-          const jsonError = JSON.parse(match[0]);
-          if (jsonError.error && jsonError.error.message) {
-            detailedError = `Gemini API Error: ${jsonError.error.message}`;
-          }
-        }
-      } catch (e) {
-        console.warn("Failed to parse detailed Gemini error message:", e);
-      }
-    }
+    const detailedError = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: "Failed to generate chat title", details: detailedError }, { status: 500 });
   }
 }

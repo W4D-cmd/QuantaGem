@@ -1,4 +1,3 @@
-import { Content, GoogleGenAI, GroundingMetadata, Part, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
@@ -6,26 +5,31 @@ import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { getUserFromToken } from "@/lib/auth";
 import * as cheerio from "cheerio";
 
+type OpenAIMessageContent =
+  | string
+  | (
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+      | { type: "file"; file: { filename: string; file_data: string } }
+    )[];
+
+interface OpenAIMessage {
+  role: "user" | "assistant" | "system";
+  content: OpenAIMessageContent;
+}
+
 interface ChatRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
   messageParts: MessagePart[];
   chatSessionId: string;
   model: string;
-  keySelection: "free" | "paid";
   isSearchActive?: boolean;
-  thinkingBudget?: number;
   isRegeneration?: boolean;
   systemPrompt?: string;
   projectId?: number | null;
 }
 
-const SUPPORTED_GEMINI_MIME_TYPES = [
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/heic",
-  "image/heif",
+const TEXT_MIME_TYPES = new Set([
   "text/plain",
   "text/html",
   "text/css",
@@ -38,10 +42,12 @@ const SUPPORTED_GEMINI_MIME_TYPES = [
   "text/csv",
   "text/xml",
   "text/rtf",
-];
+  "application/json",
+  "application/xml",
+  "application/sql",
+]);
 
-const SOURCE_CODE_EXTENSIONS = [
-  // Web Development
+const SOURCE_CODE_EXTENSIONS = new Set([
   ".html",
   ".htm",
   ".css",
@@ -57,7 +63,6 @@ const SOURCE_CODE_EXTENSIONS = [
   ".vue",
   ".svelte",
   ".astro",
-  // Backend & General Purpose
   ".py",
   ".rb",
   ".php",
@@ -92,7 +97,6 @@ const SOURCE_CODE_EXTENSIONS = [
   ".zig",
   ".cr",
   ".jl",
-  // Shell & Scripting
   ".sh",
   ".bash",
   ".zsh",
@@ -101,10 +105,7 @@ const SOURCE_CODE_EXTENSIONS = [
   ".psd1",
   ".bat",
   ".cmd",
-  // Data & Configuration
-  ".json",
   ".jsonc",
-  ".xml",
   ".yaml",
   ".yml",
   ".toml",
@@ -116,7 +117,6 @@ const SOURCE_CODE_EXTENSIONS = [
   ".graphql",
   ".gql",
   ".proto",
-  // Build & Infrastructure
   ".dockerfile",
   "Dockerfile",
   ".gitignore",
@@ -132,55 +132,34 @@ const SOURCE_CODE_EXTENSIONS = [
   ".tf",
   ".tfvars",
   ".hcl",
-  // SQL
   ".sql",
   ".ddl",
   ".dml",
-  // Markup & Docs
-  ".md",
-  ".markdown",
   ".rst",
   ".adoc",
   ".asciidoc",
   ".tex",
   ".bib",
-  // Other text-based formats
   ".txt",
-  ".csv",
   ".tsv",
   ".log",
   ".diff",
   ".patch",
   ".svg",
   ".ipynb",
-];
+]);
 
-const safetySettings = [
-  {
-    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-    threshold: HarmBlockThreshold.BLOCK_NONE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-    threshold: HarmBlockThreshold.BLOCK_NONE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-    threshold: HarmBlockThreshold.BLOCK_NONE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-    threshold: HarmBlockThreshold.BLOCK_NONE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
-    threshold: HarmBlockThreshold.BLOCK_NONE,
-  },
-];
-
-function getFileExtension(fileName?: string): string {
-  if (!fileName) return "";
-  return (fileName.split(".").pop() || "").toLowerCase();
+function isTextBasedFile(mimeType: string, fileName?: string): boolean {
+  if (TEXT_MIME_TYPES.has(mimeType.toLowerCase())) {
+    return true;
+  }
+  if (fileName) {
+    const extension = `.${fileName.split(".").pop() || ""}`.toLowerCase();
+    if (SOURCE_CODE_EXTENSIONS.has(extension)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function scrapeUrl(url: string): Promise<string | null> {
@@ -203,10 +182,7 @@ async function scrapeUrl(url: string): Promise<string | null> {
       const html = await response.text();
       return parseHtml(html);
     }
-    console.warn(`Googlebot scrape for ${url} failed with status: ${response.status}. Retrying...`);
-  } catch (error) {
-    console.warn(`Googlebot scrape for ${url} threw an error. Retrying...`, error);
-  }
+  } catch (error) {}
 
   try {
     const response = await fetch(url, {
@@ -217,12 +193,71 @@ async function scrapeUrl(url: string): Promise<string | null> {
       const html = await response.text();
       return parseHtml(html);
     }
-    console.error(`Fallback scrape for ${url} also failed with status: ${response.status}`);
     return null;
   } catch (error) {
-    console.error(`Fallback scrape for ${url} also failed with an error:`, error);
     return null;
   }
+}
+
+async function convertAppPartsToOAIContent(
+  appParts: MessagePart[],
+): Promise<{ oaiContent: OpenAIMessageContent; combinedText: string }> {
+  const oaiContentParts: Exclude<OpenAIMessageContent, string> = [];
+  const textParts: string[] = [];
+
+  for (const part of appParts) {
+    if (part.type === "text" && part.text) {
+      textParts.push(part.text);
+    } else if (part.type === "scraped_url" && part.text) {
+      textParts.push(part.text);
+    } else if (part.type === "file" && part.objectName && part.mimeType && part.fileName) {
+      try {
+        const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, part.objectName);
+        const chunks: Buffer[] = [];
+        for await (const chunk of fileStream) {
+          chunks.push(chunk as Buffer);
+        }
+        const fileBuffer = Buffer.concat(chunks);
+
+        if (isTextBasedFile(part.mimeType, part.fileName)) {
+          const fileText = fileBuffer.toString("utf-8");
+          const textBlock = `--- START OF FILE: ${part.fileName} ---\n${fileText}\n--- END OF FILE: ${part.fileName} ---`;
+          textParts.push(textBlock);
+        } else {
+          const base64data = fileBuffer.toString("base64");
+          if (part.mimeType.startsWith("image/")) {
+            oaiContentParts.push({
+              type: "image_url",
+              image_url: { url: `data:${part.mimeType};base64,${base64data}` },
+            });
+          } else if (part.mimeType === "application/pdf") {
+            oaiContentParts.push({
+              type: "file",
+              file: {
+                filename: part.fileName,
+                file_data: `data:application/pdf;base64,${base64data}`,
+              },
+            });
+          } else {
+            textParts.push(`[Unsupported file attached: ${part.fileName}]`);
+          }
+        }
+      } catch (fileError) {
+        console.error(`Failed to process file ${part.objectName}:`, fileError);
+        textParts.push(`[Error processing file: ${part.fileName}]`);
+      }
+    }
+  }
+
+  const combinedText = textParts.join("\n\n");
+  if (combinedText.trim()) {
+    oaiContentParts.unshift({ type: "text", text: combinedText });
+  }
+
+  return {
+    oaiContent: oaiContentParts,
+    combinedText: combinedText.trim(),
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -237,407 +272,180 @@ export async function POST(request: NextRequest) {
     messageParts: originalNewMessageAppParts,
     chatSessionId,
     model,
-    keySelection,
-    isSearchActive,
-    thinkingBudget,
     isRegeneration,
     projectId,
     systemPrompt: newChatSystemPrompt,
   } = (await request.json()) as ChatRequest;
 
-  const newMessageAppParts: MessagePart[] = [...originalNewMessageAppParts];
-  const urlRegex = /https?:\/\/[^\s"'<>()]+/g;
-  const scrapingPromises: Promise<MessagePart | null>[] = [];
+  const apiKey = process.env.OPENAI_API_KEY;
+  const baseUrl = process.env.OPENAI_API_BASE_URL;
 
-  for (const part of originalNewMessageAppParts) {
-    if (part.type === "text" && part.text) {
-      const urls = part.text.match(urlRegex);
-      if (urls) {
-        const uniqueUrls = [...new Set(urls)];
-        for (const url of uniqueUrls) {
-          const promise = scrapeUrl(url).then((scrapedText): MessagePart | null => {
-            if (scrapedText) {
-              return {
-                type: "scraped_url",
-                text: `CONTEXT FROM ${url}:\n---\n${scrapedText}\n---`,
-                url: url,
-              };
-            }
-            return null;
-          });
-          scrapingPromises.push(promise);
-        }
-      }
-    }
-  }
-
-  if (scrapingPromises.length > 0) {
-    const scrapedParts = await Promise.all(scrapingPromises);
-    scrapedParts.forEach((part) => {
-      if (part) {
-        newMessageAppParts.push(part);
-      }
-    });
-  }
-
-  const apiKey = keySelection === "paid" ? process.env.PAID_GOOGLE_API_KEY : process.env.FREE_GOOGLE_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json({ error: `${keySelection.toUpperCase()}_GOOGLE_API_KEY not configured` }, { status: 500 });
+  if (!apiKey || !baseUrl) {
+    return NextResponse.json({ error: "OpenAI API key or base URL not configured" }, { status: 500 });
   }
   if (!model) {
-    return NextResponse.json({ error: "model missing" }, { status: 400 });
-  }
-
-  const genAI = new GoogleGenAI({ apiKey });
-
-  const newMessageGeminiParts: Part[] = [];
-  let combinedUserTextForDB = "";
-
-  for (const appPart of newMessageAppParts) {
-    if (appPart.type === "text" && appPart.text) {
-      newMessageGeminiParts.push({ text: appPart.text });
-      combinedUserTextForDB += (combinedUserTextForDB ? " " : "") + appPart.text;
-    } else if (appPart.type === "scraped_url" && appPart.text) {
-      newMessageGeminiParts.push({ text: appPart.text });
-    } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-      let effectiveMimeType = appPart.mimeType.toLowerCase();
-      const extension = getFileExtension(appPart.fileName);
-
-      if (
-        !SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType) &&
-        SOURCE_CODE_EXTENSIONS.includes(`.${extension}`)
-      ) {
-        console.warn(
-          `Overriding MIME type for source code file ${appPart.fileName || appPart.objectName} from ${effectiveMimeType} to text/plain for Gemini.`,
-        );
-        effectiveMimeType = "text/plain";
-      }
-
-      if (!SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType)) {
-        console.warn(
-          `Skipping new file ${appPart.fileName || appPart.objectName} for Gemini due to unsupported MIME type: ${appPart.mimeType} (effective: ${effectiveMimeType})`,
-        );
-        combinedUserTextForDB +=
-          (combinedUserTextForDB ? " " : "") +
-          `[file: ${appPart.fileName || "file"} - type ${appPart.mimeType} unsupported by AI]`;
-        continue;
-      }
-
-      try {
-        const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-        const chunks: Buffer[] = [];
-        for await (const chunk of fileStream) {
-          chunks.push(chunk as Buffer);
-        }
-        const fileBuffer = Buffer.concat(chunks);
-        newMessageGeminiParts.push({
-          inlineData: {
-            mimeType: effectiveMimeType,
-            data: fileBuffer.toString("base64"),
-          },
-        });
-        if (appPart.fileName) {
-          combinedUserTextForDB += (combinedUserTextForDB ? " " : "") + `[file: ${appPart.fileName}]`;
-        }
-      } catch (fileError) {
-        console.error(
-          `Failed to retrieve or process file ${appPart.objectName} from MinIO for new message:`,
-          fileError,
-        );
-        return NextResponse.json(
-          {
-            error: `Failed to process file: ${appPart.fileName || appPart.objectName}`,
-          },
-          { status: 500 },
-        );
-      }
-    }
-  }
-
-  if (newMessageGeminiParts.length === 0) {
-    const hasActualTextContent = newMessageAppParts.some((p) => p.type === "text" && p.text && p.text.trim() !== "");
-    if (!hasActualTextContent && newMessageAppParts.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            "All uploaded files have types unsupported by the AI or could not be processed. Supported types include common images (PNG, JPEG, WEBP), PDF, and text formats (including source code).",
-        },
-        { status: 400 },
-      );
-    }
-    return NextResponse.json(
-      {
-        error: "No valid content to send to Gemini (message empty or all files unsupported/unprocessed).",
-      },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Model missing" }, { status: 400 });
   }
 
   try {
-    const historyGeminiContents: Content[] = [];
-    if (clientHistoryWithAppParts) {
-      for (const prevMsg of clientHistoryWithAppParts) {
-        const prevMsgGeminiParts: Part[] = [];
-        for (const appPart of prevMsg.parts) {
-          if (appPart.type === "text" && appPart.text) {
-            prevMsgGeminiParts.push({ text: appPart.text });
-          } else if (appPart.type === "scraped_url" && appPart.text) {
-            prevMsgGeminiParts.push({ text: appPart.text });
-          } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-            if (prevMsg.role === "user") {
-              let effectiveMimeType = appPart.mimeType.toLowerCase();
-              const extension = getFileExtension(appPart.fileName);
+    const newMessageAppParts: MessagePart[] = [...originalNewMessageAppParts];
+    const urlRegex = /https?:\/\/[^\s"'<>()]+/g;
+    const scrapingPromises: Promise<MessagePart | null>[] = [];
 
-              if (
-                !SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType) &&
-                SOURCE_CODE_EXTENSIONS.includes(`.${extension}`)
-              ) {
-                effectiveMimeType = "text/plain";
+    for (const part of originalNewMessageAppParts) {
+      if (part.type === "text" && part.text) {
+        const urls = part.text.match(urlRegex);
+        if (urls) {
+          const uniqueUrls = [...new Set(urls)];
+          for (const url of uniqueUrls) {
+            const promise = scrapeUrl(url).then((scrapedText): MessagePart | null => {
+              if (scrapedText) {
+                return {
+                  type: "scraped_url",
+                  text: `CONTEXT FROM ${url}:\n---\n${scrapedText}\n---`,
+                  url: url,
+                };
               }
-
-              if (!SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType)) {
-                console.warn(
-                  `Skipping historical file ${appPart.fileName || appPart.objectName} for Gemini due to unsupported MIME type: ${appPart.mimeType} (effective: ${effectiveMimeType})`,
-                );
-                continue;
-              }
-              try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                const chunks: Buffer[] = [];
-                for await (const chunk of fileStream) {
-                  chunks.push(chunk as Buffer);
-                }
-                const fileBuffer = Buffer.concat(chunks);
-                prevMsgGeminiParts.push({
-                  inlineData: {
-                    mimeType: effectiveMimeType,
-                    data: fileBuffer.toString("base64"),
-                  },
-                });
-              } catch (fileError) {
-                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                return NextResponse.json(
-                  {
-                    error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}`,
-                  },
-                  { status: 500 },
-                );
-              }
-            } else if (prevMsg.role === "model" && appPart.text) {
-              prevMsgGeminiParts.push({ text: appPart.text });
-            }
+              return null;
+            });
+            scrapingPromises.push(promise);
           }
-        }
-        if (prevMsgGeminiParts.length > 0 || prevMsg.role === "model") {
-          historyGeminiContents.push({
-            role: prevMsg.role,
-            parts: prevMsgGeminiParts,
-          });
         }
       }
     }
 
-    const contentsForApi: Content[] = [...historyGeminiContents, { role: "user", parts: newMessageGeminiParts }];
+    if (scrapingPromises.length > 0) {
+      const scrapedParts = await Promise.all(scrapingPromises);
+      scrapedParts.forEach((part) => {
+        if (part) {
+          newMessageAppParts.push(part);
+        }
+      });
+    }
+
+    const messagesForApi: OpenAIMessage[] = [];
 
     let systemPromptText: string | null = null;
-    try {
-      // Priorität 1: Prompt aus dem NewChatScreen
-      if (newChatSystemPrompt && newChatSystemPrompt.trim() !== "") {
-        systemPromptText = newChatSystemPrompt;
-      }
-      // Priorität 2: Prompt aus einem bestehenden Chat oder dessen Projekt
-      else if (chatSessionId) {
-        const chatSettingsResult = await pool.query(
-          "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
-          [chatSessionId, userId],
-        );
-        const chatSettings = chatSettingsResult.rows[0];
-
-        if (chatSettings?.system_prompt?.trim()) {
-          systemPromptText = chatSettings.system_prompt;
-        } else if (chatSettings?.project_id) {
-          const projectSettingsResult = await pool.query(
-            "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
-            [chatSettings.project_id, userId],
-          );
-          if (projectSettingsResult.rows[0]?.system_prompt?.trim()) {
-            systemPromptText = projectSettingsResult.rows[0].system_prompt;
-          }
-        }
-      }
-      // Priorität 3: Prompt aus dem Projekt für einen neuen Chat
-      else if (projectId) {
+    if (newChatSystemPrompt && newChatSystemPrompt.trim() !== "") {
+      systemPromptText = newChatSystemPrompt;
+    } else if (chatSessionId) {
+      const chatSettingsResult = await pool.query(
+        "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
+        [chatSessionId, userId],
+      );
+      const chatSettings = chatSettingsResult.rows[0];
+      if (chatSettings?.system_prompt?.trim()) {
+        systemPromptText = chatSettings.system_prompt;
+      } else if (chatSettings?.project_id) {
         const projectSettingsResult = await pool.query(
           "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
-          [projectId, userId],
+          [chatSettings.project_id, userId],
         );
         if (projectSettingsResult.rows[0]?.system_prompt?.trim()) {
           systemPromptText = projectSettingsResult.rows[0].system_prompt;
         }
       }
-
-      // Priorität 4 (Fallback): Globaler System-Prompt
-      if (!systemPromptText) {
-        const globalSettingsResult = await pool.query("SELECT system_prompt FROM user_settings WHERE user_id = $1", [
-          userId,
-        ]);
-        if (globalSettingsResult.rows[0]?.system_prompt?.trim()) {
-          systemPromptText = globalSettingsResult.rows[0].system_prompt;
-        }
+    } else if (projectId) {
+      const projectSettingsResult = await pool.query(
+        "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
+        [projectId, userId],
+      );
+      if (projectSettingsResult.rows[0]?.system_prompt?.trim()) {
+        systemPromptText = projectSettingsResult.rows[0].system_prompt;
       }
-    } catch (dbError) {
-      console.warn("Failed to fetch system prompt, proceeding without it:", dbError);
     }
-
-    const generationConfig: {
-      systemInstruction?: string;
-      tools?: Array<{ googleSearch: Record<string, never> }>;
-      thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
-      safetySettings?: typeof safetySettings;
-    } = {};
-
-    generationConfig.safetySettings = safetySettings;
-
-    if (systemPromptText && systemPromptText.trim() !== "") {
-      generationConfig.systemInstruction = systemPromptText;
-    }
-
-    if (isSearchActive) {
-      generationConfig.tools = [{ googleSearch: {} }];
-    }
-
-    const isThinkingSupported = model.includes("2.5-pro") || model.includes("2.5-flash");
-    if (isThinkingSupported) {
-      const effectiveThinkingConfig: { thinkingBudget?: number; includeThoughts?: boolean } = {};
-      effectiveThinkingConfig.includeThoughts = true;
-
-      if (thinkingBudget !== undefined) {
-        const isProModel = model.includes("2.5-pro");
-        if (!isProModel || (isProModel && thinkingBudget !== 0)) {
-          effectiveThinkingConfig.thinkingBudget = thinkingBudget;
-        }
+    if (!systemPromptText) {
+      const globalSettingsResult = await pool.query("SELECT system_prompt FROM user_settings WHERE user_id = $1", [
+        userId,
+      ]);
+      if (globalSettingsResult.rows[0]?.system_prompt?.trim()) {
+        systemPromptText = globalSettingsResult.rows[0].system_prompt;
       }
-      generationConfig.thinkingConfig = effectiveThinkingConfig;
     }
 
-    const streamParams: {
-      model: string;
-      contents: Content[];
-      config?: typeof generationConfig;
-    } = {
-      model,
-      contents: contentsForApi,
-    };
-
-    if (Object.keys(generationConfig).length > 0) {
-      streamParams.config = generationConfig;
+    if (systemPromptText) {
+      messagesForApi.push({ role: "system", content: systemPromptText });
     }
 
-    const streamingResult = await genAI.models.generateContentStream(streamParams);
+    for (const prevMsg of clientHistoryWithAppParts) {
+      const { oaiContent } = await convertAppPartsToOAIContent(prevMsg.parts);
+      if ((oaiContent as unknown[]).length > 0) {
+        messagesForApi.push({
+          role: prevMsg.role === "model" ? "assistant" : "user",
+          content: oaiContent,
+        });
+      }
+    }
+
+    const { oaiContent: newMsgOaiContent } = await convertAppPartsToOAIContent(newMessageAppParts);
+    if ((newMsgOaiContent as unknown[]).length > 0) {
+      messagesForApi.push({ role: "user", content: newMsgOaiContent });
+    }
+
+    const apiResponse = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messagesForApi,
+        stream: true,
+      }),
+    });
+
+    if (!apiResponse.ok) {
+      const errorBody = await apiResponse.json();
+      return NextResponse.json({ error: errorBody.error?.message || "API Error" }, { status: apiResponse.status });
+    }
 
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
       async start(controller) {
-        let modelOutput = "";
-        let thoughtSummaryOutput = "";
-        const sourcesToStore: Array<{ title: string; uri: string }> = [];
+        const reader = apiResponse.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-        for await (const chunk of streamingResult) {
-          if (chunk.candidates && chunk.candidates.length > 0) {
-            const candidate = chunk.candidates[0];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
 
-            if (candidate.groundingMetadata) {
-              const groundingMetadata: GroundingMetadata = candidate.groundingMetadata;
-
-              if (groundingMetadata.groundingChunks) {
-                for (const gc of groundingMetadata.groundingChunks) {
-                  if (gc.web && gc.web.title && gc.web.uri) {
-                    const webInfo = gc.web;
-
-                    const isDuplicate = sourcesToStore.some((s) => s.uri === webInfo.uri);
-                    if (!isDuplicate) {
-                      const source = {
-                        title: webInfo.title!,
-                        uri: webInfo.uri!,
-                      };
-                      sourcesToStore.push(source);
-                      const jsonGroundingChunk = {
-                        type: "grounding",
-                        sources: [source],
-                      };
-                      controller.enqueue(encoder.encode(JSON.stringify(jsonGroundingChunk) + "\n"));
-                    }
-                  }
-                }
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.substring(6);
+              if (data.trim() === "[DONE]") {
+                controller.close();
+                return;
               }
-            }
-
-            if (candidate.content?.parts) {
-              for (const part of candidate.content.parts) {
-                if (part.text) {
-                  if (part.thought) {
-                    thoughtSummaryOutput += part.text;
-                    const jsonChunk = { type: "thought", value: part.text };
-                    controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
-                  } else {
-                    modelOutput += part.text;
-                    const jsonChunk = { type: "text", value: part.text };
-                    controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
-                  }
+              try {
+                const json = JSON.parse(data);
+                const textChunk = json.choices?.[0]?.delta?.content;
+                if (textChunk) {
+                  const jsonlChunk = { type: "text", value: textChunk };
+                  controller.enqueue(encoder.encode(JSON.stringify(jsonlChunk) + "\n"));
                 }
+              } catch (e) {
+                console.error("Error parsing stream chunk:", e);
               }
             }
           }
         }
-
-        if (modelOutput.trim() === "") {
-          console.warn(
-            `Gemini model returned an empty message (thoughts received: ${thoughtSummaryOutput.trim() !== ""}). Not saving to DB.`,
-          );
-          const emptyMessageError = {
-            type: "error",
-            value: "Model returned an empty message. Please try again.",
-          };
-          controller.enqueue(encoder.encode(JSON.stringify(emptyMessageError) + "\n"));
-        }
         controller.close();
       },
-      cancel() {},
     });
+
     return new Response(readableStream, {
       headers: { "Content-Type": "application/jsonl; charset=utf-8" },
     });
   } catch (error: unknown) {
-    console.error("Error in Gemini API call or DB operation:", error);
-
-    let detailedError = "An unknown error occurred during the API call.";
-    let status = 500;
-
-    if (typeof error === "object" && error !== null) {
-      if ("status" in error && typeof (error as { status: unknown }).status === "number") {
-        status = (error as { status: number }).status;
-      }
-
-      if ("message" in error && typeof (error as { message: unknown }).message === "string") {
-        let errorMessage = (error as { message: string }).message;
-        try {
-          const match = errorMessage.match(/{.*}/s);
-          if (match && match[0]) {
-            const jsonError = JSON.parse(match[0]);
-            if (jsonError.error && jsonError.error.message) {
-              errorMessage = jsonError.error.message;
-            }
-          }
-        } catch (e) {
-          console.warn("Could not parse nested JSON from error message.");
-        }
-        detailedError = errorMessage;
-      }
-    } else {
-      detailedError = String(error);
-    }
-
-    return NextResponse.json({ error: detailedError }, { status });
+    console.error("Error in chat API handler:", error);
+    const detailedError = error instanceof Error ? error.message : "An unknown server error occurred.";
+    return NextResponse.json({ error: detailedError }, { status: 500 });
   }
 }

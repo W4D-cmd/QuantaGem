@@ -90,8 +90,8 @@ export default function Tooltip({ text, children, offset = 8 }: TooltipProps) {
                   zIndex: 9999,
                   pointerEvents: "none",
                 }}
-                className="bg-black dark:bg-white text-white dark:text-black text-xs rounded-lg py-1 px-2
-                  whitespace-nowrap shadow-lg"
+                className="max-w-md bg-black dark:bg-white text-white dark:text-black text-center text-xs rounded-lg
+                  py-1.5 px-2.5 shadow-lg"
               >
                 {text}
               </motion.div>

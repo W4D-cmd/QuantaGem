@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "TTS Model is required" }, { status: 400 });
   }
 
-  const apiKey = keySelection === "paid" ? process.env.PAID_GOOGLE_API_KEY : process.env.FREE_GOOGLE_API_KEY;
+  const apiKey = process.env.PAID_GOOGLE_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: `${keySelection.toUpperCase()}_GOOGLE_API_KEY not configured` }, { status: 500 });
   }

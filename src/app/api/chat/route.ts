@@ -224,29 +224,25 @@ async function convertAppPartsToOAIContent(
           chunks.push(chunk as Buffer);
         }
         const fileBuffer = Buffer.concat(chunks);
+        const base64data = fileBuffer.toString("base64");
 
-        if (isTextBasedFile(part.mimeType, part.fileName)) {
+        if (part.mimeType.startsWith("image/")) {
+          oaiContentParts.push({
+            type: "image_url",
+            image_url: { url: `data:${part.mimeType};base64,${base64data}` },
+          });
+        } else if (part.mimeType === "application/pdf") {
+          oaiContentParts.push({
+            type: "file",
+            file: {
+              filename: part.fileName,
+              file_data: `data:application/pdf;base64,${base64data}`,
+            },
+          });
+        } else {
           const fileText = fileBuffer.toString("utf-8");
           const textBlock = `--- START OF FILE: ${part.fileName} ---\n${fileText}\n--- END OF FILE: ${part.fileName} ---`;
           textParts.push(textBlock);
-        } else {
-          const base64data = fileBuffer.toString("base64");
-          if (part.mimeType.startsWith("image/")) {
-            oaiContentParts.push({
-              type: "image_url",
-              image_url: { url: `data:${part.mimeType};base64,${base64data}` },
-            });
-          } else if (part.mimeType === "application/pdf") {
-            oaiContentParts.push({
-              type: "file",
-              file: {
-                filename: part.fileName,
-                file_data: `data:application/pdf;base64,${base64data}`,
-              },
-            });
-          } else {
-            textParts.push(`[Unsupported file attached: ${part.fileName}]`);
-          }
         }
       } catch (fileError) {
         console.error(`Failed to process file ${part.objectName}:`, fileError);

@@ -3,6 +3,10 @@
   "extends": [
     "config:recommended"
   ],
+  "baseBranchPatterns": [
+    "main",
+    "feat/openai"
+  ],
   "automerge": false,
   "platformAutomerge": false,
   "packageRules": [

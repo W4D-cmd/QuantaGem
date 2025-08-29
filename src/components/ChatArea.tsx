@@ -654,7 +654,11 @@ function ChatAreaComponent(
   };
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-2 focus:outline-none" tabIndex={-1}>
+    <div
+      ref={containerRef}
+      className="flex-1 overflow-y-auto px-4 py-2 focus:outline-none chat-scroll-gutter"
+      tabIndex={-1}
+    >
       <div className="mx-auto max-w-[52rem] p-4 space-y-4">
         {messages.map((msg, i) => {
           const isUserMessage = msg.role === "user";

@@ -159,11 +159,7 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
                 />
               </div>
             </div>
-            <div
-              ref={listRef}
-              className="flex-auto max-h-80 overflow-y-auto p-2 space-y-1"
-              style={{ scrollbarGutter: "stable" }}
-            >
+            <div ref={listRef} className="flex-auto h-80 overflow-y-auto p-2 space-y-1">
               {filteredAndSortedModels.length > 0 ? (
                 filteredAndSortedModels.map((m) => (
                   <Tooltip key={m.id} text={m.description ?? ""}>

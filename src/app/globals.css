@@ -30,7 +30,6 @@ textarea.resize-none,
 .prose pre,
 .max-h-60.overflow-y-auto,
 .max-h-96.overflow-y-auto {
-  scrollbar-gutter: stable both-edges;
   scrollbar-width: auto;
   scrollbar-color: #888 transparent;
 }
@@ -50,4 +49,8 @@ html.dark .max-h-96.overflow-y-auto {
 
 .prose :not(pre) > code {
   font-size: 0.8125rem;
+}
+
+.chat-scroll-gutter {
+  scrollbar-gutter: stable both-edges;
 }

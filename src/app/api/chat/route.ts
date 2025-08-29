@@ -14,8 +14,9 @@ type OpenAIMessageContent =
     )[];
 
 interface OpenAIMessage {
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   content: OpenAIMessageContent;
+  tool_call_id?: string;
 }
 
 interface ChatRequest {
@@ -277,6 +278,7 @@ export async function POST(request: NextRequest) {
     messageParts: originalNewMessageAppParts,
     chatSessionId,
     model,
+    isSearchActive,
     isRegeneration,
     projectId,
     systemPrompt: newChatSystemPrompt,
@@ -387,17 +389,32 @@ export async function POST(request: NextRequest) {
       messagesForApi.push({ role: "user", content: newMsgOaiContent });
     }
 
+    let modelForApi = model;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const plugins: any[] = [];
+    if (isSearchActive) {
+      modelForApi = `${model}:online`;
+      plugins.push({ id: "web", max_results: 8 });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body: any = {
+      model: modelForApi,
+      messages: messagesForApi,
+      stream: true,
+    };
+
+    if (plugins.length > 0) {
+      body.plugins = plugins;
+    }
+
     const apiResponse = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: model,
-        messages: messagesForApi,
-        stream: true,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!apiResponse.ok) {
@@ -412,11 +429,13 @@ export async function POST(request: NextRequest) {
         const decoder = new TextDecoder();
         let buffer = "";
 
+        const toolCallBuffers: { [key: number]: string } = {};
+        let toolCalls: { id: string; function: { arguments: string; name: string } }[] = [];
+
         while (true) {
           const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
+          if (done) break;
+
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() || "";
@@ -430,19 +449,51 @@ export async function POST(request: NextRequest) {
               }
               try {
                 const json = JSON.parse(data);
-                const textChunk = json.choices?.[0]?.delta?.content;
-                const reasoningChunk = json.choices?.[0]?.delta?.reasoning;
+                const delta = json.choices?.[0]?.delta;
 
-                if (reasoningChunk) {
-                  const jsonlChunk = { type: "thought", value: reasoningChunk };
+                if (delta?.content) {
+                  const jsonlChunk = { type: "text", value: delta.content };
                   controller.enqueue(encoder.encode(JSON.stringify(jsonlChunk) + "\n"));
                 }
-                if (textChunk) {
-                  const jsonlChunk = { type: "text", value: textChunk };
+
+                if (delta?.reasoning) {
+                  const jsonlChunk = { type: "thought", value: delta.reasoning };
                   controller.enqueue(encoder.encode(JSON.stringify(jsonlChunk) + "\n"));
+                }
+
+                if (delta?.tool_calls) {
+                  for (const toolCall of delta.tool_calls) {
+                    if (toolCall?.index !== undefined) {
+                      if (!toolCalls[toolCall.index]) {
+                        toolCalls[toolCall.index] = { id: "", function: { arguments: "", name: "" } };
+                      }
+                      if (toolCall.id) toolCalls[toolCall.index].id = toolCall.id;
+                      if (toolCall.function?.name) toolCalls[toolCall.index].function.name = toolCall.function.name;
+                      if (toolCall.function?.arguments) {
+                        toolCalls[toolCall.index].function.arguments += toolCall.function.arguments;
+                      }
+                    }
+                  }
+                }
+
+                const finishReason = json.choices?.[0]?.finish_reason;
+                if (finishReason === "tool_calls") {
+                  for (const call of toolCalls) {
+                    try {
+                      const args = JSON.parse(call.function.arguments);
+                      if (args.results) {
+                        const citations = args.results;
+                        const jsonlChunk = { type: "citations", value: citations };
+                        controller.enqueue(encoder.encode(JSON.stringify(jsonlChunk) + "\n"));
+                      }
+                    } catch (e) {
+                      console.error("Error parsing tool call arguments:", e, "Raw args:", call.function.arguments);
+                    }
+                  }
+                  toolCalls = [];
                 }
               } catch (e) {
-                console.error("Error parsing stream chunk:", e);
+                console.log("Error parsing stream chunk:", e, "Raw line:", line);
               }
             }
           }

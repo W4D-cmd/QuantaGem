@@ -46,13 +46,19 @@ export interface MessagePart {
   url?: string;
 }
 
+export interface Citation {
+  url: string;
+  title: string;
+  snippet: string;
+}
+
 export interface Message {
   id: number;
   position: number;
   role: "user" | "model";
   parts: MessagePart[];
   thoughtSummary?: string;
-  sources?: Array<{ title: string; uri: string }>;
+  sources?: Citation[];
 }
 
 export interface ChatListItem {
@@ -896,7 +902,7 @@ export default function Home() {
     ): Promise<{
       parts: MessagePart[];
       thoughtSummary: string;
-      sources: Array<{ title: string; uri: string }>;
+      sources: Citation[];
     } | null> => {
       if (placeholderIdToUpdate) {
         messages.findIndex((m) => m.id === placeholderIdToUpdate);
@@ -940,7 +946,7 @@ export default function Home() {
         let textAccumulator = "";
         let thoughtSummaryAccumulator = "";
         let streamBuffer = "";
-        const currentSources: Array<{ title: string; uri: string }> = [];
+        const currentSources: Citation[] = [];
         let modelReturnedEmptyMessage = false;
 
         let thinkingStateReset = false;
@@ -969,9 +975,10 @@ export default function Home() {
                 textAccumulator += parsedChunk.value;
               } else if (parsedChunk.type === "thought") {
                 thoughtSummaryAccumulator += parsedChunk.value;
-              } else if (parsedChunk.type === "grounding" && parsedChunk.sources) {
-                parsedChunk.sources.forEach((s: { title: string; uri: string }) => {
-                  if (!currentSources.some((existing) => existing.uri === s.uri)) currentSources.push(s);
+              } else if (parsedChunk.type === "citations" && parsedChunk.value) {
+                const newCitations = parsedChunk.value as Citation[];
+                newCitations.forEach((c) => {
+                  if (!currentSources.some((existing) => existing.url === c.url)) currentSources.push(c);
                 });
               } else if (parsedChunk.type === "error") {
                 modelReturnedEmptyMessage = true;

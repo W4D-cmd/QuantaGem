@@ -802,31 +802,46 @@ function ChatAreaComponent(
                     })}
                     {msg.role === "model" && msg.sources && msg.sources.length > 0 && (
                       <div
-                        className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800 text-xs
-                          text-neutral-600"
+                        className="mt-4 pt-4 border-t border-neutral-200/80 dark:border-neutral-700/80 text-neutral-800
+                          dark:text-neutral-200"
                       >
-                        <p className="font-semibold mb-2">Sources:</p>
-                        <ul className="list-disc list-inside space-y-1">
+                        <h4 className="font-semibold text-sm mb-3">Sources</h4>
+                        <ol className="space-y-4 list-decimal list-inside">
                           {msg.sources.map((source, k) => (
-                            <li key={k}>
-                              <a
-                                href={source.uri}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600
-                                  break-all"
-                              >
-                                {source.title || source.uri}
-                              </a>
+                            <li key={k} className="text-sm">
+                              <div className="flex flex-col ml-2">
+                                <a
+                                  href={source.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400
+                                    dark:hover:text-blue-300 transition-colors break-words -mt-px"
+                                >
+                                  {source.title || source.url}
+                                </a>
+                                <p
+                                  className="mt-1 text-xs text-neutral-500 dark:text-neutral-400 italic font-mono
+                                    truncate"
+                                >
+                                  {source.url}
+                                </p>
+                                {source.snippet && (
+                                  <p
+                                    className="mt-1 text-xs text-neutral-600 dark:text-neutral-400 border-l-2
+                                      border-neutral-300 dark:border-neutral-600 pl-2 leading-relaxed"
+                                  >
+                                    {source.snippet}
+                                  </p>
+                                )}
+                              </div>
                             </li>
                           ))}
-                        </ul>
+                        </ol>
                       </div>
                     )}
                   </div>
                 )}
               </div>
-
               {!isBeingEdited && !(isLoading && !streamStarted && i === messages.length - 1) && (
                 <div
                   className="flex-shrink-0 flex items-center justify-center gap-1 opacity-0

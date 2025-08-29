@@ -109,7 +109,7 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
                 </div>
               </label>
             </div>
-            <div ref={listRef} className="max-h-96 overflow-y-auto p-2 space-y-1" style={{ scrollbarGutter: "stable" }}>
+            <div ref={listRef} className="flex-auto h-80 overflow-y-auto p-2 space-y-1">
               {displayedModels.map((m) => (
                 <Tooltip key={m.name} text={m.description ?? ""}>
                   <button

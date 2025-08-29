@@ -943,6 +943,7 @@ export default function Home() {
         const currentSources: Array<{ title: string; uri: string }> = [];
         let modelReturnedEmptyMessage = false;
 
+        let thinkingStateReset = false;
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
@@ -961,7 +962,10 @@ export default function Home() {
             try {
               const parsedChunk = JSON.parse(line);
               if (parsedChunk.type === "text") {
-                setIsThinking(false);
+                if (!thinkingStateReset) {
+                  setIsThinking(false);
+                  thinkingStateReset = true;
+                }
                 textAccumulator += parsedChunk.value;
               } else if (parsedChunk.type === "thought") {
                 thoughtSummaryAccumulator += parsedChunk.value;

@@ -182,7 +182,10 @@ async function scrapeUrl(url: string): Promise<string | null> {
       const html = await response.text();
       return parseHtml(html);
     }
-  } catch (error) {}
+    console.warn(`Googlebot scrape for ${url} failed with status: ${response.status}. Retrying...`);
+  } catch (error) {
+    console.warn(`Googlebot scrape for ${url} threw an error. Retrying...`, error);
+  }
 
   try {
     const response = await fetch(url, {
@@ -193,8 +196,10 @@ async function scrapeUrl(url: string): Promise<string | null> {
       const html = await response.text();
       return parseHtml(html);
     }
+    console.error(`Fallback scrape for ${url} also failed with status: ${response.status}`);
     return null;
   } catch (error) {
+    console.error(`Fallback scrape for ${url} also failed with an error:`, error);
     return null;
   }
 }
@@ -426,6 +431,12 @@ export async function POST(request: NextRequest) {
               try {
                 const json = JSON.parse(data);
                 const textChunk = json.choices?.[0]?.delta?.content;
+                const reasoningChunk = json.choices?.[0]?.delta?.reasoning;
+
+                if (reasoningChunk) {
+                  const jsonlChunk = { type: "thought", value: reasoningChunk };
+                  controller.enqueue(encoder.encode(JSON.stringify(jsonlChunk) + "\n"));
+                }
                 if (textChunk) {
                   const jsonlChunk = { type: "text", value: textChunk };
                   controller.enqueue(encoder.encode(JSON.stringify(jsonlChunk) + "\n"));

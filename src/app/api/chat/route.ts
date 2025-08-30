@@ -399,7 +399,7 @@ export async function POST(request: NextRequest) {
       messages: messagesForApi,
       stream: true,
       provider: {
-        quantizations: ["fp8", "fp16", "bf16", "fp32", "unknown", null],
+        quantizations: ["fp8", "fp16", "bf16", "fp32", "unknown"],
       },
     };
 

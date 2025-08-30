@@ -398,6 +398,9 @@ export async function POST(request: NextRequest) {
       model: modelForApi,
       messages: messagesForApi,
       stream: true,
+      provider: {
+        quantizations: ["fp8", "fp16", "bf16", "fp32"],
+      },
     };
 
     if (plugins.length > 0) {

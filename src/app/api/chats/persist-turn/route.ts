@@ -39,11 +39,7 @@ export async function POST(request: NextRequest) {
     let currentChatId = chatSessionId;
 
     if (!currentChatId) {
-      const title =
-        userMessageParts
-          .find((p) => p.type === "text")
-          ?.text?.substring(0, 50)
-          .split("\n")[0] || "New Chat";
+      const title = "New Chat";
 
       const newChatResult = await client.query(
         `INSERT INTO chat_sessions (user_id, title, last_model, project_id, system_prompt)

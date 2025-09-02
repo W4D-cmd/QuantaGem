@@ -48,7 +48,10 @@ Title:`;
     }
 
     const result = await response.json();
-    const generatedTitle = (result.choices?.[0]?.message?.content || "").trim().replace(/^"|"$/g, "");
+    const generatedTitle = (result.choices?.[0]?.message?.content || "")
+      .trim()
+      .replace(/^"|"$/g, "")
+      .replace(/^:\s*/, "");
 
     return NextResponse.json({ title: generatedTitle });
   } catch (error) {

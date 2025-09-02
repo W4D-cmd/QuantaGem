@@ -35,6 +35,7 @@ Title:`;
       },
       body: JSON.stringify({
         model: "google/gemma-3-4b-it",
+        transforms: ["middle-out"],
         messages: [{ role: "user", content: prompt }],
         stream: false,
         max_tokens: 20,

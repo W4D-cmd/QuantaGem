@@ -396,6 +396,7 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body: any = {
       model: modelForApi,
+      transforms: ["middle-out"],
       messages: messagesForApi,
       stream: true,
     };

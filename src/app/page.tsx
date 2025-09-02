@@ -30,7 +30,7 @@ import NewChatScreen from "@/components/NewChatScreen";
 import { OAIModel } from "@/lib/custom-models";
 
 const DEFAULT_MODEL_NAME = "google/gemini-2.5-flash";
-const TITLE_GENERATION_MAX_LENGTH = 30000;
+const TITLE_GENERATION_MAX_LENGTH = 8000;
 const DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 const MAX_RETRIES = 5;
 

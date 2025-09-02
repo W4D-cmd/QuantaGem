@@ -34,7 +34,7 @@ Title:`;
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "google/gemma-3-27b-it",
+        model: "google/gemma-3-4b-it",
         messages: [{ role: "user", content: prompt }],
         stream: false,
         max_tokens: 20,

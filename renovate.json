@@ -7,8 +7,8 @@
     "main",
     "feat/openai"
   ],
-  "automerge": false,
-  "platformAutomerge": false,
+  "automerge": true,
+  "platformAutomerge": true,
   "packageRules": [
     {
       "groupName": "Next.js and React stack",

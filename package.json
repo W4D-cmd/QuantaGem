@@ -22,7 +22,7 @@
     "mime": "^4.0.7",
     "minio": "^8.0.5",
     "next": "15.5.4",
-    "openai": "^5.16.0",
+    "openai": "^6.0.0",
     "pg": "^8.16.0",
     "postcss": "^8.5.4",
     "rate-limiter-flexible": "^8.0.0",

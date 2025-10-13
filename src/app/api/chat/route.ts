@@ -237,13 +237,11 @@ export async function POST(request: NextRequest) {
     messageParts: originalNewMessageAppParts,
     chatSessionId,
     model,
-    keySelection,
     isSearchActive,
     thinkingBudget,
-    isRegeneration,
     projectId,
     systemPrompt: newChatSystemPrompt,
-  } = (await request.json()) as ChatRequest;
+  } = (await request.json()) as Omit<ChatRequest, "keySelection" | "isRegeneration">;
 
   const newMessageAppParts: MessagePart[] = [...originalNewMessageAppParts];
   const urlRegex = /https?:\/\/[^\s"'<>()]+/g;
@@ -280,16 +278,18 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const apiKey = keySelection === "paid" ? process.env.PAID_GOOGLE_API_KEY : process.env.FREE_GOOGLE_API_KEY;
+  const cloudProjectId = process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
 
-  if (!apiKey) {
-    return NextResponse.json({ error: `${keySelection.toUpperCase()}_GOOGLE_API_KEY not configured` }, { status: 500 });
+  if (!cloudProjectId) {
+    return NextResponse.json({ error: "GOOGLE_CLOUD_PROJECT is not configured." }, { status: 500 });
   }
+
   if (!model) {
     return NextResponse.json({ error: "model missing" }, { status: 400 });
   }
 
-  const genAI = new GoogleGenAI({ apiKey });
+  const genAI = new GoogleGenAI({ vertexai: true, project: cloudProjectId, location: location });
 
   const newMessageGeminiParts: Part[] = [];
   let combinedUserTextForDB = "";
@@ -442,12 +442,9 @@ export async function POST(request: NextRequest) {
 
     let systemPromptText: string | null = null;
     try {
-      // Priorität 1: Prompt aus dem NewChatScreen
       if (newChatSystemPrompt && newChatSystemPrompt.trim() !== "") {
         systemPromptText = newChatSystemPrompt;
-      }
-      // Priorität 2: Prompt aus einem bestehenden Chat oder dessen Projekt
-      else if (chatSessionId) {
+      } else if (chatSessionId) {
         const chatSettingsResult = await pool.query(
           "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
           [chatSessionId, userId],
@@ -465,9 +462,7 @@ export async function POST(request: NextRequest) {
             systemPromptText = projectSettingsResult.rows[0].system_prompt;
           }
         }
-      }
-      // Priorität 3: Prompt aus dem Projekt für einen neuen Chat
-      else if (projectId) {
+      } else if (projectId) {
         const projectSettingsResult = await pool.query(
           "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
           [projectId, userId],
@@ -477,7 +472,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Priorität 4 (Fallback): Globaler System-Prompt
       if (!systemPromptText) {
         const globalSettingsResult = await pool.query("SELECT system_prompt FROM user_settings WHERE user_id = $1", [
           userId,
@@ -510,7 +504,10 @@ export async function POST(request: NextRequest) {
     const isThinkingSupported = model.includes("2.5-pro") || model.includes("2.5-flash");
     if (isThinkingSupported) {
       const effectiveThinkingConfig: { thinkingBudget?: number; includeThoughts?: boolean } = {};
-      effectiveThinkingConfig.includeThoughts = true;
+
+      if (thinkingBudget !== 0) {
+        effectiveThinkingConfig.includeThoughts = true;
+      }
 
       if (thinkingBudget !== undefined) {
         const isProModel = model.includes("2.5-pro");
@@ -518,7 +515,10 @@ export async function POST(request: NextRequest) {
           effectiveThinkingConfig.thinkingBudget = thinkingBudget;
         }
       }
-      generationConfig.thinkingConfig = effectiveThinkingConfig;
+
+      if (Object.keys(effectiveThinkingConfig).length > 0) {
+        generationConfig.thinkingConfig = effectiveThinkingConfig;
+      }
     }
 
     const streamParams: {

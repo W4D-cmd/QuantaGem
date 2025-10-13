@@ -8,15 +8,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { keySelection } = await request.json();
-  const apiKey = keySelection === "paid" ? process.env.PAID_GOOGLE_API_KEY : process.env.FREE_GOOGLE_API_KEY;
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
 
-  if (!apiKey) {
-    return NextResponse.json({ error: `${keySelection.toUpperCase()}_GOOGLE_API_KEY not configured` }, { status: 500 });
+  if (!projectId) {
+    return NextResponse.json({ error: "GOOGLE_CLOUD_PROJECT is not configured." }, { status: 500 });
   }
 
   try {
-    const genAI = new GoogleGenAI({ apiKey: apiKey, apiVersion: "v1alpha" });
+    const genAI = new GoogleGenAI({ vertexai: true, project: projectId, location: location, apiVersion: "v1alpha" });
 
     const token = await genAI.authTokens.create({
       config: {

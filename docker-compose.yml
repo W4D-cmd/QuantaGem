@@ -65,6 +65,9 @@ services:
     env_file:
       - .env
       - .env.local
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-key.json
+      GOOGLE_GENAI_USE_VERTEXAI: "True"
     depends_on:
       db:
         condition: service_healthy
@@ -76,6 +79,8 @@ services:
         condition: service_healthy
     ports:
       - "3000:3000"
+    volumes:
+      - ./secrets/gcp-key.json:/run/secrets/gcp-key.json:ro
     command: npm run start
 
 volumes:

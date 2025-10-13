@@ -30,9 +30,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ThinkingOption, getThinkingConfigForModel, getThinkingBudgetMap, getThinkingValueMap } from "@/lib/thinking";
 import { showApiErrorToast } from "@/lib/errors";
 import NewChatScreen from "@/components/NewChatScreen";
+import { customModels } from "@/lib/custom-models";
 
 const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
-const TITLE_GENERATION_MAX_LENGTH = 30000;
+const TITLE_GENERATION_MAX_LENGTH = 5000;
 const DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 const MAX_RETRIES = 5;
 
@@ -565,6 +566,7 @@ export default function Home() {
     });
   }, [activeChatId, fetchAllChats, getAuthHeaders, showToast]);
 
+  /* AUTOMATIC MODEL LIST DISABLED
   useEffect(() => {
     if (!userEmail) return;
 
@@ -609,6 +611,31 @@ export default function Home() {
         setSelectedModel(null);
       });
   }, [keySelection, getAuthHeaders, router, userEmail, showToast]);
+  */
+
+  useEffect(() => {
+    const manualModelList: Model[] = customModels.map((cm) => ({
+      name: cm.modelId,
+      displayName: cm.displayName,
+      description: `Manually loaded model: ${cm.displayName}`,
+      version: "manual",
+      supportedGenerationMethods: ["generateContent"],
+      inputTokenLimit: 32768,
+      outputTokenLimit: 4096,
+    }));
+
+    setModels(manualModelList);
+
+    if (manualModelList.length > 0) {
+      setSelectedModel((current) => {
+        if (current && manualModelList.find((m) => m.name === current.name)) {
+          return current;
+        }
+        const defaultModel = manualModelList.find((m) => m.name === DEFAULT_MODEL_NAME);
+        return defaultModel || manualModelList[0];
+      });
+    }
+  }, []);
 
   const handleRenameChat = async (chatId: number, newTitle: string) => {
     try {

@@ -8,19 +8,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
 
-  const { userMessageContent, keySelection } = await request.json();
+  const { userMessageContent } = (await request.json()) as { userMessageContent: string };
 
   if (!userMessageContent || typeof userMessageContent !== "string") {
     return NextResponse.json({ error: "User message content is required" }, { status: 400 });
   }
 
-  const apiKey = keySelection === "paid" ? process.env.PAID_GOOGLE_API_KEY : process.env.FREE_GOOGLE_API_KEY;
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
 
-  if (!apiKey) {
-    return NextResponse.json({ error: "FREE_GOOGLE_API_KEY not configured" }, { status: 500 });
+  if (!projectId) {
+    return NextResponse.json({ error: "GOOGLE_CLOUD_PROJECT is not configured." }, { status: 500 });
   }
 
-  const genAI = new GoogleGenAI({ apiKey });
+  const genAI = new GoogleGenAI({ vertexai: true, project: projectId, location: location });
 
   const safetySettings = [
     {
@@ -53,12 +54,13 @@ export async function POST(request: NextRequest) {
 Title:`;
 
     const result = await genAI.models.generateContent({
-      model: "models/gemma-3-27b-it",
+      model: "gemini-2.0-flash-lite-001",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
         safetySettings: safetySettings,
       },
     });
+
     const generatedTitle = (result.text || "").trim();
 
     return NextResponse.json({ title: generatedTitle });

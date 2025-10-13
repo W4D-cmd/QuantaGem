@@ -160,18 +160,19 @@ export async function POST(request: NextRequest) {
   }
   const userId = user.id.toString();
 
-  const { history, model, keySelection, chatSessionId } = (await request.json()) as CountTokensRequest;
+  const { history, model, chatSessionId } = (await request.json()) as Omit<CountTokensRequest, "keySelection">;
 
-  const apiKey = keySelection === "paid" ? process.env.PAID_GOOGLE_API_KEY : process.env.FREE_GOOGLE_API_KEY;
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
 
-  if (!apiKey) {
-    return NextResponse.json({ error: `${keySelection.toUpperCase()}_GOOGLE_API_KEY not configured` }, { status: 500 });
+  if (!projectId) {
+    return NextResponse.json({ error: "GOOGLE_CLOUD_PROJECT is not configured." }, { status: 500 });
   }
   if (!model) {
     return NextResponse.json({ error: "model missing" }, { status: 400 });
   }
 
-  const genAI = new GoogleGenAI({ apiKey });
+  const genAI = new GoogleGenAI({ vertexai: true, project: projectId, location: location });
   const contentsForApi: Content[] = [];
 
   try {
@@ -265,8 +266,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const response = await genAI.models.countTokens({ model, contents: contentsForApi });
-    return NextResponse.json({ totalTokens: response.totalTokens });
+    const { totalTokens } = await genAI.models.countTokens({ model, contents: contentsForApi });
+    return NextResponse.json({ totalTokens });
   } catch (error) {
     console.error("Error in token counting:", error);
     const detailedError = error instanceof Error ? error.message : String(error);

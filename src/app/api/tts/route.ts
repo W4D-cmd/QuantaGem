@@ -10,12 +10,11 @@ export async function POST(request: NextRequest) {
 
   const {
     text,
-    keySelection,
     voice,
     model,
   }: {
     text: string;
-    keySelection: "free" | "paid";
+    keySelection: "free" | "paid"; // keySelection is no longer used but kept for request compatibility
     voice: string;
     model: string;
   } = await request.json();
@@ -30,12 +29,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "TTS Model is required" }, { status: 400 });
   }
 
-  const apiKey = keySelection === "paid" ? process.env.PAID_GOOGLE_API_KEY : process.env.FREE_GOOGLE_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: `${keySelection.toUpperCase()}_GOOGLE_API_KEY not configured` }, { status: 500 });
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
+
+  if (!projectId) {
+    return NextResponse.json({ error: "GOOGLE_CLOUD_PROJECT is not configured." }, { status: 500 });
   }
 
-  const genAI = new GoogleGenAI({ apiKey });
+  const genAI = new GoogleGenAI({ vertexai: true, project: projectId, location: location });
 
   const safetySettings = [
     {

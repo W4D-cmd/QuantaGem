@@ -95,7 +95,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({ systemPrompt, onSystemPro
                   {suggestion.icon}
                   <h4 className="font-semibold text-neutral-800 dark:text-neutral-200">{suggestion.title}</h4>
                 </div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-3">{suggestion.prompt}</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">{suggestion.prompt}</p>
               </button>
             ))}
           </div>

@@ -4,9 +4,10 @@ const nextConfig: NextConfig = {
   experimental: {
     useLightningcss: false,
   },
-  webpack: (config) => {
-    config.resolve.alias["drizzle-orm"] = false;
-    return config;
+  turbopack: {
+    resolveAlias: {
+      "drizzle-orm": "@/lib/empty-module.js",
+    },
   },
   async headers() {
     return [

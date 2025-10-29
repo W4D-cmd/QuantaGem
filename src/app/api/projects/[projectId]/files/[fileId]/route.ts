@@ -3,23 +3,20 @@ import { pool } from "@/lib/db";
 import { getUserFromToken } from "@/lib/auth";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ projectId: string; fileId: string }> },
-) {
+export async function DELETE(request: NextRequest, { params }: { params: { projectId: string; fileId: string } }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
-  const { projectId, fileId } = await params;
+  const { projectId, fileId } = params;
 
   try {
     const projectCheck = await pool.query(
       `SELECT id
-       FROM projects
-       WHERE id = $1
-         AND user_id = $2`,
+             FROM projects
+             WHERE id = $1
+               AND user_id = $2`,
       [projectId, userId],
     );
     if (projectCheck.rowCount === 0) {
@@ -28,10 +25,10 @@ export async function DELETE(
 
     const fileResult = await pool.query(
       `SELECT object_name
-       FROM project_files
-       WHERE id = $1
-         AND project_id = $2
-         AND user_id = $3`,
+             FROM project_files
+             WHERE id = $1
+               AND project_id = $2
+               AND user_id = $3`,
       [fileId, projectId, userId],
     );
 
@@ -55,10 +52,10 @@ export async function DELETE(
 
     const deleteResult = await pool.query(
       `DELETE
-       FROM project_files
-       WHERE id = $1
-         AND project_id = $2
-         AND user_id = $3`,
+             FROM project_files
+             WHERE id = $1
+               AND project_id = $2
+               AND user_id = $3`,
       [fileId, projectId, userId],
     );
 

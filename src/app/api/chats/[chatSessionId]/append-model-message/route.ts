@@ -9,14 +9,14 @@ interface AppendModelMessageRequest {
   modelSources: Array<{ title: string; uri: string }>;
 }
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ chatSessionId: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: { chatSessionId: string } }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
-  const { chatSessionId } = await params;
+  const { chatSessionId } = params;
   if (!chatSessionId) {
     return NextResponse.json({ error: "Chat session ID is required" }, { status: 400 });
   }
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     await client.query(
       `INSERT INTO messages (chat_session_id, role, content, parts, position, sources, thought_summary)
-       VALUES ($1, 'model', $2, $3, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $4, $5)`,
+             VALUES ($1, 'model', $2, $3, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $4, $5)`,
       [
         chatSessionId,
         modelContent,

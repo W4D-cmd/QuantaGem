@@ -2,35 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
 import { getUserFromToken } from "@/lib/auth";
 
-export async function GET(
-  request: NextRequest,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  context: any,
-) {
+export async function GET(request: NextRequest, context: { params: { objectKey: string[] } }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
 
-  const params = context.params as { objectKey: string[] };
+  const { objectKey } = context.params;
 
-  if (!params || !params.objectKey) {
-    console.error("Invalid params in GET /api/files:", params);
-    return NextResponse.json({ error: "Internal server error: Invalid route parameters" }, { status: 500 });
-  }
-  const objectPathParams = params.objectKey;
-
-  if (!Array.isArray(objectPathParams)) {
-    console.error("objectKey is not an array:", objectPathParams);
-    return NextResponse.json({ error: "Internal server error: Invalid objectKey format" }, { status: 500 });
+  if (!objectKey || !Array.isArray(objectKey) || objectKey.length === 0) {
+    console.error("Invalid objectKey in GET /api/files:", objectKey);
+    return NextResponse.json({ error: "File path is missing or invalid" }, { status: 400 });
   }
 
-  const objectPath = objectPathParams.join("/");
-
-  if (!objectPath && objectPathParams.length > 0 && objectPathParams[0] !== "") {
-  } else if (!objectPath && (objectPathParams.length === 0 || objectPathParams[0] === "")) {
-    return NextResponse.json({ error: "File path is missing" }, { status: 400 });
-  }
+  const objectPath = objectKey.join("/");
 
   try {
     const stat = await minioClient.statObject(MINIO_BUCKET_NAME, objectPath);

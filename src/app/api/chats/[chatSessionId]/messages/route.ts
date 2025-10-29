@@ -4,14 +4,14 @@ import { getUserFromToken } from "@/lib/auth";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ chatSessionId: string }> }) {
+export async function PATCH(request: NextRequest, { params }: { params: { chatSessionId: string } }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
-  const { chatSessionId } = await params;
+  const { chatSessionId } = params;
   const { messageId, newParts } = (await request.json()) as { messageId: number; newParts: MessagePart[] };
 
   if (!messageId || !newParts) {
@@ -90,14 +90,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ chatSessionId: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: { chatSessionId: string } }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
-  const { chatSessionId } = await params;
+  const { chatSessionId } = params;
   const fromPositionStr = request.nextUrl.searchParams.get("fromPosition");
 
   if (!fromPositionStr) {

@@ -3,13 +3,13 @@ import { pool } from "@/lib/db";
 import { getUserFromToken } from "@/lib/auth";
 import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
 
-export async function GET(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
-  const { projectId } = params;
+  const { projectId } = await context.params;
 
   try {
     const projectResult = await pool.query(
@@ -44,13 +44,13 @@ export async function GET(request: NextRequest, { params }: { params: { projectI
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
-  const { projectId } = params;
+  const { projectId } = await context.params;
   const { title, systemPrompt } = (await request.json()) as {
     title?: string;
     systemPrompt?: string;
@@ -98,13 +98,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { projec
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
-  const { projectId } = params;
+  const { projectId } = await context.params;
 
   try {
     const projectCheck = await pool.query(`SELECT id FROM projects WHERE id = $1 AND user_id = $2`, [

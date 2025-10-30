@@ -4,14 +4,14 @@ import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
 import { getUserFromToken } from "@/lib/auth";
 
-export async function GET(request: NextRequest, { params }: { params: { chatSessionId: string } }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
-  const { chatSessionId } = params;
+  const { chatSessionId } = await context.params;
   const client = await pool.connect();
   try {
     const chatSessionResult = await client.query(
@@ -53,14 +53,14 @@ export async function GET(request: NextRequest, { params }: { params: { chatSess
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { chatSessionId: string } }) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
-  const { chatSessionId } = params;
+  const { chatSessionId } = await context.params;
   const { title, lastModel, systemPrompt, keySelection, projectId, thinkingBudget } = (await request.json()) as {
     title?: string;
     lastModel?: string;
@@ -138,14 +138,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { chatSe
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { chatSessionId: string } }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
-  const { chatSessionId } = params;
+  const { chatSessionId } = await context.params;
 
   try {
     const chatSessionCheck = await pool.query(

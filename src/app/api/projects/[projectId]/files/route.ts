@@ -4,13 +4,13 @@ import { getUserFromToken } from "@/lib/auth";
 import { minioClient, MINIO_BUCKET_NAME, ensureBucketExists } from "@/lib/minio";
 import { randomUUID } from "crypto";
 
-export async function GET(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
-  const { projectId } = params;
+  const { projectId } = await context.params;
 
   try {
     const projectCheck = await pool.query(`SELECT id FROM projects WHERE id = $1 AND user_id = $2`, [
@@ -36,13 +36,13 @@ export async function GET(request: NextRequest, { params }: { params: { projectI
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function POST(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
-  const { projectId } = params;
+  const { projectId } = await context.params;
 
   try {
     const projectCheck = await pool.query(`SELECT id FROM projects WHERE id = $1 AND user_id = $2`, [

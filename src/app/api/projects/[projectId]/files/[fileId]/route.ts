@@ -3,13 +3,16 @@ import { pool } from "@/lib/db";
 import { getUserFromToken } from "@/lib/auth";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 
-export async function DELETE(request: NextRequest, { params }: { params: { projectId: string; fileId: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ projectId: string; fileId: string }> },
+) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
-  const { projectId, fileId } = params;
+  const { projectId, fileId } = await context.params;
 
   try {
     const projectCheck = await pool.query(

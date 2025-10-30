@@ -9,14 +9,14 @@ interface AppendModelMessageRequest {
   modelSources: Array<{ title: string; uri: string }>;
 }
 
-export async function POST(request: NextRequest, { params }: { params: { chatSessionId: string } }) {
+export async function POST(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id.toString();
 
-  const { chatSessionId } = params;
+  const { chatSessionId } = await context.params;
   if (!chatSessionId) {
     return NextResponse.json({ error: "Chat session ID is required" }, { status: 400 });
   }

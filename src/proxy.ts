@@ -12,7 +12,7 @@ const publicPaths = [
   "/highlightjs-themes/:path*",
 ];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   if (request.method === "OPTIONS") {

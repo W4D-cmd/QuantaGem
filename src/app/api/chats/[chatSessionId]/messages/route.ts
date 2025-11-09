@@ -67,7 +67,9 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
       console.log(`Deleting ${fileNamesToDelete.length} orphaned Google files from message edit.`);
       const genAI = getGoogleGenAI();
       const deletePromises = fileNamesToDelete.map((name) => genAI.files.delete({ name }));
-      await Promise.all(deletePromises);
+      await Promise.all(deletePromises).catch((err) =>
+        console.error("Failed to delete one or more orphaned Google files:", err),
+      );
     }
 
     const newContent = newParts

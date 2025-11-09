@@ -78,8 +78,9 @@ export async function POST(request: NextRequest) {
     const originalMessages = originalMessagesResult.rows;
 
     for (const msg of originalMessages) {
-      // Since Google Files are immutable and identified by their URI, we don't need to re-upload.
-      // We can just copy the parts array, which contains the references.
+      // Since Google Files are referenced by URI and are immutable for prompts,
+      // we can just copy the parts array. No physical duplication is needed for ad-hoc files.
+      // Project files are also just references.
       await client.query(
         `INSERT INTO messages (chat_session_id, role, content, parts, position, sources, thought_summary)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,

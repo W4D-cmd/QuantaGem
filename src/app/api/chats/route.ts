@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
 import { getUserFromToken } from "@/lib/auth";
+import { getGoogleGenAI } from "@/lib/google-genai";
 
 export async function GET(request: NextRequest) {
   const user = await getUserFromToken(request);
@@ -56,30 +56,30 @@ export async function DELETE(request: NextRequest) {
       [chatSessionIds],
     );
 
-    const objectNamesToDelete: string[] = [];
+    const googleFileNamesToDelete: string[] = [];
     messagesResult.rows.forEach((message) => {
       if (message.parts && Array.isArray(message.parts)) {
         message.parts.forEach((part: MessagePart) => {
-          if (part.type === "file" && part.objectName) {
-            objectNamesToDelete.push(part.objectName);
+          if (part.type === "file" && part.googleFileName && !part.isProjectFile) {
+            googleFileNamesToDelete.push(part.googleFileName);
           }
         });
       }
     });
 
-    if (objectNamesToDelete.length > 0) {
-      const uniqueObjectNames = Array.from(new Set(objectNamesToDelete));
+    if (googleFileNamesToDelete.length > 0) {
+      const uniqueFileNames = Array.from(new Set(googleFileNamesToDelete));
       console.log(
-        `Attempting to delete ${uniqueObjectNames.length} objects from Minio for user ${userId}'s global chats:`,
-        uniqueObjectNames,
+        `Attempting to delete ${uniqueFileNames.length} ad-hoc Google files for user ${userId}'s global chats.`,
       );
       try {
-        await minioClient.removeObjects(MINIO_BUCKET_NAME, uniqueObjectNames);
-        console.log(
-          `Successfully submitted deletion request for ${uniqueObjectNames.length} objects from MinIO for user ${userId}'s global chats.`,
-        );
-      } catch (minioError) {
-        console.error(`Error deleting objects from MinIO for user ${userId}'s global chats:`, minioError);
+        const genAI = getGoogleGenAI();
+        const deletePromises = uniqueFileNames.map((name) => genAI.files.delete({ name }));
+        await Promise.all(deletePromises);
+        console.log(`Successfully submitted deletion request for ${uniqueFileNames.length} Google files.`);
+      } catch (googleFileError) {
+        console.error(`Error deleting files from Google API for user ${userId}'s global chats:`, googleFileError);
+        // Log error but don't block DB deletion
       }
     }
 
@@ -87,7 +87,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      message: "All global chat sessions and associated files deleted for user.",
+      message: "All global chat sessions and associated ad-hoc files deleted for user.",
     });
   } catch (error) {
     console.error(`Error deleting all global chat sessions for user ${userId}:`, error);

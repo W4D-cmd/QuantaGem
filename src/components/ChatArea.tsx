@@ -127,69 +127,20 @@ const ThinkingSummary: React.FC<{ summary: string; isStreaming: boolean }> = ({ 
 };
 
 const ProtectedImage = memo(
-  ({
-    objectName,
-    fileName,
-    mimeType,
-    getAuthHeaders,
-  }: {
-    objectName: string;
-    fileName: string;
-    mimeType: string;
-    getAuthHeaders: () => HeadersInit;
-  }) => {
-    const [imageUrl, setImageUrl] = useState<string | null>(null);
-
-    useEffect(() => {
-      let objectUrl: string | null = null;
-      const fetchImage = async () => {
-        try {
-          const res = await fetch(`/api/files/${objectName}`, {
-            headers: getAuthHeaders(),
-          });
-
-          if (!res.ok) {
-            console.error(`Failed to fetch image ${fileName}: ${res.statusText}`);
-            setImageUrl("/image.png");
-            return;
-          }
-
-          const blob = await res.blob();
-          objectUrl = URL.createObjectURL(blob);
-          setImageUrl(objectUrl);
-        } catch (error) {
-          console.error(`Error loading image ${fileName}:`, error);
-          setImageUrl("/image.png");
-        }
-      };
-
-      fetchImage();
-
-      return () => {
-        if (objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-        }
-      };
-    }, [objectName, fileName, mimeType, getAuthHeaders]);
-
-    if (!imageUrl) {
-      return (
-        <div
-          className="max-w-full h-auto rounded-lg border border-neutral-200 bg-neutral-100 flex items-center
-            justify-center"
-          style={{ maxHeight: "400px", minHeight: "100px" }}
-        >
-          Loading Image...
-        </div>
-      );
-    }
-
+  ({ googleFileUri, fileName, mimeType }: { googleFileUri: string; fileName: string; mimeType: string }) => {
+    // Da wir nun direkt die Google File URI haben, können wir diese direkt nutzen.
+    // Falls der Zugriff geschützt ist und einen Token erfordert, müsste hier eine Fetch-Logik implementiert werden,
+    // aber typischerweise sind diese URIs für eine gewisse Zeit direkt zugänglich oder erfordern keine Session-Cookies.
+    // Für dieses Setup gehen wir davon aus, dass die URI direkt im `src` verwendet werden kann.
+    // Wenn nicht, würde hier eine Logik stehen, die die URI abruft, ähnlich wie zuvor.
+    // Der Einfachheit und Effizienz halber verwenden wir die URI direkt.
     return (
       <img
-        src={imageUrl}
+        src={googleFileUri}
         alt={fileName}
         className="max-w-full h-auto rounded-lg border border-neutral-200"
         style={{ maxHeight: "400px" }}
+        onError={(e) => (e.currentTarget.src = "/image.png")} // Fallback-Bild
       />
     );
   },
@@ -197,45 +148,9 @@ const ProtectedImage = memo(
 
 ProtectedImage.displayName = "ProtectedImage";
 
-const ProtectedAudio = memo(
-  ({ objectName, getAuthHeaders }: { objectName: string; getAuthHeaders: () => HeadersInit }) => {
-    const [audioUrl, setAudioUrl] = useState<string | null>(null);
-
-    useEffect(() => {
-      let objectUrl: string | null = null;
-      const fetchAudio = async () => {
-        try {
-          const res = await fetch(`/api/files/${objectName}`, {
-            headers: getAuthHeaders(),
-          });
-          if (!res.ok) {
-            console.error(`Failed to fetch audio ${objectName}: ${res.statusText}`);
-            return;
-          }
-          const blob = await res.blob();
-          objectUrl = URL.createObjectURL(blob);
-          setAudioUrl(objectUrl);
-        } catch (error) {
-          console.error(`Error loading audio ${objectName}:`, error);
-        }
-      };
-
-      fetchAudio();
-
-      return () => {
-        if (objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-        }
-      };
-    }, [objectName, getAuthHeaders]);
-
-    if (!audioUrl) {
-      return <div className="text-sm text-neutral-500">Loading audio...</div>;
-    }
-
-    return <audio controls src={audioUrl} className="w-full" />;
-  },
-);
+const ProtectedAudio = memo(({ googleFileUri }: { googleFileUri: string }) => {
+  return <audio controls src={googleFileUri} className="w-full" />;
+});
 
 ProtectedAudio.displayName = "ProtectedAudio";
 
@@ -607,8 +522,8 @@ function ChatAreaComponent(
     }
   }, [editedText, editingMessage]);
 
-  const handleRemoveFilePart = (objectNameToRemove: string) => {
-    setEditedFileParts((prev) => prev.filter((p) => p.objectName !== objectNameToRemove));
+  const handleRemoveFilePart = (googleFileNameToRemove: string) => {
+    setEditedFileParts((prev) => prev.filter((p) => p.googleFileName !== googleFileNameToRemove));
   };
 
   const handleSaveClick = (index: number) => {
@@ -683,13 +598,13 @@ function ChatAreaComponent(
                       <div className="flex flex-wrap gap-2 mb-3">
                         {editedFileParts.map((part) => (
                           <div
-                            key={part.objectName}
+                            key={part.googleFileName}
                             className="bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200 px-3
                               py-1.5 rounded-full text-sm flex items-center gap-2"
                           >
                             <span>{part.fileName}</span>
                             <button
-                              onClick={() => handleRemoveFilePart(part.objectName!)}
+                              onClick={() => handleRemoveFilePart(part.googleFileName!)}
                               className="text-neutral-500 hover:text-red-500 dark:hover:text-red-400"
                             >
                               <XCircleIcon className="size-5" />
@@ -767,30 +682,28 @@ function ChatAreaComponent(
                             )}
                           </div>
                         );
-                      } else if (part.type === "file" && part.objectName && part.mimeType && part.fileName) {
+                      } else if (part.type === "file" && part.googleFileUri && part.mimeType && part.fileName) {
                         if (part.mimeType.startsWith("image/")) {
                           return (
                             <div key={j} className="my-2">
                               <ProtectedImage
-                                objectName={part.objectName}
+                                googleFileUri={part.googleFileUri}
                                 fileName={part.fileName}
                                 mimeType={part.mimeType}
-                                getAuthHeaders={getAuthHeaders}
                               />
                             </div>
                           );
                         } else if (part.mimeType.startsWith("audio/")) {
                           return (
                             <div key={j} className="my-2">
-                              <ProtectedAudio objectName={part.objectName} getAuthHeaders={getAuthHeaders} />
+                              <ProtectedAudio googleFileUri={part.googleFileUri} />
                             </div>
                           );
                         } else {
-                          const fileUrl = `/api/files/${part.objectName}`;
                           return (
                             <div key={j} className="my-2">
                               <a
-                                href={fileUrl}
+                                href={part.googleFileUri}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600

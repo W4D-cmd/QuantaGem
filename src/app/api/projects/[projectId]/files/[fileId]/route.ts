@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { getUserFromToken } from "@/lib/auth";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
+import { getGoogleGenAI } from "@/lib/google-genai";
 
 export async function DELETE(
   request: NextRequest,
@@ -17,9 +18,9 @@ export async function DELETE(
   try {
     const projectCheck = await pool.query(
       `SELECT id
-             FROM projects
-             WHERE id = $1
-               AND user_id = $2`,
+       FROM projects
+       WHERE id = $1
+         AND user_id = $2`,
       [projectId, userId],
     );
     if (projectCheck.rowCount === 0) {
@@ -27,11 +28,11 @@ export async function DELETE(
     }
 
     const fileResult = await pool.query(
-      `SELECT object_name
-             FROM project_files
-             WHERE id = $1
-               AND project_id = $2
-               AND user_id = $3`,
+      `SELECT object_name, google_file_name
+       FROM project_files
+       WHERE id = $1
+         AND project_id = $2
+         AND user_id = $3`,
       [fileId, projectId, userId],
     );
 
@@ -39,26 +40,34 @@ export async function DELETE(
       return NextResponse.json({ error: "File not found in project or not owned by user" }, { status: 404 });
     }
 
-    const objectNameToDelete = fileResult.rows[0].object_name;
+    const { object_name: objectNameToDelete, google_file_name: googleFileNameToDelete } = fileResult.rows[0];
 
+    // Delete from MinIO
     try {
       await minioClient.removeObject(MINIO_BUCKET_NAME, objectNameToDelete);
-      console.log(
-        `Successfully deleted object ${objectNameToDelete} from MinIO for project file ${fileId} (project ${projectId}, user ${userId}).`,
-      );
+      console.log(`Successfully deleted object ${objectNameToDelete} from MinIO for project file ${fileId}.`);
     } catch (minioError) {
-      console.error(
-        `Error deleting object ${objectNameToDelete} from MinIO for project file ${fileId} (project ${projectId}, user ${userId}):`,
-        minioError,
-      );
+      console.error(`Error deleting object ${objectNameToDelete} from MinIO:`, minioError);
     }
 
+    // Delete from Google Files API
+    if (googleFileNameToDelete) {
+      try {
+        const genAI = getGoogleGenAI();
+        await genAI.files.delete({ name: googleFileNameToDelete });
+        console.log(`Successfully deleted file ${googleFileNameToDelete} from Google Files API.`);
+      } catch (googleFileError) {
+        console.error(`Error deleting file ${googleFileNameToDelete} from Google Files API:`, googleFileError);
+      }
+    }
+
+    // Delete from database
     const deleteResult = await pool.query(
       `DELETE
-             FROM project_files
-             WHERE id = $1
-               AND project_id = $2
-               AND user_id = $3`,
+       FROM project_files
+       WHERE id = $1
+         AND project_id = $2
+         AND user_id = $3`,
       [fileId, projectId, userId],
     );
 
@@ -68,7 +77,7 @@ export async function DELETE(
 
     return NextResponse.json({
       ok: true,
-      message: "Project file and associated object deleted successfully.",
+      message: "Project file and associated remote objects deleted successfully.",
     });
   } catch (error) {
     console.error(`Error deleting project file ${fileId} from project ${projectId} (user ${userId}):`, error);

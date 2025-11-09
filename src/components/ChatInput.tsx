@@ -43,11 +43,14 @@ import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export interface UploadedFileInfo {
-  objectName: string;
+  uniqueId: string;
+  googleFileName: string;
+  googleFileUri: string;
   fileName: string;
   mimeType: string;
   size: number;
   isProjectFile?: boolean;
+  projectFileId?: number;
 }
 
 interface ChatInputProps {
@@ -274,8 +277,11 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
-              const result: UploadedFileInfo = JSON.parse(xhr.responseText);
-              resolve(result);
+              const result = JSON.parse(xhr.responseText);
+              resolve({
+                ...result,
+                uniqueId: `adhoc-${result.googleFileName}`,
+              });
             } catch (e) {
               console.error("Error parsing upload response:", e);
               showToast(`Upload failed for ${uploadingFile.file.name}: Invalid server response`, "error");
@@ -493,8 +499,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       }
     };
 
-    const removeSelectedFile = (objectNameToRemove: string) => {
-      setSelectedFiles((prev) => prev.filter((file) => file.objectName !== objectNameToRemove));
+    const removeSelectedFile = (uniqueIdToRemove: string) => {
+      setSelectedFiles((prev) => prev.filter((file) => file.uniqueId !== uniqueIdToRemove));
     };
 
     const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -547,29 +553,37 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       const prefix = input.substring(0, hashIndex);
 
       if (file.id === -1) {
-        const currentlySelected = new Set(selectedFiles.map((f) => f.objectName));
+        const currentlySelectedIds = new Set(selectedFiles.map((f) => f.uniqueId));
         const filesToAdd = projectFiles
-          .filter((pf) => !currentlySelected.has(pf.objectName))
-          .map((pf) => ({
-            objectName: pf.objectName,
-            fileName: pf.fileName,
-            mimeType: pf.mimeType,
-            size: pf.size,
-            isProjectFile: true,
-            projectFileId: pf.id,
-          }));
+          .filter((pf) => !currentlySelectedIds.has(`proj-${pf.id}`))
+          .map(
+            (pf) =>
+              ({
+                uniqueId: `proj-${pf.id}`,
+                fileName: pf.fileName,
+                mimeType: pf.mimeType,
+                size: pf.size,
+                googleFileName: pf.googleFileName,
+                googleFileUri: pf.googleFileUri,
+                isProjectFile: true,
+                projectFileId: pf.id,
+              }) as UploadedFileInfo,
+          );
 
         if (filesToAdd.length > 0) {
           setSelectedFiles((prev) => [...prev, ...filesToAdd]);
         }
       } else {
+        const uniqueId = `proj-${file.id}`;
         setSelectedFiles((prev) => {
-          if (!prev.some((sf) => sf.objectName === file.objectName)) {
-            const newFilePart = {
-              objectName: file.objectName,
+          if (!prev.some((sf) => sf.uniqueId === uniqueId)) {
+            const newFilePart: UploadedFileInfo = {
+              uniqueId,
               fileName: file.fileName,
               mimeType: file.mimeType,
               size: file.size,
+              googleFileName: file.googleFileName!,
+              googleFileUri: file.googleFileUri!,
               isProjectFile: true,
               projectFileId: file.id,
             };
@@ -754,7 +768,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               >
                 {selectedFiles.map((file) => (
                   <div
-                    key={file.objectName}
+                    key={file.uniqueId}
                     className="bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-400 px-3 py-1
                       rounded-full text-sm flex items-center gap-2 transition-colors duration-300 ease-in-out"
                   >
@@ -762,7 +776,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     {!isLoading && (
                       <XCircleIcon
                         className="size-4 text-neutral-500 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
-                        onClick={() => removeSelectedFile(file.objectName)}
+                        onClick={() => removeSelectedFile(file.uniqueId)}
                       />
                     )}
                   </div>

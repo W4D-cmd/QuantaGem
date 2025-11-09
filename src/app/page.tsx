@@ -42,8 +42,9 @@ export interface MessagePart {
   text?: string;
   fileName?: string;
   mimeType?: string;
-  objectName?: string;
   size?: number;
+  googleFileName?: string;
+  googleFileUri?: string;
   isProjectFile?: boolean;
   projectFileId?: number;
   url?: string;
@@ -83,6 +84,8 @@ export interface ProjectFile {
   fileName: string;
   mimeType: string;
   size: number;
+  googleFileName?: string;
+  googleFileUri?: string;
 }
 
 interface ConfirmationModalState {
@@ -1228,7 +1231,18 @@ export default function Home() {
     if (inputText.trim()) {
       newUserMessageParts.push({ type: "text", text: inputText.trim() });
     }
-    uploadedFiles.forEach((file) => newUserMessageParts.push({ type: "file", ...file }));
+    uploadedFiles.forEach((file) =>
+      newUserMessageParts.push({
+        type: "file",
+        fileName: file.fileName,
+        mimeType: file.mimeType,
+        size: file.size,
+        googleFileName: file.googleFileName,
+        googleFileUri: file.googleFileUri,
+        isProjectFile: file.isProjectFile,
+        projectFileId: file.projectFileId,
+      }),
+    );
 
     const tempUserMessageId = Date.now();
     const newUserMessage: Message = {
@@ -1382,8 +1396,9 @@ export default function Home() {
           type: "file",
           fileName: "Live Audio Response",
           mimeType: audioInfo.mimeType,
-          objectName: audioInfo.objectName,
           size: audioInfo.size,
+          googleFileName: audioInfo.googleFileName,
+          googleFileUri: audioInfo.googleFileUri,
         });
       } catch (err) {
         showToast(extractErrorMessage(err), "error");

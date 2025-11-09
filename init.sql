@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS project_files (
   file_name TEXT NOT NULL,
   mime_type TEXT NOT NULL,
   size BIGINT NOT NULL,
+  google_file_name TEXT,
+  google_file_uri TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (project_id, object_name)
 );

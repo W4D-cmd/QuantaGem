@@ -1,10 +1,19 @@
-import { Content, GoogleGenAI, GroundingMetadata, Part, HarmCategory, HarmBlockThreshold } from "@google/genai";
+import {
+  Content,
+  GoogleGenAI,
+  GroundingMetadata,
+  Part,
+  HarmCategory,
+  HarmBlockThreshold,
+  File as GoogleFile,
+} from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { getUserFromToken } from "@/lib/auth";
 import * as cheerio from "cheerio";
+import { getGoogleGenAI } from "@/lib/google-genai";
 
 interface ChatRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
@@ -18,142 +27,6 @@ interface ChatRequest {
   systemPrompt?: string;
   projectId?: number | null;
 }
-
-const SUPPORTED_GEMINI_MIME_TYPES = [
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-  "text/plain",
-  "text/html",
-  "text/css",
-  "text/javascript",
-  "application/x-javascript",
-  "text/x-python",
-  "application/x-python",
-  "text/markdown",
-  "text/md",
-  "text/csv",
-  "text/xml",
-  "text/rtf",
-];
-
-const SOURCE_CODE_EXTENSIONS = [
-  // Web Development
-  ".html",
-  ".htm",
-  ".css",
-  ".scss",
-  ".sass",
-  ".less",
-  ".js",
-  ".mjs",
-  ".cjs",
-  ".ts",
-  ".tsx",
-  ".jsx",
-  ".vue",
-  ".svelte",
-  ".astro",
-  // Backend & General Purpose
-  ".py",
-  ".rb",
-  ".php",
-  ".java",
-  ".kt",
-  ".kts",
-  ".scala",
-  ".go",
-  ".rs",
-  ".cs",
-  ".fs",
-  ".fsx",
-  ".swift",
-  ".c",
-  ".cpp",
-  ".h",
-  ".hpp",
-  ".m",
-  ".mm",
-  ".dart",
-  ".lua",
-  ".pl",
-  ".pm",
-  ".t",
-  ".r",
-  ".erl",
-  ".hrl",
-  ".ex",
-  ".exs",
-  ".hs",
-  ".d",
-  ".zig",
-  ".cr",
-  ".jl",
-  // Shell & Scripting
-  ".sh",
-  ".bash",
-  ".zsh",
-  ".ps1",
-  ".psm1",
-  ".psd1",
-  ".bat",
-  ".cmd",
-  // Data & Configuration
-  ".json",
-  ".jsonc",
-  ".xml",
-  ".yaml",
-  ".yml",
-  ".toml",
-  ".ini",
-  ".cfg",
-  ".conf",
-  ".env",
-  ".properties",
-  ".graphql",
-  ".gql",
-  ".proto",
-  // Build & Infrastructure
-  ".dockerfile",
-  "Dockerfile",
-  ".gitignore",
-  ".gitattributes",
-  ".gitlab-ci.yml",
-  ".travis.yml",
-  ".jenkinsfile",
-  "Jenkinsfile",
-  "Makefile",
-  "makefile",
-  "CMakeLists.txt",
-  ".gradle",
-  ".tf",
-  ".tfvars",
-  ".hcl",
-  // SQL
-  ".sql",
-  ".ddl",
-  ".dml",
-  // Markup & Docs
-  ".md",
-  ".markdown",
-  ".rst",
-  ".adoc",
-  ".asciidoc",
-  ".tex",
-  ".bib",
-  // Other text-based formats
-  ".txt",
-  ".csv",
-  ".tsv",
-  ".log",
-  ".diff",
-  ".patch",
-  ".svg",
-  ".ipynb",
-];
 
 const safetySettings = [
   {
@@ -177,11 +50,6 @@ const safetySettings = [
     threshold: HarmBlockThreshold.BLOCK_NONE,
   },
 ];
-
-function getFileExtension(fileName?: string): string {
-  if (!fileName) return "";
-  return (fileName.split(".").pop() || "").toLowerCase();
-}
 
 async function scrapeUrl(url: string): Promise<string | null> {
   const GOOGLEBOT_USER_AGENT = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
@@ -225,6 +93,69 @@ async function scrapeUrl(url: string): Promise<string | null> {
   }
 }
 
+async function getGoogleFileUriForPart(
+  appPart: MessagePart,
+  userId: string,
+): Promise<{ uri: string; mimeType: string } | null> {
+  if (appPart.googleFileUri && appPart.mimeType) {
+    return { uri: appPart.googleFileUri, mimeType: appPart.mimeType };
+  }
+
+  if (appPart.isProjectFile && appPart.projectFileId) {
+    const client = await pool.connect();
+    try {
+      const { rows } = await client.query(
+        "SELECT object_name, mime_type, file_name, google_file_name, google_file_uri FROM project_files WHERE id = $1 AND user_id = $2",
+        [appPart.projectFileId, userId],
+      );
+      const dbFile = rows[0];
+
+      if (!dbFile) {
+        console.error(`Project file with ID ${appPart.projectFileId} not found for user ${userId}.`);
+        return null;
+      }
+
+      if (dbFile.google_file_uri) {
+        return { uri: dbFile.google_file_uri, mimeType: dbFile.mime_type };
+      }
+
+      console.log(`On-the-fly upload for project file: ${dbFile.file_name}`);
+      const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, dbFile.object_name);
+      const chunks: Buffer[] = [];
+      for await (const chunk of fileStream) {
+        chunks.push(chunk as Buffer);
+      }
+      const fileBuffer = Buffer.concat(chunks);
+      const blob = new Blob([fileBuffer], { type: dbFile.mime_type });
+
+      const genAI = getGoogleGenAI();
+      const googleFile = await genAI.files.upload({
+        file: blob,
+        config: {
+          displayName: dbFile.file_name,
+          mimeType: dbFile.mime_type,
+        },
+      });
+
+      if (!googleFile.name || !googleFile.uri) {
+        throw new Error("On-the-fly Google File API upload did not return a valid file name or URI.");
+      }
+
+      await client.query("UPDATE project_files SET google_file_name = $1, google_file_uri = $2 WHERE id = $3", [
+        googleFile.name,
+        googleFile.uri,
+        appPart.projectFileId,
+      ]);
+
+      return { uri: googleFile.uri, mimeType: dbFile.mime_type };
+    } finally {
+      client.release();
+    }
+  }
+
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   const user = await getUserFromToken(request);
   if (!user) {
@@ -243,197 +174,60 @@ export async function POST(request: NextRequest) {
     systemPrompt: newChatSystemPrompt,
   } = (await request.json()) as Omit<ChatRequest, "keySelection" | "isRegeneration">;
 
-  const newMessageAppParts: MessagePart[] = [...originalNewMessageAppParts];
-  const urlRegex = /https?:\/\/[^\s"'<>()]+/g;
-  const scrapingPromises: Promise<MessagePart | null>[] = [];
-
-  for (const part of originalNewMessageAppParts) {
-    if (part.type === "text" && part.text) {
-      const urls = part.text.match(urlRegex);
-      if (urls) {
-        const uniqueUrls = [...new Set(urls)];
-        for (const url of uniqueUrls) {
-          const promise = scrapeUrl(url).then((scrapedText): MessagePart | null => {
-            if (scrapedText) {
-              return {
-                type: "scraped_url",
-                text: `CONTEXT FROM ${url}:\n---\n${scrapedText}\n---`,
-                url: url,
-              };
-            }
-            return null;
-          });
-          scrapingPromises.push(promise);
-        }
-      }
-    }
-  }
-
-  if (scrapingPromises.length > 0) {
-    const scrapedParts = await Promise.all(scrapingPromises);
-    scrapedParts.forEach((part) => {
-      if (part) {
-        newMessageAppParts.push(part);
-      }
-    });
-  }
-
-  const cloudProjectId = process.env.GOOGLE_CLOUD_PROJECT;
-  const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
-
-  if (!cloudProjectId) {
-    return NextResponse.json({ error: "GOOGLE_CLOUD_PROJECT is not configured." }, { status: 500 });
-  }
-
   if (!model) {
     return NextResponse.json({ error: "model missing" }, { status: 400 });
   }
 
-  const genAI = new GoogleGenAI({ vertexai: true, project: cloudProjectId, location: location });
-
-  const newMessageGeminiParts: Part[] = [];
-  let combinedUserTextForDB = "";
-
-  for (const appPart of newMessageAppParts) {
-    if (appPart.type === "text" && appPart.text) {
-      newMessageGeminiParts.push({ text: appPart.text });
-      combinedUserTextForDB += (combinedUserTextForDB ? " " : "") + appPart.text;
-    } else if (appPart.type === "scraped_url" && appPart.text) {
-      newMessageGeminiParts.push({ text: appPart.text });
-    } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-      let effectiveMimeType = appPart.mimeType.toLowerCase();
-      const extension = getFileExtension(appPart.fileName);
-
-      if (
-        !SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType) &&
-        SOURCE_CODE_EXTENSIONS.includes(`.${extension}`)
-      ) {
-        console.warn(
-          `Overriding MIME type for source code file ${appPart.fileName || appPart.objectName} from ${effectiveMimeType} to text/plain for Gemini.`,
-        );
-        effectiveMimeType = "text/plain";
-      }
-
-      if (!SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType)) {
-        console.warn(
-          `Skipping new file ${appPart.fileName || appPart.objectName} for Gemini due to unsupported MIME type: ${appPart.mimeType} (effective: ${effectiveMimeType})`,
-        );
-        combinedUserTextForDB +=
-          (combinedUserTextForDB ? " " : "") +
-          `[file: ${appPart.fileName || "file"} - type ${appPart.mimeType} unsupported by AI]`;
-        continue;
-      }
-
-      try {
-        const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-        const chunks: Buffer[] = [];
-        for await (const chunk of fileStream) {
-          chunks.push(chunk as Buffer);
-        }
-        const fileBuffer = Buffer.concat(chunks);
-        newMessageGeminiParts.push({
-          inlineData: {
-            mimeType: effectiveMimeType,
-            data: fileBuffer.toString("base64"),
-          },
-        });
-        if (appPart.fileName) {
-          combinedUserTextForDB += (combinedUserTextForDB ? " " : "") + `[file: ${appPart.fileName}]`;
-        }
-      } catch (fileError) {
-        console.error(
-          `Failed to retrieve or process file ${appPart.objectName} from MinIO for new message:`,
-          fileError,
-        );
-        return NextResponse.json(
-          {
-            error: `Failed to process file: ${appPart.fileName || appPart.objectName}`,
-          },
-          { status: 500 },
-        );
-      }
-    }
-  }
-
-  if (newMessageGeminiParts.length === 0) {
-    const hasActualTextContent = newMessageAppParts.some((p) => p.type === "text" && p.text && p.text.trim() !== "");
-    if (!hasActualTextContent && newMessageAppParts.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            "All uploaded files have types unsupported by the AI or could not be processed. Supported types include common images (PNG, JPEG, WEBP), PDF, and text formats (including source code).",
-        },
-        { status: 400 },
-      );
-    }
-    return NextResponse.json(
-      {
-        error: "No valid content to send to Gemini (message empty or all files unsupported/unprocessed).",
-      },
-      { status: 400 },
+  const newMessageAppParts: MessagePart[] = [...originalNewMessageAppParts];
+  const scrapingPromises = originalNewMessageAppParts
+    .filter((part) => part.type === "text" && part.text)
+    .flatMap((part) => (part.text?.match(/https?:\/\/[^\s"'<>()]+/g) || []).map((url) => new URL(url).href))
+    .filter((url, index, self) => self.indexOf(url) === index)
+    .map((url) =>
+      scrapeUrl(url).then((scrapedText): MessagePart | null =>
+        scrapedText ? { type: "scraped_url", text: `CONTEXT FROM ${url}:\n---\n${scrapedText}\n---`, url } : null,
+      ),
     );
-  }
+
+  const scrapedParts = (await Promise.all(scrapingPromises)).filter((p): p is MessagePart => p !== null);
+  newMessageAppParts.push(...scrapedParts);
+
+  const genAI = getGoogleGenAI();
+  const processParts = async (parts: MessagePart[]): Promise<Part[]> => {
+    const geminiParts: Part[] = [];
+    for (const appPart of parts) {
+      if (appPart.type === "text" && appPart.text) {
+        geminiParts.push({ text: appPart.text });
+      } else if (appPart.type === "scraped_url" && appPart.text) {
+        geminiParts.push({ text: appPart.text });
+      } else if (appPart.type === "file") {
+        try {
+          const fileData = await getGoogleFileUriForPart(appPart, userId);
+          if (fileData) {
+            geminiParts.push({ fileData: { fileUri: fileData.uri, mimeType: fileData.mimeType } });
+          } else {
+            console.warn(`Could not process file part: ${appPart.fileName}`);
+          }
+        } catch (error) {
+          console.error(`Error processing file part ${appPart.fileName}:`, error);
+        }
+      }
+    }
+    return geminiParts;
+  };
 
   try {
+    const newMessageGeminiParts = await processParts(newMessageAppParts);
+    if (newMessageGeminiParts.length === 0 && newMessageAppParts.some((p) => p.type === "file")) {
+      return NextResponse.json({ error: "No processable content found in message." }, { status: 400 });
+    }
+
     const historyGeminiContents: Content[] = [];
     if (clientHistoryWithAppParts) {
       for (const prevMsg of clientHistoryWithAppParts) {
-        const prevMsgGeminiParts: Part[] = [];
-        for (const appPart of prevMsg.parts) {
-          if (appPart.type === "text" && appPart.text) {
-            prevMsgGeminiParts.push({ text: appPart.text });
-          } else if (appPart.type === "scraped_url" && appPart.text) {
-            prevMsgGeminiParts.push({ text: appPart.text });
-          } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-            if (prevMsg.role === "user") {
-              let effectiveMimeType = appPart.mimeType.toLowerCase();
-              const extension = getFileExtension(appPart.fileName);
-
-              if (
-                !SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType) &&
-                SOURCE_CODE_EXTENSIONS.includes(`.${extension}`)
-              ) {
-                effectiveMimeType = "text/plain";
-              }
-
-              if (!SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType)) {
-                console.warn(
-                  `Skipping historical file ${appPart.fileName || appPart.objectName} for Gemini due to unsupported MIME type: ${appPart.mimeType} (effective: ${effectiveMimeType})`,
-                );
-                continue;
-              }
-              try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                const chunks: Buffer[] = [];
-                for await (const chunk of fileStream) {
-                  chunks.push(chunk as Buffer);
-                }
-                const fileBuffer = Buffer.concat(chunks);
-                prevMsgGeminiParts.push({
-                  inlineData: {
-                    mimeType: effectiveMimeType,
-                    data: fileBuffer.toString("base64"),
-                  },
-                });
-              } catch (fileError) {
-                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                return NextResponse.json(
-                  {
-                    error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}`,
-                  },
-                  { status: 500 },
-                );
-              }
-            } else if (prevMsg.role === "model" && appPart.text) {
-              prevMsgGeminiParts.push({ text: appPart.text });
-            }
-          }
-        }
-        if (prevMsgGeminiParts.length > 0 || prevMsg.role === "model") {
-          historyGeminiContents.push({
-            role: prevMsg.role,
-            parts: prevMsgGeminiParts,
-          });
+        const prevMsgGeminiParts = await processParts(prevMsg.parts);
+        if (prevMsgGeminiParts.length > 0) {
+          historyGeminiContents.push({ role: prevMsg.role, parts: prevMsgGeminiParts });
         }
       }
     }
@@ -441,6 +235,7 @@ export async function POST(request: NextRequest) {
     const contentsForApi: Content[] = [...historyGeminiContents, { role: "user", parts: newMessageGeminiParts }];
 
     let systemPromptText: string | null = null;
+    // ... (rest of system prompt logic remains the same) ...
     try {
       if (newChatSystemPrompt && newChatSystemPrompt.trim() !== "") {
         systemPromptText = newChatSystemPrompt;
@@ -485,7 +280,7 @@ export async function POST(request: NextRequest) {
     }
 
     const generationConfig: {
-      systemInstruction?: string;
+      systemInstruction?: Content;
       tools?: Array<{ googleSearch: Record<string, never> }>;
       thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
       safetySettings?: typeof safetySettings;
@@ -494,7 +289,7 @@ export async function POST(request: NextRequest) {
     generationConfig.safetySettings = safetySettings;
 
     if (systemPromptText && systemPromptText.trim() !== "") {
-      generationConfig.systemInstruction = systemPromptText;
+      generationConfig.systemInstruction = { role: "user", parts: [{ text: systemPromptText }] };
     }
 
     if (isSearchActive) {
@@ -504,38 +299,25 @@ export async function POST(request: NextRequest) {
     const isThinkingSupported = model.includes("2.5-pro") || model.includes("2.5-flash");
     if (isThinkingSupported) {
       const effectiveThinkingConfig: { thinkingBudget?: number; includeThoughts?: boolean } = {};
-
-      if (thinkingBudget !== 0) {
-        effectiveThinkingConfig.includeThoughts = true;
-      }
-
+      if (thinkingBudget !== 0) effectiveThinkingConfig.includeThoughts = true;
       if (thinkingBudget !== undefined) {
         const isProModel = model.includes("2.5-pro");
         if (!isProModel || (isProModel && thinkingBudget !== 0)) {
           effectiveThinkingConfig.thinkingBudget = thinkingBudget;
         }
       }
-
       if (Object.keys(effectiveThinkingConfig).length > 0) {
         generationConfig.thinkingConfig = effectiveThinkingConfig;
       }
     }
 
-    const streamParams: {
-      model: string;
-      contents: Content[];
-      config?: typeof generationConfig;
-    } = {
+    const streamingResult = await genAI.models.generateContentStream({
       model,
       contents: contentsForApi,
-    };
+      config: generationConfig,
+    });
 
-    if (Object.keys(generationConfig).length > 0) {
-      streamParams.config = generationConfig;
-    }
-
-    const streamingResult = await genAI.models.generateContentStream(streamParams);
-
+    // ... (rest of streaming response logic remains the same) ...
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
       async start(controller) {

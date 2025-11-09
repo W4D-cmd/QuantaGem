@@ -622,7 +622,7 @@ export default function Home() {
       displayName: cm.displayName,
       description: `Manually loaded model: ${cm.displayName}`,
       version: "manual",
-      supportedGenerationMethods: ["generateContent"],
+      supportedActions: ["generateContent"],
       inputTokenLimit: 32768,
       outputTokenLimit: 4096,
     }));
@@ -1391,7 +1391,7 @@ export default function Home() {
         if (!res.ok) {
           throw new Error("Failed to upload live audio.");
         }
-        const audioInfo: UploadedFileInfo = await res.json();
+        const audioInfo: Omit<UploadedFileInfo, "uniqueId"> = await res.json();
         newParts.push({
           type: "file",
           fileName: "Live Audio Response",

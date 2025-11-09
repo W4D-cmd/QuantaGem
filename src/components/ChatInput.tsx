@@ -44,8 +44,8 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export interface UploadedFileInfo {
   uniqueId: string;
-  googleFileName: string;
-  googleFileUri: string;
+  googleFileName?: string;
+  googleFileUri?: string;
   fileName: string;
   mimeType: string;
   size: number;
@@ -557,17 +557,16 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const filesToAdd = projectFiles
           .filter((pf) => !currentlySelectedIds.has(`proj-${pf.id}`))
           .map(
-            (pf) =>
-              ({
-                uniqueId: `proj-${pf.id}`,
-                fileName: pf.fileName,
-                mimeType: pf.mimeType,
-                size: pf.size,
-                googleFileName: pf.googleFileName,
-                googleFileUri: pf.googleFileUri,
-                isProjectFile: true,
-                projectFileId: pf.id,
-              }) as UploadedFileInfo,
+            (pf): UploadedFileInfo => ({
+              uniqueId: `proj-${pf.id}`,
+              fileName: pf.fileName,
+              mimeType: pf.mimeType,
+              size: pf.size,
+              googleFileName: pf.googleFileName,
+              googleFileUri: pf.googleFileUri,
+              isProjectFile: true,
+              projectFileId: pf.id,
+            }),
           );
 
         if (filesToAdd.length > 0) {
@@ -582,8 +581,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               fileName: file.fileName,
               mimeType: file.mimeType,
               size: file.size,
-              googleFileName: file.googleFileName!,
-              googleFileUri: file.googleFileUri!,
+              googleFileName: file.googleFileName,
+              googleFileUri: file.googleFileUri,
               isProjectFile: true,
               projectFileId: file.id,
             };

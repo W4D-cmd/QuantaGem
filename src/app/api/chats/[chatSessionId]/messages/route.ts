@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { getUserFromToken } from "@/lib/auth";
-import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
+import { getGoogleGenAI } from "@/lib/google-genai";
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
@@ -47,23 +47,27 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     }
 
     const originalParts: MessagePart[] = originalMessageResult.rows[0].parts || [];
-    const originalFileObjectNames = new Set(
-      originalParts.filter((p) => p.type === "file" && p.objectName).map((p) => p.objectName!),
+    const originalFileNames = new Set(
+      originalParts
+        .filter((p) => p.type === "file" && p.googleFileName && !p.isProjectFile)
+        .map((p) => p.googleFileName!),
     );
-    const newFileObjectNames = new Set(
-      newParts.filter((p) => p.type === "file" && p.objectName).map((p) => p.objectName!),
+    const newFileNames = new Set(
+      newParts.filter((p) => p.type === "file" && p.googleFileName && !p.isProjectFile).map((p) => p.googleFileName!),
     );
 
-    const objectNamesToDelete: string[] = [];
-    originalFileObjectNames.forEach((name) => {
-      if (!newFileObjectNames.has(name)) {
-        objectNamesToDelete.push(name);
+    const fileNamesToDelete: string[] = [];
+    originalFileNames.forEach((name) => {
+      if (!newFileNames.has(name)) {
+        fileNamesToDelete.push(name);
       }
     });
 
-    if (objectNamesToDelete.length > 0) {
-      console.log(`Deleting ${objectNamesToDelete.length} orphaned files from message edit.`);
-      await minioClient.removeObjects(MINIO_BUCKET_NAME, objectNamesToDelete);
+    if (fileNamesToDelete.length > 0) {
+      console.log(`Deleting ${fileNamesToDelete.length} orphaned Google files from message edit.`);
+      const genAI = getGoogleGenAI();
+      const deletePromises = fileNamesToDelete.map((name) => genAI.files.delete({ name }));
+      await Promise.all(deletePromises);
     }
 
     const newContent = newParts
@@ -128,23 +132,25 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       [chatSessionId, fromPosition],
     );
 
-    const objectNamesToDelete: string[] = [];
+    const fileNamesToDelete: string[] = [];
     messagesToDeleteResult.rows.forEach((msg) => {
       if (msg.parts && Array.isArray(msg.parts)) {
         msg.parts.forEach((part) => {
-          if (part.type === "file" && part.objectName && !part.isProjectFile) {
-            objectNamesToDelete.push(part.objectName);
+          if (part.type === "file" && part.googleFileName && !part.isProjectFile) {
+            fileNamesToDelete.push(part.googleFileName);
           }
         });
       }
     });
 
-    if (objectNamesToDelete.length > 0) {
-      const uniqueObjectNames = Array.from(new Set(objectNamesToDelete));
+    if (fileNamesToDelete.length > 0) {
+      const uniqueFileNames = Array.from(new Set(fileNamesToDelete));
       try {
-        await minioClient.removeObjects(MINIO_BUCKET_NAME, uniqueObjectNames);
-      } catch (minioError) {
-        console.error(`Error deleting objects from MinIO for chat session ${chatSessionId}:`, minioError);
+        const genAI = getGoogleGenAI();
+        const deletePromises = uniqueFileNames.map((name) => genAI.files.delete({ name }));
+        await Promise.all(deletePromises);
+      } catch (googleFileError) {
+        console.error(`Error deleting files from Google API for chat session ${chatSessionId}:`, googleFileError);
       }
     }
 

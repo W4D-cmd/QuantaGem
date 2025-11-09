@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
 import { getUserFromToken } from "@/lib/auth";
+import { getGoogleGenAI } from "@/lib/google-genai";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
@@ -16,14 +16,14 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
   try {
     const chatSessionResult = await client.query(
       `SELECT title,
-                    last_model      AS "lastModel",
-                    system_prompt   AS "systemPrompt",
-                    key_selection   AS "keySelection",
-                    project_id      AS "projectId",
-                    thinking_budget AS "thinkingBudget"
-             FROM chat_sessions
-             WHERE id = $1
-               AND user_id = $2`,
+              last_model      AS "lastModel",
+              system_prompt   AS "systemPrompt",
+              key_selection   AS "keySelection",
+              project_id      AS "projectId",
+              thinking_budget AS "thinkingBudget"
+       FROM chat_sessions
+       WHERE id = $1
+         AND user_id = $2`,
       [chatSessionId, userId],
     );
 
@@ -35,9 +35,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
 
     const messagesResult = await client.query(
       `SELECT id, position, role, parts, sources, thought_summary as "thoughtSummary"
-             FROM messages
-             WHERE chat_session_id = $1
-             ORDER BY position`,
+       FROM messages
+       WHERE chat_session_id = $1
+       ORDER BY position`,
       [chatSessionId],
     );
     return NextResponse.json({
@@ -105,11 +105,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
   sets.push(`updated_at = now()`);
 
   const sql = `
-        UPDATE chat_sessions
-        SET ${sets.join(", ")}
-        WHERE id = $${idx}
-          AND user_id = $${idx + 1}
-    `;
+    UPDATE chat_sessions
+    SET ${sets.join(", ")}
+    WHERE id = $${idx}
+      AND user_id = $${idx + 1}
+  `;
   vals.push(chatSessionId, userId);
 
   try {
@@ -119,15 +119,15 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     }
     const { rows } = await pool.query(
       `SELECT id,
-                    title,
-                    last_model      AS "lastModel",
-                    system_prompt   AS "systemPrompt",
-                    key_selection   AS "keySelection",
-                    project_id      AS "projectId",
-                    thinking_budget AS "thinkingBudget"
-             FROM chat_sessions
-             WHERE id = $1
-               AND user_id = $2`,
+              title,
+              last_model      AS "lastModel",
+              system_prompt   AS "systemPrompt",
+              key_selection   AS "keySelection",
+              project_id      AS "projectId",
+              thinking_budget AS "thinkingBudget"
+       FROM chat_sessions
+       WHERE id = $1
+         AND user_id = $2`,
       [chatSessionId, userId],
     );
     return NextResponse.json(rows[0]);
@@ -148,64 +148,52 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   const { chatSessionId } = await context.params;
 
   try {
-    const chatSessionCheck = await pool.query(
-      `SELECT id
-             FROM chat_sessions
-             WHERE id = $1
-               AND user_id = $2`,
-      [chatSessionId, userId],
-    );
+    const chatSessionCheck = await pool.query(`SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2`, [
+      chatSessionId,
+      userId,
+    ]);
 
     if (chatSessionCheck.rowCount === 0) {
       return NextResponse.json({ error: "Chat session not found or not owned by user" }, { status: 404 });
     }
 
     const messagesResult = await pool.query<{ parts: MessagePart[] }>(
-      `SELECT parts
-             FROM messages
-             WHERE chat_session_id = $1`,
+      `SELECT parts FROM messages WHERE chat_session_id = $1`,
       [chatSessionId],
     );
 
-    const objectNamesToDelete: string[] = [];
+    const fileNamesToDelete: string[] = [];
     if (messagesResult.rows.length > 0) {
       messagesResult.rows.forEach((message) => {
         if (message.parts && Array.isArray(message.parts)) {
           message.parts.forEach((part: MessagePart) => {
-            if (part.type === "file" && part.objectName && !part.isProjectFile) {
-              objectNamesToDelete.push(part.objectName);
+            if (part.type === "file" && part.googleFileName && !part.isProjectFile) {
+              fileNamesToDelete.push(part.googleFileName);
             }
           });
         }
       });
     }
 
-    if (objectNamesToDelete.length > 0) {
-      const uniqueObjectNames = Array.from(new Set(objectNamesToDelete));
+    if (fileNamesToDelete.length > 0) {
+      const uniqueFileNames = Array.from(new Set(fileNamesToDelete));
       console.log(
-        `Attempting to delete ${uniqueObjectNames.length} objects from MinIO for chat session ${chatSessionId} (user ${userId}):`,
-        uniqueObjectNames,
+        `Attempting to delete ${uniqueFileNames.length} Google files for chat session ${chatSessionId} (user ${userId}):`,
+        uniqueFileNames,
       );
       try {
-        await minioClient.removeObjects(MINIO_BUCKET_NAME, uniqueObjectNames);
-        console.log(
-          `Successfully submitted deletion request for ${uniqueObjectNames.length} objects from MinIO for chat session ${chatSessionId} (user ${userId}).`,
-        );
-      } catch (minioError) {
-        console.error(
-          `Error deleting objects from MinIO for chat session ${chatSessionId} (user ${userId}):`,
-          minioError,
-        );
+        const genAI = getGoogleGenAI();
+        const deletePromises = uniqueFileNames.map((name) => genAI.files.delete({ name }));
+        await Promise.all(deletePromises);
+      } catch (googleFileError) {
+        console.error(`Error deleting files from Google API for chat session ${chatSessionId}:`, googleFileError);
       }
     }
 
-    const deleteResult = await pool.query(
-      `DELETE
-             FROM chat_sessions
-             WHERE id = $1
-               AND user_id = $2`,
-      [chatSessionId, userId],
-    );
+    const deleteResult = await pool.query(`DELETE FROM chat_sessions WHERE id = $1 AND user_id = $2`, [
+      chatSessionId,
+      userId,
+    ]);
 
     if (deleteResult.rowCount === 0) {
       return NextResponse.json(
@@ -218,7 +206,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     return NextResponse.json({
       ok: true,
-      message: "Chat session and associated files (if any) deleted.",
+      message: "Chat session and associated ad-hoc files deleted.",
     });
   } catch (error) {
     console.error(`Error deleting chat session ${chatSessionId} for user ${userId}:`, error);

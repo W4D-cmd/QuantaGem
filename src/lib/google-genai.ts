@@ -1,11 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
 
 const genAIInstances = new Map<string, GoogleGenAI>();
-const DEFAULT_API_VERSION = "v1beta";
+const DEFAULT_API_KEY = "default";
 
-export function getGoogleGenAI(apiVersion: "v1" | "v1beta" | "v1alpha" = DEFAULT_API_VERSION): GoogleGenAI {
-  if (genAIInstances.has(apiVersion)) {
-    return genAIInstances.get(apiVersion)!;
+export function getGoogleGenAI(apiVersion?: "v1" | "v1beta" | "v1alpha"): GoogleGenAI {
+  const cacheKey = apiVersion || DEFAULT_API_KEY;
+
+  if (genAIInstances.has(cacheKey)) {
+    return genAIInstances.get(cacheKey)!;
   }
 
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
@@ -15,14 +17,25 @@ export function getGoogleGenAI(apiVersion: "v1" | "v1beta" | "v1alpha" = DEFAULT
     throw new Error("GOOGLE_CLOUD_PROJECT is not configured in environment variables.");
   }
 
-  const newInstance = new GoogleGenAI({
+  const config: {
+    vertexai: true;
+    project: string;
+    location: string;
+    apiVersion?: string;
+    httpOptions?: { timeout: number };
+  } = {
     vertexai: true,
     project: projectId,
     location: location,
-    apiVersion: apiVersion,
     httpOptions: { timeout: 600000 },
-  });
+  };
 
-  genAIInstances.set(apiVersion, newInstance);
+  if (apiVersion) {
+    config.apiVersion = apiVersion;
+  }
+
+  const newInstance = new GoogleGenAI(config);
+
+  genAIInstances.set(cacheKey, newInstance);
   return newInstance;
 }

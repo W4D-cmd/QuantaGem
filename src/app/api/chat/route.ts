@@ -1,16 +1,7 @@
-import {
-  Content,
-  GoogleGenAI,
-  GroundingMetadata,
-  Part,
-  HarmCategory,
-  HarmBlockThreshold,
-  File as GoogleFile,
-} from "@google/genai";
+import { Content, GroundingMetadata, Part, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
-import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { getUserFromToken } from "@/lib/auth";
 import * as cheerio from "cheerio";
 import { getGoogleGenAI } from "@/lib/google-genai";
@@ -29,26 +20,11 @@ interface ChatRequest {
 }
 
 const safetySettings = [
-  {
-    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-    threshold: HarmBlockThreshold.BLOCK_NONE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-    threshold: HarmBlockThreshold.BLOCK_NONE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-    threshold: HarmBlockThreshold.BLOCK_NONE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-    threshold: HarmBlockThreshold.BLOCK_NONE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
-    threshold: HarmBlockThreshold.BLOCK_NONE,
-  },
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
 
 async function scrapeUrl(url: string): Promise<string | null> {
@@ -100,59 +76,6 @@ async function getGoogleFileUriForPart(
   if (appPart.googleFileUri && appPart.mimeType) {
     return { uri: appPart.googleFileUri, mimeType: appPart.mimeType };
   }
-
-  if (appPart.isProjectFile && appPart.projectFileId) {
-    const client = await pool.connect();
-    try {
-      const { rows } = await client.query(
-        "SELECT object_name, mime_type, file_name, google_file_name, google_file_uri FROM project_files WHERE id = $1 AND user_id = $2",
-        [appPart.projectFileId, userId],
-      );
-      const dbFile = rows[0];
-
-      if (!dbFile) {
-        console.error(`Project file with ID ${appPart.projectFileId} not found for user ${userId}.`);
-        return null;
-      }
-
-      if (dbFile.google_file_uri) {
-        return { uri: dbFile.google_file_uri, mimeType: dbFile.mime_type };
-      }
-
-      console.log(`On-the-fly upload for project file: ${dbFile.file_name}`);
-      const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, dbFile.object_name);
-      const chunks: Buffer[] = [];
-      for await (const chunk of fileStream) {
-        chunks.push(chunk as Buffer);
-      }
-      const fileBuffer = Buffer.concat(chunks);
-      const blob = new Blob([fileBuffer], { type: dbFile.mime_type });
-
-      const genAI = getGoogleGenAI();
-      const googleFile = await genAI.files.upload({
-        file: blob,
-        config: {
-          displayName: dbFile.file_name,
-          mimeType: dbFile.mime_type,
-        },
-      });
-
-      if (!googleFile.name || !googleFile.uri) {
-        throw new Error("On-the-fly Google File API upload did not return a valid file name or URI.");
-      }
-
-      await client.query("UPDATE project_files SET google_file_name = $1, google_file_uri = $2 WHERE id = $3", [
-        googleFile.name,
-        googleFile.uri,
-        appPart.projectFileId,
-      ]);
-
-      return { uri: googleFile.uri, mimeType: dbFile.mime_type };
-    } finally {
-      client.release();
-    }
-  }
-
   return null;
 }
 
@@ -166,10 +89,10 @@ export async function POST(request: NextRequest) {
   const {
     history: clientHistoryWithAppParts,
     messageParts: originalNewMessageAppParts,
-    chatSessionId,
     model,
     isSearchActive,
     thinkingBudget,
+    chatSessionId,
     projectId,
     systemPrompt: newChatSystemPrompt,
   } = (await request.json()) as Omit<ChatRequest, "keySelection" | "isRegeneration">;
@@ -192,7 +115,6 @@ export async function POST(request: NextRequest) {
   const scrapedParts = (await Promise.all(scrapingPromises)).filter((p): p is MessagePart => p !== null);
   newMessageAppParts.push(...scrapedParts);
 
-  const genAI = getGoogleGenAI();
   const processParts = async (parts: MessagePart[]): Promise<Part[]> => {
     const geminiParts: Part[] = [];
     for (const appPart of parts) {
@@ -235,7 +157,6 @@ export async function POST(request: NextRequest) {
     const contentsForApi: Content[] = [...historyGeminiContents, { role: "user", parts: newMessageGeminiParts }];
 
     let systemPromptText: string | null = null;
-    // ... (rest of system prompt logic remains the same) ...
     try {
       if (newChatSystemPrompt && newChatSystemPrompt.trim() !== "") {
         systemPromptText = newChatSystemPrompt;
@@ -311,13 +232,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const genAI = getGoogleGenAI();
     const streamingResult = await genAI.models.generateContentStream({
       model,
       contents: contentsForApi,
       config: generationConfig,
     });
 
-    // ... (rest of streaming response logic remains the same) ...
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
       async start(controller) {

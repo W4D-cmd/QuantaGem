@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { getUserFromToken } from "@/lib/auth";
-import { minioClient, MINIO_BUCKET_NAME, ensureBucketExists } from "@/lib/minio";
+import { bucket, ensureBucketExists } from "@/lib/gcs";
 import { randomUUID } from "crypto";
-import { getGoogleGenAI } from "@/lib/google-genai";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
   const user = await getUserFromToken(request);
@@ -24,7 +23,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
 
     const { rows } = await pool.query(
       `SELECT id, object_name AS "objectName", file_name AS "fileName", mime_type AS "mimeType", size,
-           google_file_name AS "googleFileName", google_file_uri AS "googleFileUri"
+         google_file_name AS "googleFileName", google_file_uri AS "googleFileUri"
        FROM project_files
        WHERE project_id = $1 AND user_id = $2
        ORDER BY created_at ASC`,
@@ -69,27 +68,18 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pr
     const mimeType = file.type;
     const fileSize = file.size;
 
-    const fileExtension = originalFileName.split(".").pop() || "";
-    const baseName = originalFileName.substring(0, originalFileName.lastIndexOf(".")).replace(/[^a-zA-Z0-9_.-]/g, "_");
-    const objectName = `${randomUUID()}_${baseName}.${fileExtension}`;
+    const gcsObjectName = `${randomUUID()}/${originalFileName}`;
+    const gcsFile = bucket.file(gcsObjectName);
 
-    // Upload to MinIO (for direct access/downloads if needed)
-    await minioClient.putObject(MINIO_BUCKET_NAME, objectName, fileBuffer, fileSize, { "Content-Type": mimeType });
-
-    // Upload to Google GenAI Files API
-    const genAI = getGoogleGenAI();
-    const googleFile = await genAI.files.upload({ file, config: { displayName: originalFileName } });
-
-    if (!googleFile.name || !googleFile.uri) {
-      throw new Error("Google File API did not return a valid file name or URI.");
-    }
+    await gcsFile.save(fileBuffer, { metadata: { contentType: mimeType } });
+    const gcsUri = `gs://${bucket.name}/${gcsObjectName}`;
 
     const { rows } = await pool.query(
       `INSERT INTO project_files (project_id, user_id, object_name, file_name, mime_type, size, google_file_name, google_file_uri)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, object_name AS "objectName", file_name AS "fileName", mime_type AS "mimeType", size,
+         RETURNING id, object_name AS "objectName", file_name AS "fileName", mime_type AS "mimeType", size,
                  google_file_name AS "googleFileName", google_file_uri AS "googleFileUri"`,
-      [projectId, userId, objectName, originalFileName, mimeType, fileSize, googleFile.name, googleFile.uri],
+      [projectId, userId, gcsObjectName, originalFileName, mimeType, fileSize, gcsObjectName, gcsUri],
     );
 
     return NextResponse.json({

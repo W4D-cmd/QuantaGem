@@ -20,6 +20,7 @@ export function getGoogleGenAI(apiVersion: "v1" | "v1beta" | "v1alpha" = DEFAULT
     project: projectId,
     location: location,
     apiVersion: apiVersion,
+    httpOptions: { timeout: 600000 },
   });
 
   genAIInstances.set(apiVersion, newInstance);

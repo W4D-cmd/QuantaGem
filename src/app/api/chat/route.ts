@@ -6,6 +6,8 @@ import { getUserFromToken } from "@/lib/auth";
 import * as cheerio from "cheerio";
 import { getGoogleGenAI } from "@/lib/google-genai";
 
+export const maxDuration = 600;
+
 interface ChatRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
   messageParts: MessagePart[];

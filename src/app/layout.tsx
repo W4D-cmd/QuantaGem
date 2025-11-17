@@ -2,31 +2,15 @@ import type { Metadata } from "next";
 import "./globals.css";
 import React from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { Open_Sans } from "next/font/google";
 import localFont from "next/font/local";
 
-const roboto = localFont({
-  src: [
-    { path: "../../public/fonts/Roboto-Thin.ttf", weight: "100", style: "normal" },
-    { path: "../../public/fonts/Roboto-ThinItalic.ttf", weight: "100", style: "italic" },
-    { path: "../../public/fonts/Roboto-ExtraLight.ttf", weight: "200", style: "normal" },
-    { path: "../../public/fonts/Roboto-ExtraLightItalic.ttf", weight: "200", style: "italic" },
-    { path: "../../public/fonts/Roboto-Light.ttf", weight: "300", style: "normal" },
-    { path: "../../public/fonts/Roboto-LightItalic.ttf", weight: "300", style: "italic" },
-    { path: "../../public/fonts/Roboto-Regular.ttf", weight: "400", style: "normal" },
-    { path: "../../public/fonts/Roboto-Italic.ttf", weight: "400", style: "italic" },
-    { path: "../../public/fonts/Roboto-Medium.ttf", weight: "500", style: "normal" },
-    { path: "../../public/fonts/Roboto-MediumItalic.ttf", weight: "500", style: "italic" },
-    { path: "../../public/fonts/Roboto-SemiBold.ttf", weight: "600", style: "normal" },
-    { path: "../../public/fonts/Roboto-SemiBoldItalic.ttf", weight: "600", style: "italic" },
-    { path: "../../public/fonts/Roboto-Bold.ttf", weight: "700", style: "normal" },
-    { path: "../../public/fonts/Roboto-BoldItalic.ttf", weight: "700", style: "italic" },
-    { path: "../../public/fonts/Roboto-ExtraBold.ttf", weight: "800", style: "normal" },
-    { path: "../../public/fonts/Roboto-ExtraBoldItalic.ttf", weight: "800", style: "italic" },
-    { path: "../../public/fonts/Roboto-Black.ttf", weight: "900", style: "normal" },
-    { path: "../../public/fonts/Roboto-BlackItalic.ttf", weight: "900", style: "italic" },
-  ],
+const openSans = Open_Sans({
+  subsets: ["latin"],
   display: "swap",
   variable: "--font-sans",
+  weight: ["300", "400", "500", "600", "700", "800"],
+  style: ["normal", "italic"],
 });
 
 const jetbrainsMono = localFont({
@@ -63,7 +47,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${roboto.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${openSans.variable} ${jetbrainsMono.variable}`}>
       <body
         className={`antialiased bg-white dark:bg-neutral-950 text-black dark:text-white transition-colors duration-300
           ease-in-out`}

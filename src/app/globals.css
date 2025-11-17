@@ -13,6 +13,12 @@
   --color-foreground: var(--foreground);
 }
 
+@layer base {
+  body {
+    @apply font-medium;
+  }
+}
+
 html,
 body {
   height: 100%;

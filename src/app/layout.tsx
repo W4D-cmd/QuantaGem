@@ -2,16 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import React from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { Open_Sans } from "next/font/google";
 import localFont from "next/font/local";
-
-const openSans = Open_Sans({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-sans",
-  weight: ["300", "400", "500", "600", "700", "800"],
-  style: ["normal", "italic"],
-});
 
 const jetbrainsMono = localFont({
   src: [
@@ -47,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${openSans.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={jetbrainsMono.variable}>
       <body
         className={`antialiased bg-white dark:bg-neutral-950 text-black dark:text-white transition-colors duration-300
           ease-in-out`}

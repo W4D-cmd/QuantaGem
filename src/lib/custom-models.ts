@@ -4,6 +4,7 @@ export interface CustomModelEntry {
 }
 
 export const customModels: CustomModelEntry[] = [
+  { displayName: "Gemini 3 Pro Preview", modelId: "gemini-3-pro-preview" },
   { displayName: "Gemini 2.5 Pro", modelId: "gemini-2.5-pro" },
   { displayName: "Gemini 2.5 Flash", modelId: "gemini-2.5-flash" },
   { displayName: "Gemini 2.5 Flash-Lite", modelId: "gemini-2.5-flash-lite" },

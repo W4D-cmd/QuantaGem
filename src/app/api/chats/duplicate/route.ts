@@ -65,7 +65,6 @@ export async function POST(request: NextRequest) {
       `SELECT title,
               last_model,
               system_prompt,
-              key_selection,
               project_id,
               thinking_budget
        FROM chat_sessions
@@ -82,15 +81,14 @@ export async function POST(request: NextRequest) {
     const newChatTitle = `${originalChat.title} (copy)`;
 
     const newChatResult = await client.query(
-      `INSERT INTO chat_sessions (user_id, title, last_model, system_prompt, key_selection, project_id, thinking_budget, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-         RETURNING id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", key_selection AS "keySelection", project_id AS "projectId", thinking_budget AS "thinkingBudget"`,
+      `INSERT INTO chat_sessions (user_id, title, last_model, system_prompt, project_id, thinking_budget, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+         RETURNING id, title, last_model AS "lastModel", system_prompt AS "systemPrompt", project_id AS "projectId", thinking_budget AS "thinkingBudget"`,
       [
         userId,
         newChatTitle,
         originalChat.last_model,
         originalChat.system_prompt,
-        originalChat.key_selection,
         originalChat.project_id,
         originalChat.thinking_budget,
       ],

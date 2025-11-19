@@ -8,7 +8,6 @@ import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
 interface CountTokensRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
   model: string;
-  keySelection: "free" | "paid";
   chatSessionId: number;
 }
 
@@ -160,7 +159,7 @@ export async function POST(request: NextRequest) {
   }
   const userId = user.id.toString();
 
-  const { history, model, chatSessionId } = (await request.json()) as Omit<CountTokensRequest, "keySelection">;
+  const { history, model, chatSessionId } = (await request.json()) as CountTokensRequest;
 
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
   const location = process.env.GOOGLE_CLOUD_LOCATION || "global";

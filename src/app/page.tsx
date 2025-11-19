@@ -5,7 +5,6 @@ import ChatArea, { ChatAreaHandle, AudioPlaybackState } from "@/components/ChatA
 import ChatInput, { ChatInputHandle, UploadedFileInfo } from "@/components/ChatInput";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ModelSelector from "@/components/ModelSelector";
-import ToggleApiKeyButton from "@/components/ToggleApiKeyButton";
 import { Model } from "@google/genai";
 import Tooltip from "@/components/Tooltip";
 import Toast, { ToastProps } from "@/components/Toast";
@@ -63,7 +62,6 @@ export interface ChatListItem {
   title: string;
   lastModel: string;
   systemPrompt: string;
-  keySelection: "free" | "paid";
   projectId: number | null;
   updatedAt: string;
   thinkingBudget: number;
@@ -127,7 +125,6 @@ function createWavHeader(dataLength: number): ArrayBuffer {
 async function generateAndSetChatTitle(
   chatSessionId: number,
   userMessageContent: string,
-  keySelection: "free" | "paid",
   getAuthHeaders: () => HeadersInit,
   router: AppRouterInstance,
   showToast: (message: string, type?: ToastProps["type"]) => void,
@@ -145,7 +142,7 @@ async function generateAndSetChatTitle(
         "Content-Type": "application/json",
         ...getAuthHeaders(),
       },
-      body: JSON.stringify({ userMessageContent: truncatedContent, keySelection }),
+      body: JSON.stringify({ userMessageContent: truncatedContent }),
     });
 
     if (res.status === 401) {
@@ -198,7 +195,6 @@ export default function Home() {
   const [controller, setController] = useState<AbortController | null>(null);
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
-  const [keySelection, setKeySelection] = useState<"free" | "paid">("free");
   const [toast, setToast] = useState<Omit<ToastProps, "onClose"> | null>(null);
   const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -306,12 +302,7 @@ export default function Home() {
   };
 
   const fetchTokenCount = useCallback(
-    async (
-      currentMessages: Message[],
-      currentModel: Model | null,
-      currentKeySelection: "free" | "paid",
-      currentChatId: number | null,
-    ) => {
+    async (currentMessages: Message[], currentModel: Model | null, currentChatId: number | null) => {
       if (!currentModel || !currentChatId || currentMessages.length === 0) {
         setTotalTokens(0);
         return;
@@ -327,7 +318,6 @@ export default function Home() {
           body: JSON.stringify({
             history: currentMessages,
             model: currentModel.name,
-            keySelection: currentKeySelection,
             chatSessionId: currentChatId,
           }),
         });
@@ -353,10 +343,10 @@ export default function Home() {
   useEffect(() => {
     const previousIsLoading = sessionStorage.getItem("isLoading") === "true";
     if (previousIsLoading && !isLoading && activeChatId && messages.length > 0) {
-      fetchTokenCount(messages, selectedModel, keySelection, activeChatId);
+      fetchTokenCount(messages, selectedModel, activeChatId);
     }
     sessionStorage.setItem("isLoading", isLoading.toString());
-  }, [isLoading, activeChatId, messages, selectedModel, keySelection, fetchTokenCount]);
+  }, [isLoading, activeChatId, messages, selectedModel, fetchTokenCount]);
 
   const fetchAllProjects = useCallback(async () => {
     try {
@@ -543,76 +533,6 @@ export default function Home() {
     }
   };
 
-  const handleKeySelectionToggle = useCallback(() => {
-    setKeySelection((prev) => {
-      const newSelection = prev === "free" ? "paid" : "free";
-
-      if (activeChatId !== null) {
-        setAllChats((prevChats) =>
-          prevChats.map((c) => (c.id === activeChatId ? { ...c, keySelection: newSelection } : c)),
-        );
-        fetch(`/api/chats/${activeChatId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeaders(),
-          },
-          body: JSON.stringify({ keySelection: newSelection }),
-        })
-          .then(() => fetchAllChats())
-          .catch((err) => showToast(extractErrorMessage(err), "error"));
-      }
-      return newSelection;
-    });
-  }, [activeChatId, fetchAllChats, getAuthHeaders, showToast]);
-
-  /* AUTOMATIC MODEL LIST DISABLED
-  useEffect(() => {
-    if (!userEmail) return;
-
-    fetch(`/api/models?keySelection=${keySelection}`, {
-      headers: getAuthHeaders(),
-    })
-      .then(async (res) => {
-        if (res.status === 401) {
-          router.replace("/login");
-          return;
-        }
-        if (!res.ok) {
-          await showApiErrorToast(res, showToast);
-          return [];
-        }
-        return res.json();
-      })
-      .then((list: Model[] | undefined) => {
-        if (!list) return;
-
-        setModels(list);
-        if (list.length === 0) {
-          setSelectedModel(null);
-          return;
-        }
-        setSelectedModel((current) => {
-          if (current) {
-            const stillExists = list.find((m) => m.name === current.name);
-            if (stillExists) return stillExists;
-          }
-          const defaultModel = list.find((m) => m.name === DEFAULT_MODEL_NAME);
-          if (defaultModel) return defaultModel;
-          return list[0] || null;
-        });
-      })
-      .catch((err) => {
-        if (err.message.includes("Unauthorized")) {
-          return;
-        }
-        showToast(extractErrorMessage(err), "error");
-        setModels([]);
-        setSelectedModel(null);
-      });
-  }, [keySelection, getAuthHeaders, router, userEmail, showToast]);
-  */
-
   useEffect(() => {
     const manualModelList: Model[] = customModels.map((cm) => ({
       name: cm.modelId,
@@ -620,8 +540,8 @@ export default function Home() {
       description: `Manually loaded model: ${cm.displayName}`,
       version: "manual",
       supportedGenerationMethods: ["generateContent"],
-      inputTokenLimit: 32768,
-      outputTokenLimit: 4096,
+      inputTokenLimit: cm.inputTokenLimit,
+      outputTokenLimit: cm.outputTokenLimit,
     }));
 
     setModels(manualModelList);
@@ -770,7 +690,6 @@ export default function Home() {
             setActiveChatId(null);
             setMessages([]);
             setEditingPromptInitialValue(null);
-            setKeySelection("free");
             setCurrentChatProjectId(null);
             setTotalTokens(null);
             setThinkingOption("dynamic");
@@ -781,7 +700,6 @@ export default function Home() {
         const data: {
           messages: Message[];
           systemPrompt: string;
-          keySelection: "free" | "paid";
           projectId: number | null;
           thinkingBudget: number;
           lastModel: string;
@@ -790,7 +708,6 @@ export default function Home() {
         const modelValueMap = getThinkingValueMap(data.lastModel);
         setMessages(data.messages);
         setEditingPromptInitialValue(data.systemPrompt);
-        setKeySelection(data.keySelection);
         setCurrentChatProjectId(data.projectId);
         setThinkingOption(modelValueMap?.[data.thinkingBudget] || "dynamic");
       } catch (err: unknown) {
@@ -805,7 +722,6 @@ export default function Home() {
       setActiveChatId,
       setMessages,
       setEditingPromptInitialValue,
-      setKeySelection,
       setCurrentChatProjectId,
       showToast,
     ],
@@ -822,7 +738,6 @@ export default function Home() {
     setCurrentChatProjectId(null);
     setMessages([]);
     setEditingPromptInitialValue(null);
-    setKeySelection("free");
     setTotalTokens(null);
     setThinkingOption("dynamic");
   }, []);
@@ -831,7 +746,6 @@ export default function Home() {
     setActiveChatId(null);
     setMessages([]);
     setEditingPromptInitialValue(null);
-    setKeySelection("free");
     setTotalTokens(null);
     setIsLoading(true);
     try {
@@ -928,7 +842,6 @@ export default function Home() {
       setCurrentChatProjectId(null);
       setMessages([]);
       setEditingPromptInitialValue(null);
-      setKeySelection("free");
       setTotalTokens(null);
     }
     showToast("Project deleted.", "success");
@@ -962,11 +875,6 @@ export default function Home() {
             if (defaultModel) setSelectedModel(defaultModel);
           }
         }
-        if (chat?.keySelection) {
-          setKeySelection(chat.keySelection);
-        } else {
-          setKeySelection("free");
-        }
         const modelValueMap = getThinkingValueMap(chat?.lastModel);
         if (chat?.thinkingBudget !== undefined && modelValueMap) {
           setThinkingOption(modelValueMap[chat.thinkingBudget] || "dynamic");
@@ -986,7 +894,6 @@ export default function Home() {
         setCurrentChatProjectId(null);
         setMessages([]);
         setEditingPromptInitialValue(null);
-        setKeySelection("free");
         setTotalTokens(null);
         setThinkingOption("dynamic");
       }
@@ -1041,7 +948,6 @@ export default function Home() {
             messageParts: userMessageParts,
             chatSessionId: currentChatId,
             model: selectedModel?.name,
-            keySelection,
             isSearchActive: isSearchEnabled,
             thinkingBudget: budgetValue,
             isRegeneration,
@@ -1204,16 +1110,7 @@ export default function Home() {
         setController(null);
       }
     },
-    [
-      getAuthHeaders,
-      selectedModel,
-      keySelection,
-      showToast,
-      setStreamStarted,
-      setIsThinking,
-      setController,
-      setMessages,
-    ],
+    [getAuthHeaders, selectedModel, showToast, setStreamStarted, setIsThinking, setController, setMessages],
   );
 
   const handleSendMessage = async (inputText: string, uploadedFiles: UploadedFileInfo[], sendWithSearch: boolean) => {
@@ -1277,7 +1174,6 @@ export default function Home() {
             modelMessageParts: modelResponse.parts,
             modelThoughtSummary: modelResponse.thoughtSummary || null,
             modelSources: modelResponse.sources,
-            keySelection,
             modelName: selectedModel.name,
             projectId: currentChatProjectId,
             thinkingBudget: budgetValue,
@@ -1303,7 +1199,7 @@ export default function Home() {
         );
 
         if (isNewChat && inputText.trim()) {
-          generateAndSetChatTitle(newChatId, inputText, keySelection, getAuthHeaders, router, showToast, fetchAllChats);
+          generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
         }
       } catch (err) {
         showToast(extractErrorMessage(err), "error");
@@ -1320,7 +1216,6 @@ export default function Home() {
           body: JSON.stringify({
             chatSessionId: activeChatId,
             userMessageParts: newUserMessageParts,
-            keySelection,
             modelName: selectedModel.name,
             projectId: currentChatProjectId,
             thinkingBudget: budgetValue,
@@ -1347,7 +1242,7 @@ export default function Home() {
         setMessages((prev) => prev.filter((msg) => msg.id !== 0));
 
         if (isNewChat && inputText.trim()) {
-          generateAndSetChatTitle(newChatId, inputText, keySelection, getAuthHeaders, router, showToast, fetchAllChats);
+          generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
         }
       } catch (err) {
         setMessages(previousMessages);
@@ -1604,7 +1499,6 @@ export default function Home() {
       setActiveChatId(null);
       setMessages([]);
       setEditingPromptInitialValue(null);
-      setKeySelection("free");
       setTotalTokens(null);
     }
     showToast("All global chats deleted.", "success");
@@ -1640,7 +1534,7 @@ export default function Home() {
         const res = await fetch("/api/tts", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-          body: JSON.stringify({ text: textToPlay, voice: ttsVoice, keySelection, model: ttsModel }),
+          body: JSON.stringify({ text: textToPlay, voice: ttsVoice, model: ttsModel }),
         });
 
         if (!res.ok) {
@@ -1686,7 +1580,7 @@ export default function Home() {
         setAudioPlaybackState({ messageId: null, status: "idle" });
       }
     },
-    [audioPlaybackState, getAuthHeaders, keySelection, showToast, ttsVoice, ttsModel],
+    [audioPlaybackState, getAuthHeaders, showToast, ttsVoice, ttsModel],
   );
 
   const openGlobalSettingsModal = () => {
@@ -1829,11 +1723,6 @@ export default function Home() {
             <>
               <ModelSelector models={models} selected={selectedModel} onChangeAction={handleModelChange} />
 
-              <div className="flex items-center ml-4">
-                <Tooltip text="Switch between free and paid API key">
-                  <ToggleApiKeyButton selectedKey={keySelection} onToggleAction={handleKeySelectionToggle} />
-                </Tooltip>
-              </div>
               <div className="flex items-center ml-4">
                 <Tooltip text="Total tokens for this chat session">
                   <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
@@ -1999,7 +1888,6 @@ export default function Home() {
                       getAuthHeaders={getAuthHeaders}
                       activeProjectId={currentChatProjectId}
                       showToast={showToast}
-                      keySelection={keySelection}
                       onLiveSessionStateChange={setIsLiveSessionActive}
                       onLiveInterimText={setLiveInterimText}
                       onTurnComplete={handleLiveSessionTurnComplete}

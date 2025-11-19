@@ -11,7 +11,6 @@ interface ChatRequest {
   messageParts: MessagePart[];
   chatSessionId: string;
   model: string;
-  keySelection: "free" | "paid";
   isSearchActive?: boolean;
   thinkingBudget?: number;
   isRegeneration?: boolean;

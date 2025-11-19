@@ -55,7 +55,6 @@ registerProcessor('resampling-processor', ResamplingProcessor);
 
 interface UseLiveSessionProps {
   getAuthHeaders: () => HeadersInit;
-  keySelection: "free" | "paid";
   showToast: (message: string, type?: "success" | "error") => void;
   onStateChange: (isActive: boolean) => void;
   onInterimText: (text: string) => void;
@@ -97,7 +96,6 @@ const createWavBlob = (audioChunks: ArrayBuffer[], sampleRate: number): Blob => 
 
 export const useLiveSession = ({
   getAuthHeaders,
-  keySelection,
   showToast,
   onStateChange,
   onInterimText,
@@ -276,7 +274,7 @@ export const useLiveSession = ({
           const tokenRes = await fetch("/api/live/token", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-            body: JSON.stringify({ keySelection }),
+            body: JSON.stringify({}),
           });
           if (!tokenRes.ok) throw new Error("Could not fetch authentication token.");
           const { token } = await tokenRes.json();
@@ -460,7 +458,6 @@ export const useLiveSession = ({
       showToast,
       stopSession,
       getAuthHeaders,
-      keySelection,
       onStateChange,
       onInterimText,
       stopCurrentPlayback,

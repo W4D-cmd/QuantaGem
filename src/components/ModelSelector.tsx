@@ -16,7 +16,6 @@ export interface Props {
 
 export default function ModelSelector({ models, selected, onChangeAction }: Props) {
   const [open, setOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -40,12 +39,9 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
     if (!models || models.length === 0) {
       return [];
     }
-    if (showAll) {
-      return models;
-    }
     const availableModelMap = new Map(models.map((m) => [m.name, m]));
     return customModels.map((cm) => availableModelMap.get(cm.modelId)).filter((m): m is Model => !!m);
-  }, [models, showAll]);
+  }, [models]);
 
   return (
     <div className="relative" ref={ref}>
@@ -90,24 +86,6 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
                 transition-colors duration-300 ease-in-out"
             >
               <span className="font-semibold text-sm">Model</span>
-              <label className="flex items-center cursor-pointer">
-                <span className="mr-2 text-xs text-neutral-500 dark:text-neutral-400">Show all models</span>
-                <div className="relative inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={showAll}
-                    onChange={() => setShowAll(!showAll)}
-                  />
-                  <div
-                    className="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer dark:bg-neutral-700
-                      peer-checked:after:translate-x-full peer-checked:after:border-white after:content-['']
-                      after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300
-                      after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-neutral-600
-                      peer-checked:bg-blue-600"
-                  ></div>
-                </div>
-              </label>
             </div>
             <div ref={listRef} className="flex-auto h-80 overflow-y-auto p-2 space-y-1">
               {displayedModels.map((m) => (

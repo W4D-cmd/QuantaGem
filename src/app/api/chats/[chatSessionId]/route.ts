@@ -16,14 +16,13 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
   try {
     const chatSessionResult = await client.query(
       `SELECT title,
-                    last_model      AS "lastModel",
-                    system_prompt   AS "systemPrompt",
-                    key_selection   AS "keySelection",
-                    project_id      AS "projectId",
-                    thinking_budget AS "thinkingBudget"
-             FROM chat_sessions
-             WHERE id = $1
-               AND user_id = $2`,
+              last_model      AS "lastModel",
+              system_prompt   AS "systemPrompt",
+              project_id      AS "projectId",
+              thinking_budget AS "thinkingBudget"
+       FROM chat_sessions
+       WHERE id = $1
+         AND user_id = $2`,
       [chatSessionId, userId],
     );
 
@@ -35,9 +34,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
 
     const messagesResult = await client.query(
       `SELECT id, position, role, parts, sources, thought_summary as "thoughtSummary"
-             FROM messages
-             WHERE chat_session_id = $1
-             ORDER BY position`,
+       FROM messages
+       WHERE chat_session_id = $1
+       ORDER BY position`,
       [chatSessionId],
     );
     return NextResponse.json({
@@ -61,11 +60,10 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
   const userId = user.id.toString();
 
   const { chatSessionId } = await context.params;
-  const { title, lastModel, systemPrompt, keySelection, projectId, thinkingBudget } = (await request.json()) as {
+  const { title, lastModel, systemPrompt, projectId, thinkingBudget } = (await request.json()) as {
     title?: string;
     lastModel?: string;
     systemPrompt?: string;
-    keySelection?: "free" | "paid";
     projectId?: number | null;
     thinkingBudget?: number;
   };
@@ -86,10 +84,6 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     sets.push(`system_prompt = $${idx++}`);
     vals.push(systemPrompt);
   }
-  if (keySelection !== undefined) {
-    sets.push(`key_selection = $${idx++}`);
-    vals.push(keySelection);
-  }
   if (projectId !== undefined) {
     sets.push(`project_id = $${idx++}`);
     vals.push(projectId);
@@ -105,11 +99,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
   sets.push(`updated_at = now()`);
 
   const sql = `
-        UPDATE chat_sessions
-        SET ${sets.join(", ")}
-        WHERE id = $${idx}
-          AND user_id = $${idx + 1}
-    `;
+    UPDATE chat_sessions
+    SET ${sets.join(", ")}
+    WHERE id = $${idx}
+      AND user_id = $${idx + 1}
+  `;
   vals.push(chatSessionId, userId);
 
   try {
@@ -119,15 +113,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     }
     const { rows } = await pool.query(
       `SELECT id,
-                    title,
-                    last_model      AS "lastModel",
-                    system_prompt   AS "systemPrompt",
-                    key_selection   AS "keySelection",
-                    project_id      AS "projectId",
-                    thinking_budget AS "thinkingBudget"
-             FROM chat_sessions
-             WHERE id = $1
-               AND user_id = $2`,
+              title,
+              last_model      AS "lastModel",
+              system_prompt   AS "systemPrompt",
+              project_id      AS "projectId",
+              thinking_budget AS "thinkingBudget"
+       FROM chat_sessions
+       WHERE id = $1
+         AND user_id = $2`,
       [chatSessionId, userId],
     );
     return NextResponse.json(rows[0]);
@@ -150,9 +143,9 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   try {
     const chatSessionCheck = await pool.query(
       `SELECT id
-             FROM chat_sessions
-             WHERE id = $1
-               AND user_id = $2`,
+       FROM chat_sessions
+       WHERE id = $1
+         AND user_id = $2`,
       [chatSessionId, userId],
     );
 
@@ -162,8 +155,8 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     const messagesResult = await pool.query<{ parts: MessagePart[] }>(
       `SELECT parts
-             FROM messages
-             WHERE chat_session_id = $1`,
+       FROM messages
+       WHERE chat_session_id = $1`,
       [chatSessionId],
     );
 
@@ -201,9 +194,9 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     const deleteResult = await pool.query(
       `DELETE
-             FROM chat_sessions
-             WHERE id = $1
-               AND user_id = $2`,
+       FROM chat_sessions
+       WHERE id = $1
+         AND user_id = $2`,
       [chatSessionId, userId],
     );
 

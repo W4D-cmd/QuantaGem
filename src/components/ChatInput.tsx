@@ -60,7 +60,6 @@ interface ChatInputProps {
   getAuthHeaders: () => HeadersInit;
   activeProjectId: number | null;
   showToast: (message: string, type?: ToastProps["type"]) => void;
-  keySelection: "free" | "paid";
   onLiveSessionStateChange: (isActive: boolean) => void;
   onLiveInterimText: (text: string) => void;
   onTurnComplete: (text: string, audioBlob: Blob | null) => void;
@@ -178,7 +177,6 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       getAuthHeaders,
       activeProjectId,
       showToast,
-      keySelection,
       onLiveSessionStateChange,
       onLiveInterimText,
       onTurnComplete,
@@ -234,7 +232,6 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       stopSession,
     } = useLiveSession({
       getAuthHeaders,
-      keySelection,
       showToast,
       onStateChange: onLiveSessionStateChange,
       onInterimText: onLiveInterimText,
@@ -964,7 +961,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         onLiveModelChange={onLiveModelChange}
                         languages={languageCodes}
                         selectedLanguage={selectedLanguage}
-                        onLanguageChange={onLanguageChange}
+                        onLanguageChange={setSelectedLanguage}
                         dialogVoices={dialogVoices}
                         standardVoices={standardVoices}
                         selectedVoice={selectedVoice}

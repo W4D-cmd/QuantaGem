@@ -14,7 +14,6 @@ export async function POST(request: NextRequest) {
     model,
   }: {
     text: string;
-    keySelection: "free" | "paid"; // keySelection is no longer used but kept for request compatibility
     voice: string;
     model: string;
   } = await request.json();

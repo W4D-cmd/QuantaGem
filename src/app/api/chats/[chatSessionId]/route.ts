@@ -4,14 +4,14 @@ import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
 import { getUserFromToken } from "@/lib/auth";
 
-export async function GET(request: NextRequest, context: { params: { chatSessionId: string } }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id;
 
-  const { chatSessionId } = context.params;
+  const { chatSessionId } = await context.params;
   const parsedChatSessionId = parseInt(chatSessionId, 10);
   if (isNaN(parsedChatSessionId)) {
     return NextResponse.json({ error: "Invalid Chat Session ID format" }, { status: 400 });
@@ -59,14 +59,14 @@ export async function GET(request: NextRequest, context: { params: { chatSession
   }
 }
 
-export async function PATCH(request: NextRequest, context: { params: { chatSessionId: string } }) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id;
 
-  const { chatSessionId } = context.params;
+  const { chatSessionId } = await context.params;
   const parsedChatSessionId = parseInt(chatSessionId, 10);
   if (isNaN(parsedChatSessionId)) {
     return NextResponse.json({ error: "Invalid Chat Session ID format" }, { status: 400 });
@@ -143,14 +143,14 @@ export async function PATCH(request: NextRequest, context: { params: { chatSessi
   }
 }
 
-export async function DELETE(request: NextRequest, context: { params: { chatSessionId: string } }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
   const userId = user.id;
 
-  const { chatSessionId } = context.params;
+  const { chatSessionId } = await context.params;
   const parsedChatSessionId = parseInt(chatSessionId, 10);
   if (isNaN(parsedChatSessionId)) {
     return NextResponse.json({ error: "Invalid Chat Session ID format" }, { status: 400 });

@@ -24,6 +24,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
               last_model      AS "lastModel",
               system_prompt   AS "systemPrompt",
               project_id      AS "projectId",
+              updated_at      AS "updatedAt",
               thinking_budget AS "thinkingBudget"
        FROM chat_sessions
        WHERE id = $1

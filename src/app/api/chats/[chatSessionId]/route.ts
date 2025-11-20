@@ -4,14 +4,19 @@ import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
 import { getUserFromToken } from "@/lib/auth";
 
-export async function GET(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
+export async function GET(request: NextRequest, context: { params: { chatSessionId: string } }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = user.id;
 
-  const { chatSessionId } = await context.params;
+  const { chatSessionId } = context.params;
+  const parsedChatSessionId = parseInt(chatSessionId, 10);
+  if (isNaN(parsedChatSessionId)) {
+    return NextResponse.json({ error: "Invalid Chat Session ID format" }, { status: 400 });
+  }
+
   const client = await pool.connect();
   try {
     const chatSessionResult = await client.query(
@@ -23,7 +28,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
        FROM chat_sessions
        WHERE id = $1
          AND user_id = $2`,
-      [chatSessionId, userId],
+      [parsedChatSessionId, userId],
     );
 
     if (chatSessionResult.rows.length === 0) {
@@ -37,9 +42,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
        FROM messages
        WHERE chat_session_id = $1
        ORDER BY position`,
-      [chatSessionId],
+      [parsedChatSessionId],
     );
+
     return NextResponse.json({
+      id: parsedChatSessionId,
       ...chatSessionData,
       messages: messagesResult.rows,
     });
@@ -52,14 +59,19 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
   }
 }
 
-export async function PATCH(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
+export async function PATCH(request: NextRequest, context: { params: { chatSessionId: string } }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = user.id;
 
-  const { chatSessionId } = await context.params;
+  const { chatSessionId } = context.params;
+  const parsedChatSessionId = parseInt(chatSessionId, 10);
+  if (isNaN(parsedChatSessionId)) {
+    return NextResponse.json({ error: "Invalid Chat Session ID format" }, { status: 400 });
+  }
+
   const { title, lastModel, systemPrompt, projectId, thinkingBudget } = (await request.json()) as {
     title?: string;
     lastModel?: string;
@@ -104,7 +116,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     WHERE id = $${idx}
       AND user_id = $${idx + 1}
   `;
-  vals.push(chatSessionId, userId);
+  vals.push(parsedChatSessionId, userId);
 
   try {
     const result = await pool.query(sql, vals);
@@ -121,7 +133,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
        FROM chat_sessions
        WHERE id = $1
          AND user_id = $2`,
-      [chatSessionId, userId],
+      [parsedChatSessionId, userId],
     );
     return NextResponse.json(rows[0]);
   } catch (error) {
@@ -131,14 +143,18 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
   }
 }
 
-export async function DELETE(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
+export async function DELETE(request: NextRequest, context: { params: { chatSessionId: string } }) {
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = user.id;
 
-  const { chatSessionId } = await context.params;
+  const { chatSessionId } = context.params;
+  const parsedChatSessionId = parseInt(chatSessionId, 10);
+  if (isNaN(parsedChatSessionId)) {
+    return NextResponse.json({ error: "Invalid Chat Session ID format" }, { status: 400 });
+  }
 
   try {
     const chatSessionCheck = await pool.query(
@@ -146,7 +162,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
        FROM chat_sessions
        WHERE id = $1
          AND user_id = $2`,
-      [chatSessionId, userId],
+      [parsedChatSessionId, userId],
     );
 
     if (chatSessionCheck.rowCount === 0) {
@@ -157,7 +173,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       `SELECT parts
        FROM messages
        WHERE chat_session_id = $1`,
-      [chatSessionId],
+      [parsedChatSessionId],
     );
 
     const objectNamesToDelete: string[] = [];
@@ -197,7 +213,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
        FROM chat_sessions
        WHERE id = $1
          AND user_id = $2`,
-      [chatSessionId, userId],
+      [parsedChatSessionId, userId],
     );
 
     if (deleteResult.rowCount === 0) {

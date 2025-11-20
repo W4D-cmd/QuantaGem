@@ -1415,7 +1415,7 @@ export default function Home() {
         throw new Error("Failed to delete message for regeneration.");
       }
 
-      const historyForAPI = messages.slice(0, userMessageIndex + 1);
+      const historyForAPI = messages.slice(0, userMessageIndex);
       const currentMessages = messages.slice(0, modelMessageIndex);
 
       const placeholderMessage: Message = {

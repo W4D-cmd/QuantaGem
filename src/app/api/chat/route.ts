@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = user.id;
 
   const {
     history: clientHistoryWithAppParts,
@@ -378,57 +378,57 @@ export async function POST(request: NextRequest) {
     if (clientHistoryWithAppParts) {
       for (const prevMsg of clientHistoryWithAppParts) {
         const prevMsgGeminiParts: Part[] = [];
-        for (const appPart of prevMsg.parts) {
-          if (appPart.type === "text" && appPart.text) {
-            prevMsgGeminiParts.push({ text: appPart.text });
-          } else if (appPart.type === "scraped_url" && appPart.text) {
-            prevMsgGeminiParts.push({ text: appPart.text });
-          } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-            if (prevMsg.role === "user") {
-              let effectiveMimeType = appPart.mimeType.toLowerCase();
-              const extension = getFileExtension(appPart.fileName);
-
-              if (
-                !SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType) &&
-                SOURCE_CODE_EXTENSIONS.includes(`.${extension}`)
-              ) {
-                effectiveMimeType = "text/plain";
-              }
-
-              if (!SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType)) {
-                console.warn(
-                  `Skipping historical file ${appPart.fileName || appPart.objectName} for Gemini due to unsupported MIME type: ${appPart.mimeType} (effective: ${effectiveMimeType})`,
-                );
-                continue;
-              }
-              try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                const chunks: Buffer[] = [];
-                for await (const chunk of fileStream) {
-                  chunks.push(chunk as Buffer);
-                }
-                const fileBuffer = Buffer.concat(chunks);
-                prevMsgGeminiParts.push({
-                  inlineData: {
-                    mimeType: effectiveMimeType,
-                    data: fileBuffer.toString("base64"),
-                  },
-                });
-              } catch (fileError) {
-                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                return NextResponse.json(
-                  {
-                    error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}`,
-                  },
-                  { status: 500 },
-                );
-              }
-            } else if (prevMsg.role === "model" && appPart.text) {
+        if (prevMsg.parts && Array.isArray(prevMsg.parts)) {
+          for (const appPart of prevMsg.parts) {
+            if (appPart.type === "text" && appPart.text) {
               prevMsgGeminiParts.push({ text: appPart.text });
+            } else if (appPart.type === "scraped_url" && appPart.text) {
+              prevMsgGeminiParts.push({ text: appPart.text });
+            } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
+              if (prevMsg.role === "user") {
+                let effectiveMimeType = appPart.mimeType.toLowerCase();
+                const extension = getFileExtension(appPart.fileName);
+
+                if (
+                  !SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType) &&
+                  SOURCE_CODE_EXTENSIONS.includes(`.${extension}`)
+                ) {
+                  effectiveMimeType = "text/plain";
+                }
+
+                if (!SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType)) {
+                  console.warn(
+                    `Skipping historical file ${appPart.fileName || appPart.objectName} for Gemini due to unsupported MIME type: ${appPart.mimeType} (effective: ${effectiveMimeType})`,
+                  );
+                  continue;
+                }
+                try {
+                  const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                  const chunks: Buffer[] = [];
+                  for await (const chunk of fileStream) {
+                    chunks.push(chunk as Buffer);
+                  }
+                  const fileBuffer = Buffer.concat(chunks);
+                  prevMsgGeminiParts.push({
+                    inlineData: {
+                      mimeType: effectiveMimeType,
+                      data: fileBuffer.toString("base64"),
+                    },
+                  });
+                } catch (fileError) {
+                  console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
+                  return NextResponse.json(
+                    {
+                      error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}`,
+                    },
+                    { status: 500 },
+                  );
+                }
+              }
             }
           }
         }
-        if (prevMsgGeminiParts.length > 0 || prevMsg.role === "model") {
+        if (prevMsgGeminiParts.length > 0) {
           historyGeminiContents.push({
             role: prevMsg.role,
             parts: prevMsgGeminiParts,

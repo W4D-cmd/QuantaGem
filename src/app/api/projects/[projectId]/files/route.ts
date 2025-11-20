@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = user.id;
   const { projectId } = await context.params;
 
   try {
@@ -23,9 +23,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
 
     const { rows } = await pool.query(
       `SELECT id, object_name AS "objectName", file_name AS "fileName", mime_type AS "mimeType", size
-             FROM project_files
-             WHERE project_id = $1 AND user_id = $2
-             ORDER BY created_at ASC`,
+       FROM project_files
+       WHERE project_id = $1 AND user_id = $2
+       ORDER BY created_at ASC`,
       [projectId, userId],
     );
     return NextResponse.json(rows);
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pr
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = user.id;
   const { projectId } = await context.params;
 
   try {
@@ -76,15 +76,23 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pr
 
     const { rows } = await pool.query(
       `INSERT INTO project_files (project_id, user_id, object_name, file_name, mime_type, size)
-             VALUES ($1, $2, $3, $4, $5, $6)
-                 RETURNING id, object_name AS "objectName", file_name AS "fileName", mime_type AS "mimeType", size`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, object_name AS "objectName", file_name AS "fileName", mime_type AS "mimeType", size`,
       [projectId, userId, objectName, originalFileName, mimeType, fileSize],
     );
 
+    const newFile = rows[0];
+
     return NextResponse.json({
+      type: "file",
       success: true,
       message: "File uploaded and associated with project successfully",
-      ...rows[0],
+      projectFileId: newFile.id,
+      objectName: newFile.objectName,
+      fileName: newFile.fileName,
+      mimeType: newFile.mimeType,
+      size: newFile.size,
+      isProjectFile: true,
     });
   } catch (error) {
     console.error(`Error uploading project file to project ${projectId} (user ${userId}):`, error);

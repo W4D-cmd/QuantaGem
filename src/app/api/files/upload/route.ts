@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     await minioClient.putObject(MINIO_BUCKET_NAME, objectName, fileBuffer, fileSize, { "Content-Type": mimeType });
 
     return NextResponse.json({
+      type: "file",
       success: true,
       message: "File uploaded successfully",
       fileName: originalFileName,

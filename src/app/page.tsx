@@ -31,7 +31,8 @@ import { showApiErrorToast } from "@/lib/errors";
 import NewChatScreen from "@/components/NewChatScreen";
 import { customModels } from "@/lib/custom-models";
 
-const DEFAULT_MODEL_NAME = "models/gemini-2.5-flash";
+const FALLBACK_DEFAULT_MODEL_NAME = "gemini-2.5-pro";
+const DEFAULT_MODEL_NAME = process.env.NEXT_PUBLIC_DEFAULT_MODEL_ID || FALLBACK_DEFAULT_MODEL_NAME;
 const TITLE_GENERATION_MAX_LENGTH = 5000;
 const DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 const MAX_RETRIES = 5;

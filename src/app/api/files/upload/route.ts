@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { minioClient, MINIO_BUCKET_NAME, ensureBucketExists } from "@/lib/minio";
 import { randomUUID } from "crypto";
+import { getUserFromToken } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
-  const userIdHeader = request.headers.get("x-user-id");
-  if (!userIdHeader) {
-    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
+  // Direct authentication verification required because Middleware skips multipart requests
+  const user = await getUserFromToken(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized: Invalid token" }, { status: 401 });
   }
-  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
+  const userId = user.id.toString();
 
   try {
     await ensureBucketExists();

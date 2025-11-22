@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
-import { getUserFromToken } from "@/lib/auth";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ objectKey: string[] }> }) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
+  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
 
   const { objectKey } = await context.params;
 

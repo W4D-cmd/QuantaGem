@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { getUserFromToken } from "@/lib/auth";
 import { MessagePart } from "@/app/page";
 
 interface PersistUserMessageRequest {
@@ -13,11 +12,11 @@ interface PersistUserMessageRequest {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
 
   const { chatSessionId, userMessageParts, modelName, projectId, thinkingBudget, systemPrompt } =
     (await request.json()) as PersistUserMessageRequest;

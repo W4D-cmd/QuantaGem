@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { getUserFromToken } from "@/lib/auth";
 import { minioClient, MINIO_BUCKET_NAME, ensureBucketExists } from "@/lib/minio";
 import { randomUUID } from "crypto";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id;
+  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
   const { projectId } = await context.params;
 
   try {
@@ -37,11 +36,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id;
+  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
   const { projectId } = await context.params;
 
   try {

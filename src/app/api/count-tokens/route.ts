@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Content, GoogleGenAI, Part } from "@google/genai";
 import { pool } from "@/lib/db";
-import { getUserFromToken } from "@/lib/auth";
 import { MessagePart } from "@/app/page";
 import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
 
@@ -153,11 +152,11 @@ function getFileExtension(fileName?: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
 
   const { history, model, chatSessionId } = (await request.json()) as CountTokensRequest;
 

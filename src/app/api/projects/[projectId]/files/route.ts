@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { minioClient, MINIO_BUCKET_NAME, ensureBucketExists } from "@/lib/minio";
 import { randomUUID } from "crypto";
+import { getUserFromToken } from "@/lib/auth";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
   const userIdHeader = request.headers.get("x-user-id");
-  if (!userIdHeader) {
-    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
+  let userId = userIdHeader;
+
+  // Fallback auth check if middleware didn't run (though for GET it usually does)
+  if (!userId) {
+    const user = await getUserFromToken(request);
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    userId = user.id.toString();
   }
-  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
+
   const { projectId } = await context.params;
 
   try {
@@ -36,11 +42,13 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
-  const userIdHeader = request.headers.get("x-user-id");
-  if (!userIdHeader) {
-    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
+  // Direct authentication verification required because Middleware skips multipart requests
+  const user = await getUserFromToken(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized: Invalid token" }, { status: 401 });
   }
-  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
+  const userId = user.id;
+
   const { projectId } = await context.params;
 
   try {

@@ -13,7 +13,6 @@ const publicPaths = [
   "/highlightjs-themes/:path*",
 ];
 
-// This function is the proxy that runs on matching requests.
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -33,6 +32,15 @@ export async function proxy(request: NextRequest) {
 
   // Pass through Next.js-specific paths and public paths without authentication.
   if (pathname.startsWith("/_next/") || isPublic) {
+    return NextResponse.next();
+  }
+
+  // CRITICAL FIX: Skip middleware processing for multipart/form-data (file uploads).
+  // Modifying headers on these requests causes the "Response body object should not be disturbed" error
+  // because Next.js attempts to clone the large stream.
+  // Authentication for these routes must be handled explicitly in the Route Handler.
+  const contentType = request.headers.get("content-type") || "";
+  if (contentType.includes("multipart/form-data")) {
     return NextResponse.next();
   }
 
@@ -72,11 +80,7 @@ export async function proxy(request: NextRequest) {
     requestHeaders.set("x-user-id", payload.userId.toString());
     requestHeaders.set("x-user-email", payload.email);
 
-    // Using `NextResponse.rewrite` to the same URL is a known workaround for a
-    // bug in some Next.js versions where `NextResponse.next` with modified headers breaks
-    // streaming request bodies (like file uploads). This approach correctly
-    // forwards the modified headers without disturbing the body stream.
-    return NextResponse.rewrite(request.nextUrl, {
+    return NextResponse.next({
       request: {
         headers: requestHeaders,
       },
@@ -92,16 +96,6 @@ export async function proxy(request: NextRequest) {
   }
 }
 
-// The matcher configuration remains the same.
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * This ensures the proxy runs on all pages and API routes, except for static assets.
-     */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { getUserFromToken } from "@/lib/auth";
 import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
   const { projectId } = await context.params;
 
   try {
@@ -45,11 +44,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
 }
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
   const { projectId } = await context.params;
   const { title, systemPrompt } = (await request.json()) as {
     title?: string;
@@ -99,11 +98,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ p
 }
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
   const { projectId } = await context.params;
 
   try {

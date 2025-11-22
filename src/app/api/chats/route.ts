@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
-import { getUserFromToken } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = userIdHeader;
 
   const { rows } = await pool.query(
     `
@@ -31,11 +30,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = userIdHeader;
 
   try {
     const chatSessionIdsResult = await pool.query(

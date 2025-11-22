@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserFromToken } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
-  const user = await getUserFromToken(request);
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: Invalid or expired session" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
+  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
+  const userEmail = request.headers.get("x-user-email");
 
-  return NextResponse.json({ id: user.id, email: user.email });
+  return NextResponse.json({ id: userId, email: userEmail });
 }

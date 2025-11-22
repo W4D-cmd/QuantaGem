@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { getUserFromToken } from "@/lib/auth";
 import { ChatListItem, MessagePart } from "@/app/page";
 import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
 import { randomUUID } from "crypto";
@@ -45,11 +44,11 @@ async function duplicateFile(originalObjectName: string): Promise<string | null>
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id;
+  const userId = parseInt(userIdHeader, 10);
 
   const { chatId: originalChatId } = await request.json();
 

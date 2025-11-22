@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { getUserFromToken } from "@/lib/auth";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
 import { MessagePart } from "@/app/page";
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
 
   const { chatSessionId } = await context.params;
   const { messageId, newParts } = (await request.json()) as { messageId: number; newParts: MessagePart[] };
@@ -91,11 +90,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
 }
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
-  const user = await getUserFromToken(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized: User not authenticated" }, { status: 401 });
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = user.id.toString();
+  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
 
   const { chatSessionId } = await context.params;
   const fromPositionStr = request.nextUrl.searchParams.get("fromPosition");

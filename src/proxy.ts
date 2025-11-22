@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuthToken } from "@/lib/auth";
 
+// Public paths that do not require authentication.
 const publicPaths = [
   "/",
   "/login",
@@ -12,44 +13,44 @@ const publicPaths = [
   "/highlightjs-themes/:path*",
 ];
 
-export async function proxy(request: NextRequest) {
-  const path = request.nextUrl.pathname;
-  const requestHeaders = new Headers(request.headers);
+// This function is the middleware that runs on matching requests.
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
   // Allow OPTIONS requests to pass through for CORS preflight checks.
   if (request.method === "OPTIONS") {
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    return NextResponse.next();
   }
 
-  // Check if the path is a public one that doesn't require authentication.
+  // Check if the path is a public one.
   const isPublic = publicPaths.some((publicPath) => {
     if (publicPath.endsWith("/:path*")) {
       const basePath = publicPath.replace("/:path*", "");
-      return path.startsWith(basePath);
+      return pathname.startsWith(basePath);
     }
-    return publicPath === path;
+    return publicPath === pathname;
   });
 
-  if (path.startsWith("/_next/") || isPublic) {
-    return NextResponse.next({ request: { headers: requestHeaders } });
+  // Pass through Next.js-specific paths and public paths without authentication.
+  if (pathname.startsWith("/_next/") || isPublic) {
+    return NextResponse.next();
   }
 
-  // Extract token from either header (for mobile/API clients) or cookie (for web client).
+  // Extract token from header (API clients) or cookie (web client).
   const authTokenFromHeader = request.headers.get("Authorization");
   const sessionCookie = request.cookies.get("__session");
 
   let tokenToVerify: string | undefined;
 
-  if (authTokenFromHeader && authTokenFromHeader.startsWith("Bearer ")) {
+  if (authTokenFromHeader?.startsWith("Bearer ")) {
     tokenToVerify = authTokenFromHeader.substring(7);
   } else if (sessionCookie) {
     tokenToVerify = sessionCookie.value;
   }
 
   const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("redirectedFrom", request.nextUrl.pathname);
+  loginUrl.searchParams.set("redirectedFrom", pathname);
 
-  // If no token is found, redirect to login.
   if (!tokenToVerify) {
     return NextResponse.redirect(loginUrl);
   }
@@ -57,36 +58,41 @@ export async function proxy(request: NextRequest) {
   try {
     const payload = await verifyAuthToken(tokenToVerify);
 
-    // If token is invalid or expired, redirect to login and clear cookie if present.
     if (!payload) {
-      const res = NextResponse.redirect(loginUrl);
-      if (sessionCookie && tokenToVerify === sessionCookie.value) {
-        res.cookies.delete("__session");
+      const response = NextResponse.redirect(loginUrl);
+      // Clear the cookie if it was the source of the invalid token.
+      if (sessionCookie?.value === tokenToVerify) {
+        response.cookies.delete("__session");
       }
-      return res;
+      return response;
     }
 
-    // Auth successful: Decorate the request with user info and pass it on.
+    // Auth successful. Create a new Headers object to avoid mutating the original.
+    const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-user-id", payload.userId.toString());
     requestHeaders.set("x-user-email", payload.email);
 
-    // This is the crucial fix: return NextResponse.next() with a cloned request object.
-    return NextResponse.next({
+    // Using `NextResponse.rewrite` to the same URL is a known workaround for a
+    // bug in some Next.js versions where `NextResponse.next` with modified headers breaks
+    // streaming request bodies (like file uploads). This approach correctly
+    // forwards the modified headers without disturbing the body stream.
+    return NextResponse.rewrite(request.nextUrl, {
       request: {
         headers: requestHeaders,
       },
     });
   } catch (error) {
-    console.error("Middleware authentication error during token verification:", error);
+    console.error("Middleware authentication error:", error);
     loginUrl.searchParams.set("error", "internal_error");
-    const res = NextResponse.redirect(loginUrl);
-    if (sessionCookie && tokenToVerify === sessionCookie.value) {
-      res.cookies.delete("__session");
+    const response = NextResponse.redirect(loginUrl);
+    if (sessionCookie?.value === tokenToVerify) {
+      response.cookies.delete("__session");
     }
-    return res;
+    return response;
   }
 }
 
+// The matcher configuration remains the same.
 export const config = {
   matcher: [
     /*

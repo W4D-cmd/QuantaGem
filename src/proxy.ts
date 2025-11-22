@@ -13,8 +13,8 @@ const publicPaths = [
   "/highlightjs-themes/:path*",
 ];
 
-// This function is the middleware that runs on matching requests.
-export async function middleware(request: NextRequest) {
+// This function is the proxy that runs on matching requests.
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow OPTIONS requests to pass through for CORS preflight checks.
@@ -82,7 +82,7 @@ export async function middleware(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Middleware authentication error:", error);
+    console.error("Proxy authentication error:", error);
     loginUrl.searchParams.set("error", "internal_error");
     const response = NextResponse.redirect(loginUrl);
     if (sessionCookie?.value === tokenToVerify) {
@@ -100,7 +100,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * This ensures the middleware runs on all pages and API routes, except for static assets.
+     * This ensures the proxy runs on all pages and API routes, except for static assets.
      */
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],

@@ -19,7 +19,10 @@ export async function POST(request: NextRequest) {
   if (!userIdHeader) {
     return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = userIdHeader;
+  const userId = parseInt(userIdHeader, 10);
+  if (isNaN(userId)) {
+    return NextResponse.json({ error: "Invalid user ID" }, { status: 401 });
+  }
 
   const {
     chatSessionId,

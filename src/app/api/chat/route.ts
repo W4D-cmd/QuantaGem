@@ -229,6 +229,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
   const userId = parseInt(userIdHeader, 10);
+  if (isNaN(userId)) {
+    return NextResponse.json({ error: "Invalid user ID" }, { status: 401 });
+  }
 
   const {
     history: clientHistoryWithAppParts,
@@ -541,70 +544,89 @@ export async function POST(request: NextRequest) {
         let thoughtSummaryOutput = "";
         const sourcesToStore: Array<{ title: string; uri: string }> = [];
 
-        for await (const chunk of streamingResult) {
-          if (chunk.candidates && chunk.candidates.length > 0) {
-            const candidate = chunk.candidates[0];
+        try {
+          for await (const chunk of streamingResult) {
+            if (chunk.candidates && chunk.candidates.length > 0) {
+              const candidate = chunk.candidates[0];
 
-            if (candidate.groundingMetadata) {
-              const groundingMetadata: GroundingMetadata = candidate.groundingMetadata;
+              if (candidate.groundingMetadata) {
+                const groundingMetadata: GroundingMetadata = candidate.groundingMetadata;
 
-              if (groundingMetadata.groundingChunks) {
-                for (const gc of groundingMetadata.groundingChunks) {
-                  if (gc.web && gc.web.title && gc.web.uri) {
-                    const webInfo = gc.web;
+                if (groundingMetadata.groundingChunks) {
+                  for (const gc of groundingMetadata.groundingChunks) {
+                    if (gc.web && gc.web.title && gc.web.uri) {
+                      const webInfo = gc.web;
 
-                    const isDuplicate = sourcesToStore.some((s) => s.uri === webInfo.uri);
-                    if (!isDuplicate) {
-                      const source = {
-                        title: webInfo.title!,
-                        uri: webInfo.uri!,
-                      };
-                      sourcesToStore.push(source);
-                      const jsonGroundingChunk = {
-                        type: "grounding",
-                        sources: [source],
-                      };
-                      controller.enqueue(encoder.encode(JSON.stringify(jsonGroundingChunk) + "\n"));
+                      const isDuplicate = sourcesToStore.some((s) => s.uri === webInfo.uri);
+                      if (!isDuplicate) {
+                        const source = {
+                          title: webInfo.title!,
+                          uri: webInfo.uri!,
+                        };
+                        sourcesToStore.push(source);
+                        const jsonGroundingChunk = {
+                          type: "grounding",
+                          sources: [source],
+                        };
+                        controller.enqueue(encoder.encode(JSON.stringify(jsonGroundingChunk) + "\n"));
+                      }
+                    }
+                  }
+                }
+              }
+
+              if (candidate.content?.parts) {
+                for (const part of candidate.content.parts) {
+                  if (part.text) {
+                    if (part.thought) {
+                      thoughtSummaryOutput += part.text;
+                      const jsonChunk = { type: "thought", value: part.text };
+                      controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+                    } else {
+                      modelOutput += part.text;
+                      const jsonChunk = { type: "text", value: part.text };
+                      controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
                     }
                   }
                 }
               }
             }
-
-            if (candidate.content?.parts) {
-              for (const part of candidate.content.parts) {
-                if (part.text) {
-                  if (part.thought) {
-                    thoughtSummaryOutput += part.text;
-                    const jsonChunk = { type: "thought", value: part.text };
-                    controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
-                  } else {
-                    modelOutput += part.text;
-                    const jsonChunk = { type: "text", value: part.text };
-                    controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
-                  }
-                }
-              }
-            }
           }
-        }
 
-        if (modelOutput.trim() === "") {
-          console.warn(
-            `Gemini model returned an empty message (thoughts received: ${thoughtSummaryOutput.trim() !== ""}). Not saving to DB.`,
-          );
-          const emptyMessageError = {
+          if (modelOutput.trim() === "") {
+            console.warn(
+              `Gemini model returned an empty message (thoughts received: ${thoughtSummaryOutput.trim() !== ""}). Not saving to DB.`,
+            );
+            const emptyMessageError = {
+              type: "error",
+              value: "Model returned an empty message. Please try again.",
+            };
+            controller.enqueue(encoder.encode(JSON.stringify(emptyMessageError) + "\n"));
+          }
+        } catch (streamError) {
+          console.error("Error during stream processing:", streamError);
+          const errorMessage = {
             type: "error",
-            value: "Model returned an empty message. Please try again.",
+            value: "An error occurred during stream processing. Please try again.",
           };
-          controller.enqueue(encoder.encode(JSON.stringify(emptyMessageError) + "\n"));
+          controller.enqueue(encoder.encode(JSON.stringify(errorMessage) + "\n"));
+        } finally {
+          controller.close();
         }
-        controller.close();
       },
-      cancel() {},
+      cancel() {
+        // Properly handle stream cancellation if needed
+        console.log("Stream cancelled for chat session");
+      },
     });
+
     return new Response(readableStream, {
-      headers: { "Content-Type": "application/jsonl; charset=utf-8" },
+      headers: {
+        "Content-Type": "application/jsonl; charset=utf-8",
+        // Set appropriate headers to avoid caching issues that might cause stream disturbance
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
     });
   } catch (error: unknown) {
     console.error("Error in Gemini API call or DB operation:", error);

@@ -8,7 +8,10 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
   if (!userIdHeader) {
     return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
+  const userId = parseInt(userIdHeader, 10);
+  if (isNaN(userId)) {
+    return NextResponse.json({ error: "Invalid user ID" }, { status: 401 });
+  }
 
   const { chatSessionId } = await context.params;
   const { messageId, newParts } = (await request.json()) as { messageId: number; newParts: MessagePart[] };
@@ -94,7 +97,10 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   if (!userIdHeader) {
     return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
+  const userId = parseInt(userIdHeader, 10);
+  if (isNaN(userId)) {
+    return NextResponse.json({ error: "Invalid user ID" }, { status: 401 });
+  }
 
   const { chatSessionId } = await context.params;
   const fromPositionStr = request.nextUrl.searchParams.get("fromPosition");

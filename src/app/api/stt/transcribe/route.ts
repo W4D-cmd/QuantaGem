@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
-  // Direct authentication verification required because Middleware skips multipart requests
   const user = await getUserFromToken(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: Invalid token" }, { status: 401 });
   }
-  // userId is authenticated here, though not strictly used in logic below, it enforces security.
 
   try {
     const formData = await request.formData();

@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   if (!userIdHeader) {
     return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
+  const userId = userIdHeader;
 
   try {
     const { rows } = await pool.query(
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   if (!userIdHeader) {
     return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
+  const userId = userIdHeader;
 
   try {
     const { title } = await request.json();

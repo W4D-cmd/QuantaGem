@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   if (!userIdHeader) {
     return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
   }
-  const userId = userIdHeader; // oder parseInt(userIdHeader, 10);
+  const userId = userIdHeader;
   const userEmail = request.headers.get("x-user-email");
 
   return NextResponse.json({ id: userId, email: userEmail });

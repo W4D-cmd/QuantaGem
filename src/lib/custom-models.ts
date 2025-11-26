@@ -25,8 +25,20 @@ export const customModels: CustomModelEntry[] = [
     outputTokenLimit: 65536,
   },
   {
+    displayName: "Gemini 2.5 Flash Preview",
+    modelId: "gemini-2.5-flash-preview-09-2025",
+    inputTokenLimit: 1048576,
+    outputTokenLimit: 65536,
+  },
+  {
     displayName: "Gemini 2.5 Flash-Lite",
     modelId: "gemini-2.5-flash-lite",
+    inputTokenLimit: 1048576,
+    outputTokenLimit: 65536,
+  },
+  {
+    displayName: "Gemini 2.5 Flash-Lite Preview",
+    modelId: "gemini-2.5-flash-lite-preview-09-2025",
     inputTokenLimit: 1048576,
     outputTokenLimit: 65536,
   },

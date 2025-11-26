@@ -39,7 +39,6 @@ const SUPPORTED_GEMINI_MIME_TYPES = [
 ];
 
 const SOURCE_CODE_EXTENSIONS = [
-  // Web Development
   ".html",
   ".htm",
   ".css",
@@ -55,7 +54,6 @@ const SOURCE_CODE_EXTENSIONS = [
   ".vue",
   ".svelte",
   ".astro",
-  // Backend & General Purpose
   ".py",
   ".rb",
   ".php",
@@ -90,7 +88,6 @@ const SOURCE_CODE_EXTENSIONS = [
   ".zig",
   ".cr",
   ".jl",
-  // Shell & Scripting
   ".sh",
   ".bash",
   ".zsh",
@@ -99,7 +96,6 @@ const SOURCE_CODE_EXTENSIONS = [
   ".psd1",
   ".bat",
   ".cmd",
-  // Data & Configuration
   ".json",
   ".jsonc",
   ".xml",
@@ -114,7 +110,6 @@ const SOURCE_CODE_EXTENSIONS = [
   ".graphql",
   ".gql",
   ".proto",
-  // Build & Infrastructure
   ".dockerfile",
   "Dockerfile",
   ".gitignore",
@@ -130,11 +125,9 @@ const SOURCE_CODE_EXTENSIONS = [
   ".tf",
   ".tfvars",
   ".hcl",
-  // SQL
   ".sql",
   ".ddl",
   ".dml",
-  // Markup & Docs
   ".md",
   ".markdown",
   ".rst",
@@ -142,7 +135,6 @@ const SOURCE_CODE_EXTENSIONS = [
   ".asciidoc",
   ".tex",
   ".bib",
-  // Other text-based formats
   ".txt",
   ".csv",
   ".tsv",
@@ -615,7 +607,6 @@ export async function POST(request: NextRequest) {
         }
       },
       cancel() {
-        // Properly handle stream cancellation if needed
         console.log("Stream cancelled for chat session");
       },
     });
@@ -623,7 +614,6 @@ export async function POST(request: NextRequest) {
     return new Response(readableStream, {
       headers: {
         "Content-Type": "application/jsonl; charset=utf-8",
-        // Set appropriate headers to avoid caching issues that might cause stream disturbance
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
       },

@@ -1804,7 +1804,7 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
-                className="flex-1 flex flex-col overflow-hidden"
+                className="flex-1 flex flex-col overflow-hidden relative"
               >
                 {messages.length > 0 ? (
                   <ChatArea
@@ -1824,15 +1824,24 @@ export default function Home() {
                     audioPlaybackState={audioPlaybackState}
                   />
                 ) : (
-                  <NewChatScreen
-                    systemPrompt={newChatSystemPrompt}
-                    onSystemPromptChange={setNewChatSystemPrompt}
-                    projectId={currentChatProjectId}
-                    projects={allProjects}
-                  />
+                  <div
+                    className="absolute inset-0 overflow-y-auto z-0 scrollbar-thin scrollbar-thumb-neutral-200
+                      dark:scrollbar-thumb-neutral-800"
+                  >
+                    <NewChatScreen
+                      systemPrompt={newChatSystemPrompt}
+                      onSystemPromptChange={setNewChatSystemPrompt}
+                      projectId={currentChatProjectId}
+                      projects={allProjects}
+                    />
+                  </div>
                 )}
 
-                <div className="flex-none p-4">
+                <div
+                  className={`p-4 transition-all duration-300 ease-in-out ${
+                    messages.length === 0 ? "absolute bottom-0 w-full z-10" : "flex-none"
+                  }`}
+                >
                   <div className="mx-auto max-w-[52rem] relative">
                     <AnimatePresence>
                       {isLiveSessionActive && (
@@ -1856,7 +1865,7 @@ export default function Home() {
                     </AnimatePresence>
                     <div className="relative h-0">
                       <AnimatePresence>
-                        {!isAutoScrollActive && (
+                        {!isAutoScrollActive && messages.length > 0 && (
                           <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}

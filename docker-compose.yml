@@ -81,7 +81,13 @@ services:
       - "3000:3000"
     volumes:
       - ./secrets/gcp-key.json:/run/secrets/gcp-key.json:ro
-    command: npm run start
+    read_only: true
+    cap_drop:
+      - ALL
+    user: "65532:65532"
+    tmpfs:
+      - /tmp:size=50M,mode=1777
+      - /app/.next/cache:size=50M,mode=1777
 
 volumes:
   db_data:

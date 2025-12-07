@@ -237,39 +237,6 @@ export async function POST(request: NextRequest) {
   } = (await request.json()) as Omit<ChatRequest, "keySelection" | "isRegeneration">;
 
   const newMessageAppParts: MessagePart[] = [...originalNewMessageAppParts];
-  const urlRegex = /https?:\/\/[^\s"'<>()]+/g;
-  const scrapingPromises: Promise<MessagePart | null>[] = [];
-
-  for (const part of originalNewMessageAppParts) {
-    if (part.type === "text" && part.text) {
-      const urls = part.text.match(urlRegex);
-      if (urls) {
-        const uniqueUrls = [...new Set(urls)];
-        for (const url of uniqueUrls) {
-          const promise = scrapeUrl(url).then((scrapedText): MessagePart | null => {
-            if (scrapedText) {
-              return {
-                type: "scraped_url",
-                text: `CONTEXT FROM ${url}:\n---\n${scrapedText}\n---`,
-                url: url,
-              };
-            }
-            return null;
-          });
-          scrapingPromises.push(promise);
-        }
-      }
-    }
-  }
-
-  if (scrapingPromises.length > 0) {
-    const scrapedParts = await Promise.all(scrapingPromises);
-    scrapedParts.forEach((part) => {
-      if (part) {
-        newMessageAppParts.push(part);
-      }
-    });
-  }
 
   const cloudProjectId = process.env.GOOGLE_CLOUD_PROJECT;
   const location = process.env.GOOGLE_CLOUD_LOCATION || "global";

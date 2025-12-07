@@ -31,11 +31,6 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const contentType = request.headers.get("content-type") || "";
-  if (contentType.includes("multipart/form-data")) {
-    return NextResponse.next();
-  }
-
   const authTokenFromHeader = request.headers.get("Authorization");
   const sessionCookie = request.cookies.get("__session");
 

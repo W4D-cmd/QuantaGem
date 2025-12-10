@@ -1,40 +1,70 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:best-practices"
   ],
   "baseBranchPatterns": [
     "main",
     "vertexai",
     "feat/openai"
   ],
-  "automerge": true,
   "platformAutomerge": true,
+  "dependencyDashboard": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "assignees": ["@me"],
+    "schedule": ["at any time"],
+    "groupName": null
+  },
   "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "Security Updates immer automergen, wenn CI erfolgreich",
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "vulnerabilityAlerts": true,
+      "automerge": true
+    },
     {
       "groupName": "Next.js and React stack",
       "groupSlug": "nextjs-react-stack",
       "matchPackageNames": [
-        "/^next/",
-        "/^@next//",
-        "/react/",
-        "/react-dom/"
+        "next",
+        "react",
+        "react-dom",
+        "eslint-config-next"
+      ],
+      "matchPackagePatterns": [
+        "^@next/",
+        "^@types/react",
+        "^@types/react-dom"
       ]
     },
     {
       "groupName": "Tailwind CSS stack",
       "groupSlug": "tailwindcss-stack",
       "matchPackageNames": [
-        "/tailwindcss/",
-        "/^@tailwindcss//"
+        "tailwindcss",
+        "postcss",
+        "autoprefixer"
+      ],
+      "matchPackagePatterns": [
+        "^@tailwindcss/"
       ]
     },
     {
+      "groupName": "Docker image updates",
+      "groupSlug": "docker-images",
       "matchDatasources": [
         "docker"
-      ],
-      "groupName": "Docker image updates",
-      "groupSlug": "docker-images"
+      ]
     }
   ],
   "dockerfile": {
@@ -44,4 +74,3 @@
     "enabled": true
   }
 }
-

@@ -27,7 +27,7 @@
       "automerge": false
     },
     {
-      "description": "Security Updates immer automergen, wenn CI erfolgreich",
+      "description": "Always auto-merge security updates if CI was successful",
       "matchUpdateTypes": ["major", "minor", "patch"],
       "vulnerabilityAlerts": true,
       "automerge": true

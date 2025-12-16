@@ -11,7 +11,7 @@ import shutil
 
 app = FastAPI()
 
-MODEL_SIZE = "deepdml/faster-whisper-large-v3-turbo-ct2" 
+MODEL_SIZE = "Systran/faster-whisper-large-v3" 
 COMPUTE_TYPE = "int8"
 CPU_THREADS = 14 
 

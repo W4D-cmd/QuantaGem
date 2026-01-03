@@ -1,117 +1,107 @@
-# Gemini Chat Interface
+# QuantaGem
 
-> [!WARNING]
-> **Work-in-progress:** This project is currently in a very early stage. Only the minimum core functionality is implemented, and many features are still missing or incomplete.
+QuantaGem is a high-performance, production-grade WebUI for Google's Gemini AI, built with a modern Full-Stack architecture. Unlike simpler interfaces, QuantaGem leverages the power of Vertex AI, persistent vector-like project storage, and a distributed microservices architecture to provide a robust environment for AI-driven workflows.
 
-A simple, open-source Next.js web interface for interacting with Google's Gemini AI API. It provides a ChatGPT-like chat experience with basic streaming response functionality, using PostgreSQL to store chat history.
+## 🏗 Architecture & Tech Stack
 
-## Features
+- **Frontend/Backend:** [Next.js 15+](https://nextjs.org/) (App Router, Server Components, Route Handlers).
+- **Language:** [TypeScript](https://www.typescriptlang.org/) with strict type safety.
+- **Styling:** [Tailwind CSS 4.0](https://tailwindcss.com/) with Lightning CSS.
+- **Database:** [PostgreSQL 18](https://www.postgresql.org/) for session, message, and project persistence.
+- **Object Storage:** [MinIO](https://min.io/) (S3-compatible) for handling chat attachments and project files.
+- **Cache/Rate Limiting:** [Redis 8](https://redis.io/) for secure authentication limiting.
+- **AI Integration:** [Google Vertex AI SDK](https://cloud.google.com/vertex-ai) (Gemini 2.0/2.5/3 and more).
+- **Speech-to-Text:** Local Python microservice using [Faster Whisper](https://github.com/SYSTRAN/faster-whisper).
+- **Deployment:** [Docker Compose](https://www.docker.com/) with Distroless (non-root) production images for maximum security.
 
-- Interactive, ChatGPT-inspired chat interface
-- Integration with Google's Gemini AI API
-- Basic streaming responses
-- Persistent conversation history (PostgreSQL)
-- Support for free and paid Google API keys
-- Markdown and code syntax highlighting
-- Modern UI built with Next.js and Tailwind CSS
+## 🚀 Core Features
 
-## Installation
+- **Advanced Chat Interface:** Supports streaming responses, Markdown, LaTeX math, and syntax highlighting.
+- **Project Management:** Organize chats into projects with dedicated system prompts and persistent file attachments.
+- **Vertex AI Integration:** Optimized for enterprise-grade Gemini models, including support for "Thinking" models with adjustable budgets.
+- **Multimodal Support:** Upload PDFs, images, and large source code folders (via Directory Picker API) for context-aware prompting.
+- **Search & Grounding:** Toggle Google Search grounding for real-time information retrieval.
+- **Voice Intelligence:** Built-in Speech-to-Text (local Whisper) and Text-to-Speech (Gemini TTS).
+- **Secure Auth:** JWT-based authentication with bcrypt hashing and Redis-backed rate limiting.
+
+## 🛠 Installation & Setup
 
 ### Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/)
-- Google Gemini API key ([get here](https://aistudio.google.com/))
+- [Docker & Docker Compose](https://docs.docker.com/get-docker/)
+- A Google Cloud Project with **Vertex AI API** enabled.
+- A Google Cloud Service Account key (JSON format).
 
-### 1. Clone the repository:
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/W4D-cmd/QuantaGem.git
+cd QuantaGem
 ```
 
 ### 2. Environment Configuration
 
-Create a new file `.env.local` in the root of the repository. Copy and paste the content of the `.env` file into it and set your API keys.
-
-> [!NOTE]
-> If you do not have multiple Google accounts or wish to only use the free API simply put the same key for both entries.
+Create a `.env.local` file in the root directory. You can use the provided `.env` as a template:
 
 ```env
-FREE_GOOGLE_API_KEY="your_free_google_api_key"
-PAID_GOOGLE_API_KEY="your_paid_google_api_key"
+GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+GOOGLE_CLOUD_LOCATION="global"
+GOOGLE_GENAI_USE_VERTEXAI="True"
+
+JWT_SECRET="generate-a-32-char-random-string"
+
+POSTGRES_USER=quantagemuser
+POSTGRES_PASSWORD=quantagempass
+POSTGRES_DB=quantagemdb
+
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadminsecret
+MINIO_DEFAULT_BUCKET=chat-files
 ```
 
-You must also set `JWT_SECRET` to a random, cryptographically strong string.
-This secret is vital for securing user sessions and should be at least 32 characters (256 bits) long.
-You can generate a suitable value using `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` and add it to your `.env.local` file.
-```env
-JWT_SECRET="your_jwt_secret"
-```
+### 3. GCP Authentication
 
-### 3. Customizing the Speech-to-Text (STT) Model
-
-The application uses the `medium` as the default model for Speech-to-Text transcription. You can change this to any other model from the Faster Whisper family to balance performance and accuracy according to your hardware and needs.
-
-To change the model, you need to edit the model identifier string in the STT service's source code.
-
-1.  Open the file `stt-service/main.py`.
-2.  Locate the `model_size` variable at the top of the file.
-
-    ```python
-    model_size = "medium"
-    compute_type = "int8"
-    ```
-
-3.  Replace the string value of `model_size` (e.g., `"medium"`) with the name of your desired model from the list below (e.g., `"distil-large-v3"`).
-4.  Save the file and rebuild the Docker container using `docker compose up --build` for the changes to take effect.
-
-<details>
-<summary><b>Available Faster Whisper Models</b></summary>
-
-Here is a list of available models, grouped by type. Larger models are more accurate but slower and require more resources.
-
-#### Standard Models (Multilingual)
-*   `tiny`
-*   `base`
-*   `small`
-*   `medium`
-*   `large-v1`
-*   `large-v2`
-*   `large-v3`
-
-#### English-Only Models (.en)
-*   `tiny.en`
-*   `base.en`
-*   `small.en`
-*   `medium.en`
-
-#### Distilled Models (distil)
-*   `distil-small.en`
-*   `distil-medium.en`
-*   `distil-large-v2`
-*   `distil-large-v3`
-
-</details>
-
-## Running the Application
-
-Inside the cloned repository execute the following command to start up the docker environment including the database and the Next.js app:
+Create a directory named `secrets` in the root and place your Google Cloud Service Account JSON key inside it. Rename it to `gcp-key.json`:
 
 ```bash
-docker compose up --build
+mkdir secrets
+# Copy your key file
+cp /path/to/your/service-account-key.json secrets/gcp-key.json
 ```
 
-Open your browser at [http://localhost:3000](http://localhost:3000).
+### 4. Deploy with Docker
 
-## Contributing
+Start the entire stack in production mode:
 
-Contributions are welcome! Please follow these steps:
+```bash
+docker compose up -d --build
+```
 
-1. Fork the repository.
-2. Create your feature branch (`git checkout -b feature/my-feature`).
-3. Commit your changes (`git commit -am 'Add new feature'`).
-4. Push to the branch (`git push origin feature/my-feature`).
-5. Create a new pull request.
+The application will be available at `http://localhost:3000`.
 
-## License
+## 🎤 Speech-to-Text (STT) Customization
 
-Licensed under the MIT License. See [LICENSE](LICENSE) for details.
+The `stt-service` uses `faster-whisper-large-v3` by default on CPU. To adjust the model size for better performance on weaker hardware, modify `stt-service/main.py`:
+
+```python
+MODEL_SIZE = "Systran/faster-whisper-medium" # Options: tiny, base, small, medium, large-v3
+COMPUTE_TYPE = "int8"
+CPU_THREADS = 4 # Adjust based on your CPU
+```
+
+After modifying, rebuild the service:
+```bash
+docker compose up -d --build stt-service
+```
+
+## 🔒 Security Posture
+
+- **Distroless Images:** The production container uses `gcr.io/distroless/nodejs24`, containing only the application and its runtime dependencies.
+- **Non-Root Execution:** The application runs as user `65532:65532`.
+- **Read-Only RootFS:** The container filesystem is read-only, using `tmpfs` only for required cache directories.
+- **Capability Drop:** All Linux capabilities are dropped in the Compose file.
+- **Security Headers:** Implements strict CORS and CSP headers.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

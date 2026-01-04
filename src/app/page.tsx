@@ -246,6 +246,10 @@ export default function Home() {
   const prevDisplayingProjectManagementIdRef = useRef<number | null>(null);
 
   const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
+  
+  const sortedProjects = useMemo(() => {
+    return [...allProjects].sort((a, b) => a.title.localeCompare(b.title));
+  }, [allProjects]);
 
   const showToast = useCallback((message: string, type: ToastProps["type"] = "error") => {
     setToast({ message, type });
@@ -1675,7 +1679,7 @@ export default function Home() {
       </AnimatePresence>
       <Sidebar
         chats={allChats}
-        projects={allProjects}
+        projects={sortedProjects}
         activeChatId={activeChatId}
         activeProjectId={displayingProjectManagementId}
         onNewChat={handleNewChat}

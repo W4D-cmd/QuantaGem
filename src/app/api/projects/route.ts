@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       `SELECT id, title, system_prompt AS "systemPrompt", created_at AS "createdAt", updated_at AS "updatedAt"
          FROM projects
          WHERE user_id = $1
-         ORDER BY updated_at DESC`,
+         ORDER BY LOWER(title) ASC`,
       [userId],
     );
     return NextResponse.json(rows);

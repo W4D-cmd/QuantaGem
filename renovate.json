@@ -1,13 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:best-practices"
-  ],
-  "baseBranchPatterns": [
-    "main",
-    "vertexai",
-    "feat/openai"
-  ],
+  "extends": ["config:best-practices"],
+  "baseBranchPatterns": ["main", "vertexai", "feat/openai"],
   "platformAutomerge": true,
   "dependencyDashboard": true,
   "vulnerabilityAlerts": {
@@ -29,7 +23,9 @@
     {
       "description": "Always auto-merge security updates if CI was successful",
       "matchUpdateTypes": ["major", "minor", "patch"],
-      "vulnerabilityAlerts": true,
+      "vulnerabilityAlerts": {
+        "enabled": true
+      },
       "automerge": true
     },
     {
@@ -39,12 +35,10 @@
         "next",
         "react",
         "react-dom",
-        "eslint-config-next"
-      ],
-      "matchPackagePatterns": [
-        "^@next/",
-        "^@types/react",
-        "^@types/react-dom"
+        "eslint-config-next",
+        "/^@next//",
+        "/^@types/react/",
+        "/^@types/react-dom/"
       ]
     },
     {
@@ -53,18 +47,14 @@
       "matchPackageNames": [
         "tailwindcss",
         "postcss",
-        "autoprefixer"
-      ],
-      "matchPackagePatterns": [
-        "^@tailwindcss/"
+        "autoprefixer",
+        "/^@tailwindcss//"
       ]
     },
     {
       "groupName": "Docker image updates",
       "groupSlug": "docker-images",
-      "matchDatasources": [
-        "docker"
-      ]
+      "matchDatasources": ["docker"]
     }
   ],
   "dockerfile": {

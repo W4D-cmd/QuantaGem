@@ -205,6 +205,64 @@ export default function Sidebar({
   const [draggedChatId, setDraggedChatId] = useState<number | null>(null);
   const [dropTargetProjectId, setDropTargetProjectId] = useState<number | null | "global">(null);
 
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const mouseYRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (draggedChatId === null) {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      return;
+    }
+
+    const EDGE_THRESHOLD = 50;
+    const MAX_SCROLL_SPEED = 12;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseYRef.current = e.clientY;
+    };
+
+    const scrollLoop = () => {
+      const container = scrollContainerRef.current;
+      if (!container) {
+        animationFrameRef.current = requestAnimationFrame(scrollLoop);
+        return;
+      }
+
+      const rect = container.getBoundingClientRect();
+      const mouseY = mouseYRef.current;
+
+      const distanceFromTop = mouseY - rect.top;
+      const distanceFromBottom = rect.bottom - mouseY;
+
+      if (distanceFromTop >= 0 && distanceFromTop < EDGE_THRESHOLD) {
+        const intensity = 1 - distanceFromTop / EDGE_THRESHOLD;
+        const scrollSpeed = Math.ceil(intensity * MAX_SCROLL_SPEED);
+        container.scrollTop -= scrollSpeed;
+      } else if (distanceFromBottom >= 0 && distanceFromBottom < EDGE_THRESHOLD) {
+        const intensity = 1 - distanceFromBottom / EDGE_THRESHOLD;
+        const scrollSpeed = Math.ceil(intensity * MAX_SCROLL_SPEED);
+        container.scrollTop += scrollSpeed;
+      }
+
+      animationFrameRef.current = requestAnimationFrame(scrollLoop);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    animationFrameRef.current = requestAnimationFrame(scrollLoop);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [draggedChatId]);
+
   const handleDragStart = (e: React.DragEvent<HTMLLIElement>, chatId: number) => {
     setDraggedChatId(chatId);
     e.dataTransfer.effectAllowed = "move";
@@ -346,6 +404,7 @@ export default function Sidebar({
       </div>
 
       <motion.div
+        ref={scrollContainerRef}
         className="flex-grow overflow-y-auto pr-3"
         variants={animationVariants.container}
         initial="hidden"

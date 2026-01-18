@@ -34,6 +34,7 @@ interface SidebarProps {
   onDuplicateChat: (chatId: number) => void;
   expandedProjects: Set<number>;
   onToggleProjectExpansion: React.Dispatch<React.SetStateAction<Set<number>>>;
+  onMoveChat?: (chatId: number, targetProjectId: number | null) => void;
 }
 
 const groupChatsByDate = (chats: ChatListItem[]) => {
@@ -196,10 +197,73 @@ export default function Sidebar({
   onDuplicateChat,
   expandedProjects,
   onToggleProjectExpansion,
+  onMoveChat,
 }: SidebarProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<{ type: "chat" | "project"; id: number } | null>(null);
   const menuAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const [draggedChatId, setDraggedChatId] = useState<number | null>(null);
+  const [dropTargetProjectId, setDropTargetProjectId] = useState<number | null | "global">(null);
+
+  const handleDragStart = (e: React.DragEvent<HTMLLIElement>, chatId: number) => {
+    setDraggedChatId(chatId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", chatId.toString());
+    const target = e.currentTarget;
+    setTimeout(() => {
+      target.style.opacity = "0.5";
+    }, 0);
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLLIElement>) => {
+    e.currentTarget.style.opacity = "1";
+    setDraggedChatId(null);
+    setDropTargetProjectId(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLElement>, targetProjectId: number | null | "global") => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (draggedChatId === null) return;
+
+    const draggedChat = chats.find((c) => c.id === draggedChatId);
+    if (!draggedChat) return;
+
+    const currentProjectId = draggedChat.projectId;
+    const targetId = targetProjectId === "global" ? null : targetProjectId;
+
+    if (currentProjectId === targetId) {
+      e.dataTransfer.dropEffect = "none";
+      return;
+    }
+
+    e.dataTransfer.dropEffect = "move";
+    setDropTargetProjectId(targetProjectId);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (!e.currentTarget.contains(relatedTarget)) {
+      setDropTargetProjectId(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLElement>, targetProjectId: number | null) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropTargetProjectId(null);
+
+    if (draggedChatId === null || !onMoveChat) return;
+
+    const draggedChat = chats.find((c) => c.id === draggedChatId);
+    if (!draggedChat) return;
+
+    if (draggedChat.projectId === targetProjectId) return;
+
+    onMoveChat(draggedChatId, targetProjectId);
+    setDraggedChatId(null);
+  };
 
   const toggleProjectExpansion = (projectId: number) => {
     onToggleProjectExpansion((prev: Set<number>) => {
@@ -287,88 +351,104 @@ export default function Sidebar({
         initial="hidden"
         animate="visible"
       >
-        <AnimatePresence>
-          {groupedGlobalChats.map((group) => (
-            <motion.div key={group.label} variants={animationVariants.item} className="mb-4">
-              <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2">
-                {group.label}
-              </h3>
-              <ul>
-                <AnimatePresence>
-                  {group.chats.map((chat) => (
-                    <motion.li
-                      key={chat.id}
-                      variants={animationVariants.item}
-                      exit="exit"
-                      layout="position"
-                      className="mb-0.5 relative group"
-                    >
-                      <EditableItem
-                        item={chat}
-                        isActive={chat.id === activeChatId}
-                        isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
-                        onSelect={() => onSelectChat(chat.id)}
-                        onStartEdit={() => handleStartEdit("chat", chat.id)}
-                        onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
-                        onCancelEdit={handleCancelEdit}
+        <div
+          onDragOver={(e) => handleDragOver(e, "global")}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, null)}
+          className={`rounded-lg transition-colors duration-200 ${
+            dropTargetProjectId === "global" && draggedChatId !== null
+              ? "bg-blue-100/50 dark:bg-blue-900/30 ring-2 ring-blue-400 ring-inset"
+              : ""
+          }`}
+        >
+          <AnimatePresence>
+            {groupedGlobalChats.map((group) => (
+              <motion.div key={group.label} variants={animationVariants.item} className="mb-4">
+                <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2">
+                  {group.label}
+                </h3>
+                <ul>
+                  <AnimatePresence>
+                    {group.chats.map((chat) => (
+                      <motion.li
+                        key={chat.id}
+                        variants={animationVariants.item}
+                        exit="exit"
+                        layout="position"
+                        className={`mb-0.5 relative group ${draggedChatId === chat.id ? "opacity-50" : ""} ${
+                          !editingItem && onMoveChat ? "cursor-grab active:cursor-grabbing" : ""
+                        }`}
+                        draggable={!editingItem && !!onMoveChat}
+                        onDragStart={(e) => handleDragStart(e, chat.id)}
+                        onDragEnd={handleDragEnd}
                       >
-                        <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
-                        <div
-                          className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
-                            group-hover:translate-x-0 transition-all duration-200 ease-in-out"
+                        <EditableItem
+                          item={chat}
+                          isActive={chat.id === activeChatId}
+                          isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
+                          onSelect={() => onSelectChat(chat.id)}
+                          onStartEdit={() => handleStartEdit("chat", chat.id)}
+                          onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
+                          onCancelEdit={handleCancelEdit}
                         >
-                          <button
-                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                              e.stopPropagation();
-                              menuAnchorRef.current = e.currentTarget;
-                              setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
-                            }}
-                            className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                          <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
+                          <div
+                            className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
+                              group-hover:translate-x-0 transition-all duration-200 ease-in-out"
                           >
-                            <EllipsisHorizontalIcon className="size-5" />
-                          </button>
-                          <DropdownMenu
-                            open={openMenuId === `chat-${chat.id}`}
-                            anchorRef={menuAnchorRef}
-                            onCloseAction={() => setOpenMenuId(null)}
-                            position="left"
-                            items={[
-                              {
-                                id: "rename",
-                                icon: <PencilIcon className="size-4" />,
-                                label: "Rename",
-                                onClick: () => handleStartEdit("chat", chat.id),
-                              },
-                              {
-                                id: "duplicate",
-                                icon: <DocumentDuplicateIcon className="size-4" />,
-                                label: "Duplicate",
-                                onClick: () => onDuplicateChat(chat.id),
-                              },
-                              {
-                                id: "settings",
-                                icon: <Cog6ToothIcon className="size-4" />,
-                                label: "Settings",
-                                onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
-                              },
-                              {
-                                id: "delete",
-                                icon: <TrashIcon className="size-4 text-red-500" />,
-                                label: "Delete",
-                                onClick: () => onDeleteChat(chat.id),
-                                className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
-                              },
-                            ]}
-                          />
-                        </div>
-                      </EditableItem>
-                    </motion.li>
+                            <button
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                e.stopPropagation();
+                                menuAnchorRef.current = e.currentTarget;
+                                setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
+                              }}
+                              className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                            >
+                              <EllipsisHorizontalIcon className="size-5" />
+                            </button>
+                            <DropdownMenu
+                              open={openMenuId === `chat-${chat.id}`}
+                              anchorRef={menuAnchorRef}
+                              onCloseAction={() => setOpenMenuId(null)}
+                              position="left"
+                              items={[
+                                {
+                                  id: "rename",
+                                  icon: <PencilIcon className="size-4" />,
+                                  label: "Rename",
+                                  onClick: () => handleStartEdit("chat", chat.id),
+                                },
+                                {
+                                  id: "duplicate",
+                                  icon: <DocumentDuplicateIcon className="size-4" />,
+                                  label: "Duplicate",
+                                  onClick: () => onDuplicateChat(chat.id),
+                                },
+                                {
+                                  id: "settings",
+                                  icon: <Cog6ToothIcon className="size-4" />,
+                                  label: "Settings",
+                                  onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
+                                },
+                                {
+                                  id: "delete",
+                                  icon: <TrashIcon className="size-4 text-red-500" />,
+                                  label: "Delete",
+                                  onClick: () => onDeleteChat(chat.id),
+                                  className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
+                                },
+                              ]}
+                            />
+                          </div>
+                        </EditableItem>
+                      </motion.li>
                   ))}
                 </AnimatePresence>
               </ul>
             </motion.div>
           ))}
         </AnimatePresence>
+        </div>
 
         {projects.length > 0 && (
           <motion.div key="projects-section" variants={animationVariants.item} className="mb-4">
@@ -382,8 +462,17 @@ export default function Sidebar({
                     exit="exit"
                     layout="position"
                     className="mb-0.5"
+                    onDragOver={(e) => handleDragOver(e, project.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, project.id)}
                   >
-                    <div className="flex items-center group">
+                    <div
+                      className={`flex items-center group rounded-lg transition-colors duration-200 ${
+                        dropTargetProjectId === project.id && draggedChatId !== null
+                          ? "bg-blue-100/50 dark:bg-blue-900/30 ring-2 ring-blue-400 ring-inset"
+                          : ""
+                      }`}
+                    >
                       <motion.button
                         onClick={() => toggleProjectExpansion(project.id)}
                         className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
@@ -470,7 +559,12 @@ export default function Sidebar({
                                     variants={animationVariants.item}
                                     exit="exit"
                                     layout="position"
-                                    className="mb-0.5 relative group"
+                                    className={`mb-0.5 relative group ${draggedChatId === chat.id ? "opacity-50" : ""} ${
+                                      !editingItem && onMoveChat ? "cursor-grab active:cursor-grabbing" : ""
+                                    }`}
+                                    draggable={!editingItem && !!onMoveChat}
+                                    onDragStart={(e) => handleDragStart(e, chat.id)}
+                                    onDragEnd={handleDragEnd}
                                   >
                                     <EditableItem
                                       item={chat}

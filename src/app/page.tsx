@@ -654,6 +654,49 @@ export default function Home() {
     [getAuthHeaders, router, fetchAllChats, setActiveChatId, setDisplayingProjectManagementId, showToast],
   );
 
+  const handleMoveChat = useCallback(
+    async (chatId: number, targetProjectId: number | null) => {
+      try {
+        const res = await fetch(`/api/chats/${chatId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({ projectId: targetProjectId }),
+        });
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          await showApiErrorToast(res, showToast);
+          return;
+        }
+
+        setAllChats((prev) =>
+          prev.map((c) => (c.id === chatId ? { ...c, projectId: targetProjectId } : c)),
+        );
+
+        if (targetProjectId !== null) {
+          setExpandedProjects((prev: Set<number>) => {
+            const newSet = new Set(prev);
+            newSet.add(targetProjectId);
+            return newSet;
+          });
+        }
+
+        const targetName = targetProjectId
+          ? allProjects.find((p) => p.id === targetProjectId)?.title || "project"
+          : "global chats";
+        showToast(`Chat moved to ${targetName}.`, "success");
+      } catch (err: unknown) {
+        showToast(extractErrorMessage(err), "error");
+      }
+    },
+    [getAuthHeaders, router, showToast, allProjects],
+  );
+
   const handleNewChat = useCallback(
     async (projectId: number | null = null) => {
       setActiveChatId(null);
@@ -1695,6 +1738,7 @@ export default function Home() {
         onDuplicateChat={handleDuplicateChat}
         expandedProjects={expandedProjects}
         onToggleProjectExpansion={setExpandedProjects}
+        onMoveChat={handleMoveChat}
       />
       <main
         className="flex-1 flex flex-col relative"

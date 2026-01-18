@@ -375,13 +375,16 @@ export default function Sidebar({
                         variants={animationVariants.item}
                         exit="exit"
                         layout="position"
-                        className={`mb-0.5 relative group ${draggedChatId === chat.id ? "opacity-50" : ""} ${
-                          !editingItem && onMoveChat ? "cursor-grab active:cursor-grabbing" : ""
-                        }`}
-                        draggable={!editingItem && !!onMoveChat}
-                        onDragStart={(e) => handleDragStart(e, chat.id)}
-                        onDragEnd={handleDragEnd}
+                        className="mb-0.5"
                       >
+                        <div
+                          className={`relative group ${draggedChatId === chat.id ? "opacity-50" : ""} ${
+                            !editingItem && onMoveChat ? "cursor-grab active:cursor-grabbing" : ""
+                          }`}
+                          draggable={!editingItem && !!onMoveChat}
+                          onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent<HTMLLIElement>, chat.id)}
+                          onDragEnd={(e) => handleDragEnd(e as unknown as React.DragEvent<HTMLLIElement>)}
+                        >
                         <EditableItem
                           item={chat}
                           isActive={chat.id === activeChatId}
@@ -441,6 +444,7 @@ export default function Sidebar({
                             />
                           </div>
                         </EditableItem>
+                        </div>
                       </motion.li>
                   ))}
                 </AnimatePresence>
@@ -559,13 +563,16 @@ export default function Sidebar({
                                     variants={animationVariants.item}
                                     exit="exit"
                                     layout="position"
-                                    className={`mb-0.5 relative group ${draggedChatId === chat.id ? "opacity-50" : ""} ${
-                                      !editingItem && onMoveChat ? "cursor-grab active:cursor-grabbing" : ""
-                                    }`}
-                                    draggable={!editingItem && !!onMoveChat}
-                                    onDragStart={(e) => handleDragStart(e, chat.id)}
-                                    onDragEnd={handleDragEnd}
+                                    className="mb-0.5"
                                   >
+                                    <div
+                                      className={`relative group ${draggedChatId === chat.id ? "opacity-50" : ""} ${
+                                        !editingItem && onMoveChat ? "cursor-grab active:cursor-grabbing" : ""
+                                      }`}
+                                      draggable={!editingItem && !!onMoveChat}
+                                      onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent<HTMLLIElement>, chat.id)}
+                                      onDragEnd={(e) => handleDragEnd(e as unknown as React.DragEvent<HTMLLIElement>)}
+                                    >
                                     <EditableItem
                                       item={chat}
                                       isActive={chat.id === activeChatId}
@@ -626,6 +633,7 @@ export default function Sidebar({
                                         />
                                       </div>
                                     </EditableItem>
+                                    </div>
                                   </motion.li>
                                 ))
                               ) : (

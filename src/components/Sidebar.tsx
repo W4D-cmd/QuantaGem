@@ -206,9 +206,10 @@ export default function Sidebar({
   const [dropTargetProjectId, setDropTargetProjectId] = useState<number | null | "global">(null);
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
   const mouseYRef = useRef<number>(0);
+  const animationFrameRef = useRef<number | null>(null);
 
+  // Auto-scroll animation loop when dragging
   useEffect(() => {
     if (draggedChatId === null) {
       if (animationFrameRef.current !== null) {
@@ -218,50 +219,43 @@ export default function Sidebar({
       return;
     }
 
-    const EDGE_THRESHOLD = 50;
-    const MAX_SCROLL_SPEED = 12;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      mouseYRef.current = e.clientY;
-    };
+    const EDGE_THRESHOLD = 150;
+    const MAX_SCROLL_SPEED = 8;
+    const MIN_SCROLL_SPEED = 1;
 
     const scrollLoop = () => {
       const container = scrollContainerRef.current;
-      if (!container) {
-        animationFrameRef.current = requestAnimationFrame(scrollLoop);
-        return;
-      }
+      if (container && mouseYRef.current !== 0) {
+        const rect = container.getBoundingClientRect();
+        const mouseY = mouseYRef.current;
 
-      const rect = container.getBoundingClientRect();
-      const mouseY = mouseYRef.current;
+        const distanceFromTop = mouseY - rect.top;
+        const distanceFromBottom = rect.bottom - mouseY;
 
-      const distanceFromTop = mouseY - rect.top;
-      const distanceFromBottom = rect.bottom - mouseY;
-
-      if (distanceFromTop >= 0 && distanceFromTop < EDGE_THRESHOLD) {
-        const intensity = 1 - distanceFromTop / EDGE_THRESHOLD;
-        const scrollSpeed = Math.ceil(intensity * MAX_SCROLL_SPEED);
-        container.scrollTop -= scrollSpeed;
-      } else if (distanceFromBottom >= 0 && distanceFromBottom < EDGE_THRESHOLD) {
-        const intensity = 1 - distanceFromBottom / EDGE_THRESHOLD;
-        const scrollSpeed = Math.ceil(intensity * MAX_SCROLL_SPEED);
-        container.scrollTop += scrollSpeed;
+        if (distanceFromTop >= 0 && distanceFromTop < EDGE_THRESHOLD) {
+          const intensity = 1 - distanceFromTop / EDGE_THRESHOLD;
+          const scrollSpeed = MIN_SCROLL_SPEED + intensity * (MAX_SCROLL_SPEED - MIN_SCROLL_SPEED);
+          container.scrollTop -= scrollSpeed;
+        } else if (distanceFromBottom >= 0 && distanceFromBottom < EDGE_THRESHOLD) {
+          const intensity = 1 - distanceFromBottom / EDGE_THRESHOLD;
+          const scrollSpeed = MIN_SCROLL_SPEED + intensity * (MAX_SCROLL_SPEED - MIN_SCROLL_SPEED);
+          container.scrollTop += scrollSpeed;
+        }
       }
 
       animationFrameRef.current = requestAnimationFrame(scrollLoop);
     };
 
-    document.addEventListener("mousemove", handleMouseMove);
     animationFrameRef.current = requestAnimationFrame(scrollLoop);
 
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
     };
   }, [draggedChatId]);
+
 
   const handleDragStart = (e: React.DragEvent<HTMLLIElement>, chatId: number) => {
     setDraggedChatId(chatId);
@@ -282,6 +276,10 @@ export default function Sidebar({
   const handleDragOver = (e: React.DragEvent<HTMLElement>, targetProjectId: number | null | "global") => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Update mouse position for auto-scroll animation loop
+    mouseYRef.current = e.clientY;
+
     if (draggedChatId === null) return;
 
     const draggedChat = chats.find((c) => c.id === draggedChatId);

@@ -66,6 +66,13 @@ export function isOpenAIReasoningModel(modelName: string | null | undefined): bo
   return modelName in openAIReasoningModelConfigs;
 }
 
+const GPT5_FAMILY_MODELS = ["gpt-5", "gpt-5-mini", "gpt-5.1", "gpt-5.2", "gpt-5.2-mini"];
+
+export function isGPT5FamilyModel(modelName: string | null | undefined): boolean {
+  if (!modelName) return false;
+  return GPT5_FAMILY_MODELS.includes(modelName);
+}
+
 export function getOpenAIReasoningConfig(modelName: string | null | undefined): OpenAIReasoningModelConfig | null {
   if (!modelName) return null;
   return openAIReasoningModelConfigs[modelName] ?? null;

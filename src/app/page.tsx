@@ -26,7 +26,13 @@ import ConfirmationModal from "@/components/ConfirmationModal";
 import { liveModels, LiveModel } from "@/lib/live-models";
 import { dialogVoices, standardVoices } from "@/lib/voices";
 import { motion, AnimatePresence } from "framer-motion";
-import { ThinkingOption, getThinkingConfigForModel, getThinkingBudgetMap, getThinkingValueMap } from "@/lib/thinking";
+import {
+  ThinkingOption,
+  VerbosityOption,
+  getThinkingConfigForModel,
+  getThinkingBudgetMap,
+  getThinkingValueMap,
+} from "@/lib/thinking";
 import { showApiErrorToast } from "@/lib/errors";
 import NewChatScreen from "@/components/NewChatScreen";
 import { customModels } from "@/lib/custom-models";
@@ -222,6 +228,7 @@ export default function Home() {
   const [liveInterimText, setLiveInterimText] = useState("");
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
   const [thinkingOption, setThinkingOption] = useState<ThinkingOption>("dynamic");
+  const [verbosity, setVerbosity] = useState<VerbosityOption>("medium");
   const [newChatSystemPrompt, setNewChatSystemPrompt] = useState<string>("");
 
   const [selectedLiveModel, setSelectedLiveModel] = useState<LiveModel>(liveModels[0]);
@@ -524,6 +531,10 @@ export default function Home() {
     },
     [activeChatId, getAuthHeaders, showToast, fetchAllChats, selectedModel],
   );
+
+  const handleVerbosityChange = useCallback((newVerbosity: VerbosityOption) => {
+    setVerbosity(newVerbosity);
+  }, []);
 
   const handleLiveModelChange = (model: LiveModel) => {
     setSelectedLiveModel(model);
@@ -1001,6 +1012,7 @@ export default function Home() {
             isRegeneration,
             systemPrompt: systemPromptForNewChat,
             projectId: projectIdForNewChat,
+            verbosity,
           }),
           signal: ctrl.signal,
         });
@@ -1158,7 +1170,7 @@ export default function Home() {
         setController(null);
       }
     },
-    [getAuthHeaders, selectedModel, showToast, setStreamStarted, setIsThinking, setController, setMessages],
+    [getAuthHeaders, selectedModel, showToast, setStreamStarted, setIsThinking, setController, setMessages, verbosity],
   );
 
   const handleSendMessage = async (inputText: string, uploadedFiles: UploadedFileInfo[], sendWithSearch: boolean) => {
@@ -1963,6 +1975,8 @@ export default function Home() {
                       thinkingOption={thinkingOption}
                       onThinkingOptionChange={handleThinkingOptionChange}
                       selectedModel={selectedModel}
+                      verbosity={verbosity}
+                      onVerbosityChange={handleVerbosityChange}
                     />
                   </div>
                 </div>

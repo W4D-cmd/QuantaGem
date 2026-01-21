@@ -29,7 +29,9 @@ import {
 } from "@heroicons/react/24/outline";
 import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
 import { Message, ProjectFile } from "@/app/page";
-import { ThinkingOption, getThinkingConfigForModel } from "@/lib/thinking";
+import { ThinkingOption, VerbosityOption, getThinkingConfigForModel } from "@/lib/thinking";
+import { modelSupportsVerbosity } from "@/lib/custom-models";
+import VerbositySelector from "./VerbositySelector";
 import { ArrowUpIcon } from "@heroicons/react/20/solid";
 import { StopIcon } from "@heroicons/react/16/solid";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
@@ -77,6 +79,8 @@ interface ChatInputProps {
   thinkingOption: ThinkingOption;
   onThinkingOptionChange: (option: ThinkingOption) => void;
   selectedModel: Model | null;
+  verbosity: VerbosityOption;
+  onVerbosityChange: (verbosity: VerbosityOption) => void;
 }
 
 export interface ChatInputHandle {
@@ -194,6 +198,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       thinkingOption,
       onThinkingOptionChange,
       selectedModel,
+      verbosity,
+      onVerbosityChange,
     },
     ref,
   ) => {
@@ -224,6 +230,10 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [fileAnimationParent] = useAutoAnimate();
 
     const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
+    const isVerbositySupported = useMemo(
+      () => (selectedModel?.name ? modelSupportsVerbosity(selectedModel.name) : false),
+      [selectedModel]
+    );
 
     const {
       isConnecting: isLiveConnecting,
@@ -916,6 +926,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   items={thinkingDropdownItems}
                   position="left"
                 />
+                {isVerbositySupported && (
+                  <VerbositySelector
+                    verbosity={verbosity}
+                    onVerbosityChange={onVerbosityChange}
+                    disabled={isRecording || isTranscribing || isScanning || isSessionActive}
+                  />
+                )}
               </div>
 
               <div className="flex items-center gap-2">

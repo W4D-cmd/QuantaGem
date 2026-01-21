@@ -5,7 +5,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
-import { getProviderForModel, ModelProvider } from "@/lib/custom-models";
+import { getProviderForModel, ModelProvider, modelSupportsVerbosity } from "@/lib/custom-models";
+import {
+  isOpenAIReasoningModel,
+  mapBudgetToOpenAIReasoningEffort,
+  VerbosityOption,
+  supportsVerbosity,
+} from "@/lib/thinking";
 
 interface ChatRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
@@ -17,6 +23,7 @@ interface ChatRequest {
   isRegeneration?: boolean;
   systemPrompt?: string;
   projectId?: number | null;
+  verbosity?: VerbosityOption;
 }
 
 const SUPPORTED_GEMINI_MIME_TYPES = [
@@ -536,6 +543,8 @@ async function handleOpenAIRequest(
   newMessageAppParts: MessagePart[],
   clientHistoryWithAppParts: Array<{ role: string; parts: MessagePart[] }>,
   systemPromptText: string | null,
+  thinkingBudget: number | undefined,
+  verbosity: VerbosityOption | undefined,
 ): Promise<Response> {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -738,11 +747,26 @@ async function handleOpenAIRequest(
     content: newMessageContentParts,
   });
 
-  const stream = await openai.chat.completions.create({
+  const requestOptions: OpenAI.ChatCompletionCreateParamsStreaming & {
+    reasoning_effort?: string;
+    text?: { verbosity: string };
+  } = {
     model,
     messages,
     stream: true,
-  });
+  };
+
+  if (isOpenAIReasoningModel(model)) {
+    const reasoningEffort = mapBudgetToOpenAIReasoningEffort(model, thinkingBudget);
+    requestOptions.reasoning_effort = reasoningEffort;
+  }
+
+  if (supportsVerbosity(model) || modelSupportsVerbosity(model)) {
+    const effectiveVerbosity = verbosity ?? "medium";
+    requestOptions.text = { verbosity: effectiveVerbosity };
+  }
+
+  const stream = await openai.chat.completions.create(requestOptions);
 
   const encoder = new TextEncoder();
   const readableStream = new ReadableStream({
@@ -752,6 +776,13 @@ async function handleOpenAIRequest(
       try {
         for await (const chunk of stream) {
           const delta = chunk.choices[0]?.delta;
+
+          if (isOpenAIReasoningModel(model) && (delta as Record<string, unknown>)?.reasoning_content) {
+            const reasoningText = (delta as Record<string, unknown>).reasoning_content as string;
+            const jsonChunk = { type: "thought", value: reasoningText };
+            controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+          }
+
           if (delta?.content) {
             modelOutput += delta.content;
             const jsonChunk = { type: "text", value: delta.content };
@@ -811,6 +842,7 @@ export async function POST(request: NextRequest) {
     thinkingBudget,
     projectId,
     systemPrompt: newChatSystemPrompt,
+    verbosity,
   } = (await request.json()) as Omit<ChatRequest, "keySelection" | "isRegeneration">;
 
   const newMessageAppParts: MessagePart[] = [...originalNewMessageAppParts];
@@ -825,7 +857,14 @@ export async function POST(request: NextRequest) {
 
   try {
     if (provider === "openai") {
-      return await handleOpenAIRequest(model, newMessageAppParts, clientHistoryWithAppParts, systemPromptText);
+      return await handleOpenAIRequest(
+        model,
+        newMessageAppParts,
+        clientHistoryWithAppParts,
+        systemPromptText,
+        thinkingBudget,
+        verbosity,
+      );
     } else {
       return await handleGeminiRequest(
         model,

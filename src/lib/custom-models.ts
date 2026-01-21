@@ -6,11 +6,23 @@ export interface CustomModelEntry {
   inputTokenLimit: number;
   outputTokenLimit: number;
   provider: ModelProvider;
+  supportsReasoning?: boolean;
+  supportsVerbosity?: boolean;
 }
 
 export function getProviderForModel(modelId: string): ModelProvider | undefined {
   const model = customModels.find((m) => m.modelId === modelId);
   return model?.provider;
+}
+
+export function modelSupportsVerbosity(modelId: string): boolean {
+  const model = customModels.find((m) => m.modelId === modelId);
+  return model?.supportsVerbosity ?? false;
+}
+
+export function modelSupportsReasoning(modelId: string): boolean {
+  const model = customModels.find((m) => m.modelId === modelId);
+  return model?.supportsReasoning ?? false;
 }
 
 export const customModels: CustomModelEntry[] = [
@@ -34,6 +46,7 @@ export const customModels: CustomModelEntry[] = [
     inputTokenLimit: 1048576,
     outputTokenLimit: 65536,
     provider: "gemini",
+    supportsReasoning: true,
   },
   {
     displayName: "Gemini 2.5 Flash",
@@ -41,6 +54,7 @@ export const customModels: CustomModelEntry[] = [
     inputTokenLimit: 1048576,
     outputTokenLimit: 65536,
     provider: "gemini",
+    supportsReasoning: true,
   },
   {
     displayName: "Gemini 2.5 Flash Preview",
@@ -48,6 +62,7 @@ export const customModels: CustomModelEntry[] = [
     inputTokenLimit: 1048576,
     outputTokenLimit: 65536,
     provider: "gemini",
+    supportsReasoning: true,
   },
   {
     displayName: "Gemini 2.5 Flash-Lite",
@@ -55,6 +70,7 @@ export const customModels: CustomModelEntry[] = [
     inputTokenLimit: 1048576,
     outputTokenLimit: 65536,
     provider: "gemini",
+    supportsReasoning: true,
   },
   {
     displayName: "Gemini 2.5 Flash-Lite Preview",
@@ -62,6 +78,7 @@ export const customModels: CustomModelEntry[] = [
     inputTokenLimit: 1048576,
     outputTokenLimit: 65536,
     provider: "gemini",
+    supportsReasoning: true,
   },
   {
     displayName: "Gemini 2.0 Flash",
@@ -113,11 +130,57 @@ export const customModels: CustomModelEntry[] = [
     provider: "openai",
   },
   {
+    displayName: "GPT-5",
+    modelId: "gpt-5",
+    inputTokenLimit: 1047576,
+    outputTokenLimit: 32768,
+    provider: "openai",
+    supportsReasoning: true,
+    supportsVerbosity: true,
+  },
+  {
+    displayName: "GPT-5 Mini",
+    modelId: "gpt-5-mini",
+    inputTokenLimit: 1047576,
+    outputTokenLimit: 32768,
+    provider: "openai",
+    supportsReasoning: true,
+    supportsVerbosity: true,
+  },
+  {
+    displayName: "GPT-5.1",
+    modelId: "gpt-5.1",
+    inputTokenLimit: 1047576,
+    outputTokenLimit: 32768,
+    provider: "openai",
+    supportsReasoning: true,
+    supportsVerbosity: true,
+  },
+  {
+    displayName: "GPT-5.2",
+    modelId: "gpt-5.2",
+    inputTokenLimit: 1047576,
+    outputTokenLimit: 32768,
+    provider: "openai",
+    supportsReasoning: true,
+    supportsVerbosity: true,
+  },
+  {
+    displayName: "GPT-5.2 Mini",
+    modelId: "gpt-5.2-mini",
+    inputTokenLimit: 1047576,
+    outputTokenLimit: 32768,
+    provider: "openai",
+    supportsReasoning: true,
+    supportsVerbosity: true,
+  },
+  {
     displayName: "o3",
     modelId: "o3",
     inputTokenLimit: 200000,
     outputTokenLimit: 100000,
     provider: "openai",
+    supportsReasoning: true,
   },
   {
     displayName: "o4-mini",
@@ -125,5 +188,6 @@ export const customModels: CustomModelEntry[] = [
     inputTokenLimit: 200000,
     outputTokenLimit: 100000,
     provider: "openai",
+    supportsReasoning: true,
   },
 ];

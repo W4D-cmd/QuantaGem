@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Content, GoogleGenAI, Part } from "@google/genai";
+import { getEncoding } from "js-tiktoken";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
 import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
+import { getProviderForModel } from "@/lib/custom-models";
 
 interface CountTokensRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
@@ -143,6 +145,154 @@ function getFileExtension(fileName?: string): string {
   return (fileName.split(".").pop() || "").toLowerCase();
 }
 
+function countTokensWithTiktoken(text: string): number {
+  const encoding = getEncoding("o200k_base");
+  const tokens = encoding.encode(text);
+  return tokens.length;
+}
+
+function extractTextFromHistory(
+  history: Array<{ role: string; parts: MessagePart[] }>,
+  systemPromptText: string | null,
+): string {
+  const textParts: string[] = [];
+
+  if (systemPromptText && systemPromptText.trim() !== "") {
+    textParts.push(systemPromptText);
+    textParts.push("OK");
+  }
+
+  for (const msg of history) {
+    for (const appPart of msg.parts) {
+      if (appPart.type === "text" && appPart.text) {
+        textParts.push(appPart.text);
+      }
+    }
+  }
+
+  return textParts.join("\n");
+}
+
+async function fetchSystemPrompt(chatSessionId: number, userId: string): Promise<string | null> {
+  let systemPromptText: string | null = null;
+
+  try {
+    const chatSettingsResult = await pool.query(
+      "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
+      [chatSessionId, userId],
+    );
+
+    const chatSpecificPrompt = chatSettingsResult.rows[0]?.system_prompt?.trim();
+    const associatedProjectId = chatSettingsResult.rows[0]?.project_id;
+
+    if (chatSpecificPrompt) {
+      systemPromptText = chatSpecificPrompt;
+    } else if (associatedProjectId) {
+      const projectSettingsResult = await pool.query(
+        "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
+        [associatedProjectId, userId],
+      );
+      if (projectSettingsResult.rows.length > 0 && projectSettingsResult.rows[0].system_prompt?.trim() !== "") {
+        systemPromptText = projectSettingsResult.rows[0].system_prompt;
+      }
+    }
+
+    if (!systemPromptText) {
+      const globalSettingsResult = await pool.query("SELECT system_prompt FROM user_settings WHERE user_id = $1", [
+        userId,
+      ]);
+      if (globalSettingsResult.rows.length > 0 && globalSettingsResult.rows[0].system_prompt?.trim() !== "") {
+        systemPromptText = globalSettingsResult.rows[0].system_prompt;
+      }
+    }
+  } catch (dbError) {
+    console.warn("Failed to fetch system prompt for token counting, proceeding without it:", dbError);
+  }
+
+  return systemPromptText;
+}
+
+async function countTokensForGemini(
+  history: Array<{ role: string; parts: MessagePart[] }>,
+  model: string,
+  systemPromptText: string | null,
+): Promise<number> {
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
+
+  if (!projectId) {
+    throw new Error("GOOGLE_CLOUD_PROJECT is not configured.");
+  }
+
+  const genAI = new GoogleGenAI({ vertexai: true, project: projectId, location: location });
+  const contentsForApi: Content[] = [];
+
+  if (systemPromptText && systemPromptText.trim() !== "") {
+    contentsForApi.push({ role: "user", parts: [{ text: systemPromptText }] });
+    contentsForApi.push({ role: "model", parts: [{ text: "OK" }] });
+  }
+
+  if (history) {
+    for (const msg of history) {
+      const msgGeminiParts: Part[] = [];
+      for (const appPart of msg.parts) {
+        if (appPart.type === "text" && appPart.text) {
+          msgGeminiParts.push({ text: appPart.text });
+        } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
+          if (msg.role === "user") {
+            let effectiveMimeType = appPart.mimeType.toLowerCase();
+            const extension = getFileExtension(appPart.fileName);
+
+            if (
+              !SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType) &&
+              SOURCE_CODE_EXTENSIONS.includes(`.${extension}`)
+            ) {
+              effectiveMimeType = "text/plain";
+            }
+
+            if (!SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType)) {
+              continue;
+            }
+
+            try {
+              const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+              const chunks: Buffer[] = [];
+              for await (const chunk of fileStream) {
+                chunks.push(chunk as Buffer);
+              }
+              const fileBuffer = Buffer.concat(chunks);
+              msgGeminiParts.push({
+                inlineData: {
+                  mimeType: effectiveMimeType,
+                  data: fileBuffer.toString("base64"),
+                },
+              });
+            } catch (fileError) {
+              console.error(`Could not retrieve file ${appPart.objectName} for token count:`, fileError);
+            }
+          } else if (msg.role === "model" && appPart.text) {
+            msgGeminiParts.push({ text: appPart.text });
+          }
+        }
+      }
+      if (msgGeminiParts.length > 0) {
+        contentsForApi.push({ role: msg.role, parts: msgGeminiParts });
+      }
+    }
+  }
+
+  const { totalTokens } = await genAI.models.countTokens({ model, contents: contentsForApi });
+  return totalTokens ?? 0;
+}
+
+function countTokensForOpenAI(
+  history: Array<{ role: string; parts: MessagePart[] }>,
+  systemPromptText: string | null,
+): number {
+  const text = extractTextFromHistory(history, systemPromptText);
+  return countTokensWithTiktoken(text);
+}
+
 export async function POST(request: NextRequest) {
   const userIdHeader = request.headers.get("x-user-id");
   if (!userIdHeader) {
@@ -152,111 +302,26 @@ export async function POST(request: NextRequest) {
 
   const { history, model, chatSessionId } = (await request.json()) as CountTokensRequest;
 
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-  const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
-
-  if (!projectId) {
-    return NextResponse.json({ error: "GOOGLE_CLOUD_PROJECT is not configured." }, { status: 500 });
-  }
   if (!model) {
     return NextResponse.json({ error: "model missing" }, { status: 400 });
   }
 
-  const genAI = new GoogleGenAI({ vertexai: true, project: projectId, location: location });
-  const contentsForApi: Content[] = [];
+  const provider = getProviderForModel(model);
 
   try {
     let systemPromptText: string | null = null;
     if (chatSessionId) {
-      try {
-        const chatSettingsResult = await pool.query(
-          "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
-          [chatSessionId, userId],
-        );
-
-        const chatSpecificPrompt = chatSettingsResult.rows[0]?.system_prompt?.trim();
-        const associatedProjectId = chatSettingsResult.rows[0]?.project_id;
-
-        if (chatSpecificPrompt) {
-          systemPromptText = chatSpecificPrompt;
-        } else if (associatedProjectId) {
-          const projectSettingsResult = await pool.query(
-            "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
-            [associatedProjectId, userId],
-          );
-          if (projectSettingsResult.rows.length > 0 && projectSettingsResult.rows[0].system_prompt?.trim() !== "") {
-            systemPromptText = projectSettingsResult.rows[0].system_prompt;
-          }
-        }
-
-        if (!systemPromptText) {
-          const globalSettingsResult = await pool.query("SELECT system_prompt FROM user_settings WHERE user_id = $1", [
-            userId,
-          ]);
-          if (globalSettingsResult.rows.length > 0 && globalSettingsResult.rows[0].system_prompt?.trim() !== "") {
-            systemPromptText = globalSettingsResult.rows[0].system_prompt;
-          }
-        }
-      } catch (dbError) {
-        console.warn("Failed to fetch system prompt for token counting, proceeding without it:", dbError);
-      }
+      systemPromptText = await fetchSystemPrompt(chatSessionId, userId);
     }
 
-    if (systemPromptText && systemPromptText.trim() !== "") {
-      contentsForApi.push({ role: "user", parts: [{ text: systemPromptText }] });
-      contentsForApi.push({ role: "model", parts: [{ text: "OK" }] });
+    let totalTokens: number;
+
+    if (provider === "openai") {
+      totalTokens = countTokensForOpenAI(history ?? [], systemPromptText);
+    } else {
+      totalTokens = await countTokensForGemini(history ?? [], model, systemPromptText);
     }
 
-    if (history) {
-      for (const msg of history) {
-        const msgGeminiParts: Part[] = [];
-        for (const appPart of msg.parts) {
-          if (appPart.type === "text" && appPart.text) {
-            msgGeminiParts.push({ text: appPart.text });
-          } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-            if (msg.role === "user") {
-              let effectiveMimeType = appPart.mimeType.toLowerCase();
-              const extension = getFileExtension(appPart.fileName);
-
-              if (
-                !SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType) &&
-                SOURCE_CODE_EXTENSIONS.includes(`.${extension}`)
-              ) {
-                effectiveMimeType = "text/plain";
-              }
-
-              if (!SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType)) {
-                continue;
-              }
-
-              try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                const chunks: Buffer[] = [];
-                for await (const chunk of fileStream) {
-                  chunks.push(chunk as Buffer);
-                }
-                const fileBuffer = Buffer.concat(chunks);
-                msgGeminiParts.push({
-                  inlineData: {
-                    mimeType: effectiveMimeType,
-                    data: fileBuffer.toString("base64"),
-                  },
-                });
-              } catch (fileError) {
-                console.error(`Could not retrieve file ${appPart.objectName} for token count:`, fileError);
-              }
-            } else if (msg.role === "model" && appPart.text) {
-              msgGeminiParts.push({ text: appPart.text });
-            }
-          }
-        }
-        if (msgGeminiParts.length > 0) {
-          contentsForApi.push({ role: msg.role, parts: msgGeminiParts });
-        }
-      }
-    }
-
-    const { totalTokens } = await genAI.models.countTokens({ model, contents: contentsForApi });
     return NextResponse.json({ totalTokens });
   } catch (error) {
     console.error("Error in token counting:", error);

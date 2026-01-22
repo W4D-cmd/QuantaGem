@@ -56,6 +56,10 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     command: uvicorn main:app --host 0.0.0.0 --port 8001 --timeout-keep-alive 0
+    environment:
+      - DOCLING_NUM_THREADS=1
+      - OMP_NUM_THREADS=4
+      - MKL_NUM_THREADS=4
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/ping"]
       interval: 10s

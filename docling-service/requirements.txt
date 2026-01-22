@@ -1,0 +1,2 @@
+fastapi[all]
+docling>=2.0.0

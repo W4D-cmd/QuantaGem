@@ -1060,6 +1060,8 @@ export default function Home() {
                 });
               } else if (parsedChunk.type === "error") {
                 modelReturnedEmptyMessage = true;
+              } else if (parsedChunk.type === "warning") {
+                showToast(parsedChunk.value, "error");
               }
             } catch (jsonError) {
               console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);

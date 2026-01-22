@@ -182,6 +182,30 @@ const safetySettings = [
   },
 ];
 
+const DOCLING_SERVICE_URL = process.env.DOCLING_SERVICE_URL || "http://docling-service:8001";
+
+async function convertPdfToMarkdown(pdfBuffer: Buffer, filename?: string): Promise<string | null> {
+  try {
+    const response = await fetch(`${DOCLING_SERVICE_URL}/convert`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        file_data: pdfBuffer.toString("base64"),
+        filename: filename || "document.pdf",
+      }),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Docling service error: ${response.status} - ${errorText}`);
+      return null;
+    }
+    return await response.text();
+  } catch (error) {
+    console.error("Error calling Docling service:", error);
+    return null;
+  }
+}
+
 function getFileExtension(fileName?: string): string {
   if (!fileName) return "";
   return (fileName.split(".").pop() || "").toLowerCase();
@@ -853,6 +877,9 @@ async function handleOpenAIResponsesAPIRequest(
 
   const openai = new OpenAI({ apiKey });
 
+  // Track PDFs that failed to convert via Docling
+  const failedPdfConversions: string[] = [];
+
   const inputItems: ResponsesAPIInputItem[] = [];
 
   if (clientHistoryWithAppParts) {
@@ -902,13 +929,20 @@ async function handleOpenAIResponsesAPIRequest(
                   chunks.push(chunk as Buffer);
                 }
                 const fileBuffer = Buffer.concat(chunks);
-                const base64Data = fileBuffer.toString("base64");
                 const filename = appPart.fileName || appPart.objectName;
-                contentParts.push({
-                  type: "input_file",
-                  filename: filename,
-                  file_data: `data:${mimeType};base64,${base64Data}`,
-                });
+
+                // Try to convert PDF to markdown via Docling
+                const markdownContent = await convertPdfToMarkdown(fileBuffer, filename);
+
+                if (markdownContent) {
+                  // Successfully converted - send as text
+                  const fileHeader = `--- Document: ${filename} ---\n`;
+                  contentParts.push({ type: "input_text", text: fileHeader + markdownContent });
+                } else {
+                  // PDF conversion failed - skip this file and track for warning
+                  console.warn(`Docling conversion failed for ${filename}, skipping file`);
+                  failedPdfConversions.push(filename);
+                }
               } catch (fileError) {
                 console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
                 return NextResponse.json(
@@ -1010,13 +1044,20 @@ async function handleOpenAIResponsesAPIRequest(
             chunks.push(chunk as Buffer);
           }
           const fileBuffer = Buffer.concat(chunks);
-          const base64Data = fileBuffer.toString("base64");
           const filename = appPart.fileName || appPart.objectName;
-          newMessageContentParts.push({
-            type: "input_file",
-            filename: filename,
-            file_data: `data:${mimeType};base64,${base64Data}`,
-          });
+
+          // Try to convert PDF to markdown via Docling
+          const markdownContent = await convertPdfToMarkdown(fileBuffer, filename);
+
+          if (markdownContent) {
+            // Successfully converted - send as text
+            const fileHeader = `--- Document: ${filename} ---\n`;
+            newMessageContentParts.push({ type: "input_text", text: fileHeader + markdownContent });
+          } else {
+            // PDF conversion failed - skip this file and track for warning
+            console.warn(`Docling conversion failed for ${filename}, skipping file`);
+            failedPdfConversions.push(filename);
+          }
         } catch (fileError) {
           console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO for new message:`, fileError);
           return NextResponse.json(
@@ -1126,6 +1167,15 @@ async function handleOpenAIResponsesAPIRequest(
       let hasReceivedContent = false;
 
       try {
+        // Send warnings for any PDFs that failed to convert
+        for (const failedFile of failedPdfConversions) {
+          const warningMessage = {
+            type: "warning",
+            value: `PDF "${failedFile}" could not be processed and was excluded from this request.`,
+          };
+          controller.enqueue(encoder.encode(JSON.stringify(warningMessage) + "\n"));
+        }
+
         for await (const event of stream) {
           if (event.type === "response.output_text.delta" && event.delta) {
             modelOutput += event.delta;

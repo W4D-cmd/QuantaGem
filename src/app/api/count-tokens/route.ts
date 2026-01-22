@@ -33,6 +33,37 @@ const SUPPORTED_GEMINI_MIME_TYPES = [
   "text/rtf",
 ];
 
+// OpenAI token estimation constants for multimodal content
+// Based on OpenAI's vision pricing: high-detail images use ~85 base + 170 per 512x512 tile
+// Using 1000 as a reasonable average for typical images
+const OPENAI_IMAGE_TOKEN_ESTIMATE = 1000;
+// Approximate tokens per KB for PDF documents (~200 tokens/KB is a reasonable estimate)
+const OPENAI_PDF_TOKENS_PER_KB = 200;
+// Minimum estimate for unknown file types
+const OPENAI_UNKNOWN_FILE_TOKEN_ESTIMATE = 100;
+
+// Text-based MIME types that can be read and counted directly with tiktoken
+const TEXT_BASED_MIME_TYPES = [
+  "text/plain",
+  "text/html",
+  "text/css",
+  "text/javascript",
+  "application/javascript",
+  "application/x-javascript",
+  "text/x-python",
+  "application/x-python",
+  "text/markdown",
+  "text/md",
+  "text/csv",
+  "text/xml",
+  "application/xml",
+  "application/json",
+  "text/rtf",
+];
+
+// Image MIME types for OpenAI estimation
+const IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/heic", "image/heif"];
+
 const SOURCE_CODE_EXTENSIONS = [
   ".html",
   ".htm",
@@ -151,26 +182,77 @@ function countTokensWithTiktoken(text: string): number {
   return tokens.length;
 }
 
-function extractTextFromHistory(
-  history: Array<{ role: string; parts: MessagePart[] }>,
-  systemPromptText: string | null,
-): string {
-  const textParts: string[] = [];
+/**
+ * Determines if a file should be treated as text-based for OpenAI token counting.
+ * Text files can be read and counted directly with tiktoken.
+ */
+function isTextBasedFile(mimeType: string, fileName?: string): boolean {
+  const normalizedMime = mimeType.toLowerCase();
+  if (TEXT_BASED_MIME_TYPES.includes(normalizedMime)) {
+    return true;
+  }
+  const extension = getFileExtension(fileName);
+  return extension ? SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) : false;
+}
 
-  if (systemPromptText && systemPromptText.trim() !== "") {
-    textParts.push(systemPromptText);
-    textParts.push("OK");
+/**
+ * Determines if a file is an image for OpenAI estimation.
+ */
+function isImageFile(mimeType: string): boolean {
+  const normalizedMime = mimeType.toLowerCase();
+  return IMAGE_MIME_TYPES.includes(normalizedMime) || normalizedMime.startsWith("image/");
+}
+
+/**
+ * Counts tokens for a single file attachment for OpenAI models.
+ * - Text-based files: fetches content from MinIO and counts with tiktoken
+ * - Images: returns a fixed estimate based on OpenAI's vision pricing
+ * - PDFs: estimates based on file size
+ * - Unknown types: returns a minimal estimate
+ */
+async function countFileTokensForOpenAI(filePart: MessagePart): Promise<number> {
+  if (!filePart.objectName || !filePart.mimeType) {
+    return 0;
   }
 
-  for (const msg of history) {
-    for (const appPart of msg.parts) {
-      if (appPart.type === "text" && appPart.text) {
-        textParts.push(appPart.text);
-      }
+  const mimeType = filePart.mimeType.toLowerCase();
+
+  // Handle images with fixed estimate
+  if (isImageFile(mimeType)) {
+    return OPENAI_IMAGE_TOKEN_ESTIMATE;
+  }
+
+  // Handle PDFs with size-based estimate
+  if (mimeType === "application/pdf") {
+    try {
+      const stat = await minioClient.statObject(MINIO_BUCKET_NAME, filePart.objectName);
+      const fileSizeKB = stat.size / 1024;
+      return Math.max(Math.ceil(fileSizeKB * OPENAI_PDF_TOKENS_PER_KB), 100);
+    } catch (error) {
+      console.error(`Could not get PDF size for ${filePart.objectName}:`, error);
+      return 1500; // Default estimate for ~1 page
     }
   }
 
-  return textParts.join("\n");
+  // Handle text-based files by reading content
+  if (isTextBasedFile(mimeType, filePart.fileName)) {
+    try {
+      const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, filePart.objectName);
+      const chunks: Buffer[] = [];
+      for await (const chunk of fileStream) {
+        chunks.push(chunk as Buffer);
+      }
+      const fileBuffer = Buffer.concat(chunks);
+      const fileContent = fileBuffer.toString("utf-8");
+      return countTokensWithTiktoken(fileContent);
+    } catch (error) {
+      console.error(`Could not retrieve file ${filePart.objectName} for token count:`, error);
+      return 0;
+    }
+  }
+
+  // Unknown file type - return minimal estimate
+  return OPENAI_UNKNOWN_FILE_TOKEN_ESTIMATE;
 }
 
 async function fetchSystemPrompt(chatSessionId: number, userId: string): Promise<string | null> {
@@ -285,12 +367,39 @@ async function countTokensForGemini(
   return totalTokens ?? 0;
 }
 
-function countTokensForOpenAI(
+/**
+ * Counts tokens for OpenAI models including file attachments.
+ * - Text parts: counted directly with tiktoken
+ * - File attachments: fetched from MinIO and counted/estimated appropriately
+ */
+async function countTokensForOpenAI(
   history: Array<{ role: string; parts: MessagePart[] }>,
   systemPromptText: string | null,
-): number {
-  const text = extractTextFromHistory(history, systemPromptText);
-  return countTokensWithTiktoken(text);
+): Promise<number> {
+  let totalTokens = 0;
+
+  // Count system prompt tokens
+  if (systemPromptText && systemPromptText.trim() !== "") {
+    totalTokens += countTokensWithTiktoken(systemPromptText);
+    totalTokens += countTokensWithTiktoken("OK");
+  }
+
+  // Process each message in history
+  for (const msg of history) {
+    for (const appPart of msg.parts) {
+      if (appPart.type === "text" && appPart.text) {
+        totalTokens += countTokensWithTiktoken(appPart.text);
+      } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
+        // Only count files from user messages (same pattern as Gemini)
+        if (msg.role === "user") {
+          const fileTokens = await countFileTokensForOpenAI(appPart);
+          totalTokens += fileTokens;
+        }
+      }
+    }
+  }
+
+  return totalTokens;
 }
 
 export async function POST(request: NextRequest) {
@@ -317,7 +426,7 @@ export async function POST(request: NextRequest) {
     let totalTokens: number;
 
     if (provider === "openai") {
-      totalTokens = countTokensForOpenAI(history ?? [], systemPromptText);
+      totalTokens = await countTokensForOpenAI(history ?? [], systemPromptText);
     } else {
       totalTokens = await countTokensForGemini(history ?? [], model, systemPromptText);
     }

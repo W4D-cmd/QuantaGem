@@ -55,7 +55,7 @@ services:
       context: ./docling-service
       dockerfile: Dockerfile
     restart: unless-stopped
-    command: uvicorn main:app --host 0.0.0.0 --port 8001
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --timeout-keep-alive 0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/ping"]
       interval: 10s

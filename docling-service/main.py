@@ -4,6 +4,7 @@ import tempfile
 import os
 import threading
 import time
+import asyncio
 from typing import Optional
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import PlainTextResponse
@@ -74,8 +75,12 @@ async def convert_pdf_to_markdown(request: PDFConvertRequest):
             temp_pdf.write(pdf_bytes)
             temp_pdf_path = temp_pdf.name
 
-        result = converter.convert(temp_pdf_path)
-        markdown_content = result.document.export_to_markdown()
+        # Run blocking Docling conversion in thread pool to avoid blocking event loop
+        def do_conversion():
+            result = converter.convert(temp_pdf_path)
+            return result.document.export_to_markdown()
+
+        markdown_content = await asyncio.to_thread(do_conversion)
 
         return markdown_content
 

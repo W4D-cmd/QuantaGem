@@ -29,7 +29,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
 import { Message, ProjectFile } from "@/app/page";
-import { ThinkingOption, VerbosityOption, getThinkingConfigForModel } from "@/lib/thinking";
+import { ThinkingOption, VerbosityOption, getThinkingConfigForModel, isOpenAIReasoningModel, getOpenAIReasoningConfig } from "@/lib/thinking";
 import { modelSupportsVerbosity } from "@/lib/custom-models";
 import VerbositySelector from "./VerbositySelector";
 import { ArrowUpIcon } from "@heroicons/react/20/solid";
@@ -445,17 +445,40 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     ];
 
     const thinkingDropdownItems = useMemo((): DropdownItem[] => {
-      const config = getThinkingConfigForModel(selectedModel?.name);
+      const modelName = selectedModel?.name;
+      const config = getThinkingConfigForModel(modelName);
       if (!config) return [];
 
-      const options: ThinkingOption[] = ["dynamic", "low", "medium", "high"];
-      if (config.canBeOff) {
-        options.splice(1, 0, "off");
+      let options: ThinkingOption[];
+
+      if (isOpenAIReasoningModel(modelName)) {
+        const openaiConfig = getOpenAIReasoningConfig(modelName);
+        const efforts = openaiConfig?.supportedEfforts ?? [];
+        options = ["dynamic"];
+        if (efforts.includes("none")) options.push("off");
+        if (efforts.includes("low")) options.push("low");
+        if (efforts.includes("medium")) options.push("medium");
+        if (efforts.includes("high")) options.push("high");
+        if (efforts.includes("xhigh")) options.push("xhigh");
+      } else {
+        options = ["dynamic", "low", "medium", "high"];
+        if (config.canBeOff) {
+          options.splice(1, 0, "off");
+        }
       }
+
+      const labelMap: Record<ThinkingOption, string> = {
+        dynamic: "Dynamic",
+        off: "Off",
+        low: "Low",
+        medium: "Medium",
+        high: "High",
+        xhigh: "Extra High",
+      };
 
       return options.map((option) => ({
         id: option,
-        label: option.charAt(0).toUpperCase() + option.slice(1),
+        label: labelMap[option],
         onClick: () => onThinkingOptionChange(option),
         className: thinkingOption === option ? "font-semibold" : "",
         icon: thinkingOption === option ? <CheckIcon className="size-4 text-blue-500" /> : <div className="size-4" />,

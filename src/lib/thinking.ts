@@ -1,4 +1,4 @@
-export type ThinkingOption = "dynamic" | "off" | "low" | "medium" | "high";
+export type ThinkingOption = "dynamic" | "off" | "low" | "medium" | "high" | "xhigh";
 
 export type OpenAIReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh";
 
@@ -25,49 +25,64 @@ const modelConfigs: Record<string, ThinkingModelConfig> = {
 const openAIReasoningModelConfigs: Record<string, OpenAIReasoningModelConfig> = {
   "gpt-5.2": {
     supportedEfforts: ["none", "low", "medium", "high", "xhigh"],
-    defaultEffort: "medium",
+    defaultEffort: "none",
     supportsVerbosity: true,
   },
   "gpt-5.1": {
     supportedEfforts: ["none", "low", "medium", "high"],
-    defaultEffort: "medium",
+    defaultEffort: "none",
     supportsVerbosity: true,
   },
 };
 
-export function isOpenAIReasoningModel(modelName: string | null | undefined): boolean {
-  if (!modelName) return false;
-  return modelName in openAIReasoningModelConfigs;
+function getOpenAIModelBase(modelName: string): string | null {
+  if (modelName.startsWith("gpt-5.2")) return "gpt-5.2";
+  if (modelName.startsWith("gpt-5.1")) return "gpt-5.1";
+  return null;
 }
 
-const GPT5_FAMILY_MODELS = ["gpt-5", "gpt-5-mini", "gpt-5.1", "gpt-5.2", "gpt-5.2-mini"];
+export function isOpenAIReasoningModel(modelName: string | null | undefined): boolean {
+  if (!modelName) return false;
+  const baseModel = getOpenAIModelBase(modelName);
+  return baseModel !== null && baseModel in openAIReasoningModelConfigs;
+}
+
+const GPT5_FAMILY_PREFIXES = ["gpt-5-", "gpt-5.1", "gpt-5.2"];
 
 export function isGPT5FamilyModel(modelName: string | null | undefined): boolean {
   if (!modelName) return false;
-  return GPT5_FAMILY_MODELS.includes(modelName);
+  return GPT5_FAMILY_PREFIXES.some(prefix => modelName.startsWith(prefix));
 }
 
 export function getOpenAIReasoningConfig(modelName: string | null | undefined): OpenAIReasoningModelConfig | null {
   if (!modelName) return null;
-  return openAIReasoningModelConfigs[modelName] ?? null;
+  const baseModel = getOpenAIModelBase(modelName);
+  if (!baseModel) return null;
+  return openAIReasoningModelConfigs[baseModel] ?? null;
 }
 
 export function supportsVerbosity(modelName: string | null | undefined): boolean {
   if (!modelName) return false;
-  const config = openAIReasoningModelConfigs[modelName];
+  const baseModel = getOpenAIModelBase(modelName);
+  if (!baseModel) return false;
+  const config = openAIReasoningModelConfigs[baseModel];
   return config?.supportsVerbosity ?? false;
 }
 
 export function getSupportedReasoningEfforts(modelName: string | null | undefined): OpenAIReasoningEffort[] {
   if (!modelName) return [];
-  const config = openAIReasoningModelConfigs[modelName];
+  const baseModel = getOpenAIModelBase(modelName);
+  if (!baseModel) return [];
+  const config = openAIReasoningModelConfigs[baseModel];
   return config?.supportedEfforts ?? [];
 }
 
 export function getDefaultReasoningEffort(modelName: string | null | undefined): OpenAIReasoningEffort {
-  if (!modelName) return "medium";
-  const config = openAIReasoningModelConfigs[modelName];
-  return config?.defaultEffort ?? "medium";
+  if (!modelName) return "none";
+  const baseModel = getOpenAIModelBase(modelName);
+  if (!baseModel) return "none";
+  const config = openAIReasoningModelConfigs[baseModel];
+  return config?.defaultEffort ?? "none";
 }
 
 export function getThinkingConfigForModel(modelName: string | null | undefined): ThinkingModelConfig | null {
@@ -75,7 +90,9 @@ export function getThinkingConfigForModel(modelName: string | null | undefined):
   if (modelName.includes("2.5-pro")) return modelConfigs["2.5-pro"];
   if (modelName.includes("2.5-flash")) return modelConfigs["2.5-flash"];
   if (isOpenAIReasoningModel(modelName)) {
-    return { min: 0, max: 0, canBeOff: false, medium: 0 };
+    const config = getOpenAIReasoningConfig(modelName);
+    const canBeOff = config?.supportedEfforts.includes("none") ?? false;
+    return { min: 0, max: 0, canBeOff, medium: 0 };
   }
   return null;
 }
@@ -92,6 +109,7 @@ export function getThinkingBudgetMap(modelName: string | null | undefined): Reco
       low: efforts.includes("low") ? 1 : -1,
       medium: efforts.includes("medium") ? 2 : -1,
       high: efforts.includes("high") ? 3 : -1,
+      xhigh: efforts.includes("xhigh") ? 4 : -1,
     };
   }
 
@@ -104,6 +122,7 @@ export function getThinkingBudgetMap(modelName: string | null | undefined): Reco
     low: config.min,
     medium: config.medium,
     high: config.max,
+    xhigh: -1,
   };
 }
 
@@ -120,6 +139,7 @@ export function getThinkingValueMap(modelName: string | null | undefined): { [ke
     if (efforts.includes("low")) valueMap[1] = "low";
     if (efforts.includes("medium")) valueMap[2] = "medium";
     if (efforts.includes("high")) valueMap[3] = "high";
+    if (efforts.includes("xhigh")) valueMap[4] = "xhigh";
     return valueMap;
   }
 
@@ -144,7 +164,7 @@ export function mapBudgetToOpenAIReasoningEffort(
   budget: number | undefined
 ): OpenAIReasoningEffort {
   const config = getOpenAIReasoningConfig(modelName);
-  if (!config) return "medium";
+  if (!config) return "none";
 
   if (budget === undefined || budget === -1) {
     return config.defaultEffort;

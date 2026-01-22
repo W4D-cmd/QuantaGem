@@ -14,6 +14,9 @@ import {
   supportsVerbosity,
 } from "@/lib/thinking";
 
+// Allow long-running requests for PDF conversion via Docling
+export const maxDuration = 600;
+
 interface ChatRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
   messageParts: MessagePart[];

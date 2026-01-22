@@ -64,7 +64,8 @@ export const customModels: CustomModelEntry[] = [
     inputTokenLimit: 400000,
     outputTokenLimit: 128000,
     provider: "openai",
-	supportsReasoning: true,
+    supportsReasoning: true,
+    supportsVerbosity: true,
   },
   {
     displayName: "GPT-5.1",
@@ -72,6 +73,7 @@ export const customModels: CustomModelEntry[] = [
     inputTokenLimit: 400000,
     outputTokenLimit: 128000,
     provider: "openai",
-	supportsReasoning: true,
+    supportsReasoning: true,
+    supportsVerbosity: true,
   },
 ];

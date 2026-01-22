@@ -50,6 +50,8 @@ const SUPPORTED_GEMINI_MIME_TYPES = [
 
 const SUPPORTED_OPENAI_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
+const SUPPORTED_OPENAI_DOCUMENT_TYPES = ["application/pdf"];
+
 const SOURCE_CODE_EXTENSIONS = [
   ".html",
   ".htm",
@@ -831,6 +833,7 @@ type ResponsesAPIInputItem =
       content: Array<
         | { type: "input_text"; text: string }
         | { type: "input_image"; image_url: string }
+        | { type: "input_file"; filename: string; file_data: string }
       >;
     };
 
@@ -857,6 +860,7 @@ async function handleOpenAIResponsesAPIRequest(
       const contentParts: Array<
         | { type: "input_text"; text: string }
         | { type: "input_image"; image_url: string }
+        | { type: "input_file"; filename: string; file_data: string }
       > = [];
 
       if (prevMsg.parts && Array.isArray(prevMsg.parts)) {
@@ -880,6 +884,30 @@ async function handleOpenAIResponsesAPIRequest(
                 contentParts.push({
                   type: "input_image",
                   image_url: `data:${mimeType};base64,${base64Data}`,
+                });
+              } catch (fileError) {
+                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
+                return NextResponse.json(
+                  {
+                    error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}`,
+                  },
+                  { status: 500 },
+                );
+              }
+            } else if (SUPPORTED_OPENAI_DOCUMENT_TYPES.includes(mimeType)) {
+              try {
+                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const chunks: Buffer[] = [];
+                for await (const chunk of fileStream) {
+                  chunks.push(chunk as Buffer);
+                }
+                const fileBuffer = Buffer.concat(chunks);
+                const base64Data = fileBuffer.toString("base64");
+                const filename = appPart.fileName || appPart.objectName;
+                contentParts.push({
+                  type: "input_file",
+                  filename: filename,
+                  file_data: `data:${mimeType};base64,${base64Data}`,
                 });
               } catch (fileError) {
                 console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
@@ -941,6 +969,7 @@ async function handleOpenAIResponsesAPIRequest(
   const newMessageContentParts: Array<
     | { type: "input_text"; text: string }
     | { type: "input_image"; image_url: string }
+    | { type: "input_file"; filename: string; file_data: string }
   > = [];
 
   for (const appPart of newMessageAppParts) {
@@ -963,6 +992,30 @@ async function handleOpenAIResponsesAPIRequest(
           newMessageContentParts.push({
             type: "input_image",
             image_url: `data:${mimeType};base64,${base64Data}`,
+          });
+        } catch (fileError) {
+          console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO for new message:`, fileError);
+          return NextResponse.json(
+            {
+              error: `Failed to process file: ${appPart.fileName || appPart.objectName}`,
+            },
+            { status: 500 },
+          );
+        }
+      } else if (SUPPORTED_OPENAI_DOCUMENT_TYPES.includes(mimeType)) {
+        try {
+          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+          const chunks: Buffer[] = [];
+          for await (const chunk of fileStream) {
+            chunks.push(chunk as Buffer);
+          }
+          const fileBuffer = Buffer.concat(chunks);
+          const base64Data = fileBuffer.toString("base64");
+          const filename = appPart.fileName || appPart.objectName;
+          newMessageContentParts.push({
+            type: "input_file",
+            filename: filename,
+            file_data: `data:${mimeType};base64,${base64Data}`,
           });
         } catch (fileError) {
           console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO for new message:`, fileError);
@@ -1015,7 +1068,7 @@ async function handleOpenAIResponsesAPIRequest(
       return NextResponse.json(
         {
           error:
-            "All uploaded files have types unsupported by OpenAI or could not be processed. Supported types include images (PNG, JPEG, WEBP, GIF) and text files.",
+            "All uploaded files have types unsupported by OpenAI or could not be processed. Supported types include images (PNG, JPEG, WEBP, GIF), PDFs, and text files.",
         },
         { status: 400 },
       );

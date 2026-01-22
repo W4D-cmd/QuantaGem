@@ -5,17 +5,32 @@ import os
 import threading
 import time
 import asyncio
+import gc
+import platform
+import ctypes
 from typing import Optional
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
-from docling.document_converter import DocumentConverter
+
+# Docling Imports
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions
 
 app = FastAPI()
 
 converter: Optional[DocumentConverter] = None
 converter_loaded_event = threading.Event()
 
+def release_memory():
+    """Zwingt Python und das OS, Speicher freizugeben."""
+    gc.collect()
+    if platform.system() == "Linux":
+        try:
+            ctypes.CDLL("libc.so.6").malloc_trim(0)
+        except Exception:
+            pass
 
 class PDFConvertRequest(BaseModel):
     file_data: str  # base64 encoded PDF
@@ -25,9 +40,21 @@ class PDFConvertRequest(BaseModel):
 def load_docling_converter():
     global converter
     start_time = time.time()
-    print("Docling: Initializing DocumentConverter...")
+    print("Docling: Initializing DocumentConverter with 4 CPU threads...")
     try:
-        converter = DocumentConverter()
+        pipeline_options = PdfPipelineOptions()
+        
+        pipeline_options.accelerator_options = AcceleratorOptions(
+            num_threads=4, 
+            device="cpu"
+        )
+
+        converter = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+            }
+        )
+        
         load_duration = time.time() - start_time
         print(f"Docling: DocumentConverter initialized in {load_duration:.2f}s.")
         converter_loaded_event.set()
@@ -75,10 +102,16 @@ async def convert_pdf_to_markdown(request: PDFConvertRequest):
             temp_pdf.write(pdf_bytes)
             temp_pdf_path = temp_pdf.name
 
-        # Run blocking Docling conversion in thread pool to avoid blocking event loop
+        # Run blocking Docling conversion in thread pool
         def do_conversion():
             result = converter.convert(temp_pdf_path)
-            return result.document.export_to_markdown()
+            markdown_output = result.document.export_to_markdown()
+            
+            del result
+            
+            release_memory()
+            
+            return markdown_output
 
         markdown_content = await asyncio.to_thread(do_conversion)
 
@@ -86,6 +119,7 @@ async def convert_pdf_to_markdown(request: PDFConvertRequest):
 
     except Exception as e:
         print(f"Docling: Conversion failed: {e}")
+        release_memory()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"PDF conversion failed: {str(e)}",

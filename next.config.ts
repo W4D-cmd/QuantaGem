@@ -28,26 +28,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      {
-        // Allow WebR CDN for R code execution
-        source: "/:path*",
-        headers: [
-          {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://webr.r-wasm.org blob:",
-              "script-src-elem 'self' 'unsafe-inline' https://webr.r-wasm.org",
-              "worker-src 'self' blob: https://webr.r-wasm.org",
-              "connect-src 'self' https://webr.r-wasm.org https://repo.r-wasm.org https://*.r-wasm.org",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
-              "font-src 'self' data:",
-              "frame-src 'self' blob:",
-            ].join("; "),
-          },
-        ],
-      },
     ];
   },
 };

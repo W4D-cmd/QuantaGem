@@ -15,6 +15,7 @@ import React, {
 import Tooltip from "@/components/Tooltip";
 import {
   ArrowPathIcon,
+  BeakerIcon,
   CheckIcon,
   CpuChipIcon,
   FolderOpenIcon,
@@ -62,6 +63,7 @@ interface ChatInputProps {
   selectedModel: Model | null;
   verbosity: VerbosityOption;
   onVerbosityChange: (verbosity: VerbosityOption) => void;
+  onSystemPromptGenerated: (prompt: string) => void;
 }
 
 export interface ChatInputHandle {
@@ -167,6 +169,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       selectedModel,
       verbosity,
       onVerbosityChange,
+      onSystemPromptGenerated,
     },
     ref,
   ) => {
@@ -205,6 +208,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [isRefining, setIsRefining] = useState(false);
     const originalInputBeforeRefineRef = useRef<string | null>(null);
     const refineAbortControllerRef = useRef<AbortController | null>(null);
+
+    const [isGeneratingSystemPrompt, setIsGeneratingSystemPrompt] = useState(false);
+    const systemPromptAbortControllerRef = useRef<AbortController | null>(null);
 
     const uploadFileWithProgress = (uploadingFile: { file: File; id: string; progress: number }) => {
       return new Promise<UploadedFileInfo | null>((resolve) => {
@@ -584,7 +590,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         isRecording ||
         isTranscribing ||
         isScanning ||
-        isRefining
+        isRefining ||
+        isGeneratingSystemPrompt
       )
         return;
       onSendMessageAction(input, selectedFiles, isSearchActive);
@@ -775,6 +782,93 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       }
     };
 
+    const handleGenerateSystemPrompt = async () => {
+      if (!input.trim() || !selectedModel) return;
+
+      setIsGeneratingSystemPrompt(true);
+      const controller = new AbortController();
+      systemPromptAbortControllerRef.current = controller;
+
+      try {
+        const response = await fetch("/api/generate-system-prompt", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({
+            prompt: input,
+            model: selectedModel.name,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to generate system prompt.");
+        }
+
+        if (!response.body) {
+          throw new Error("No response body received.");
+        }
+
+        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+        let generatedText = "";
+        let streamBuffer = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          streamBuffer += value;
+          const lines = streamBuffer.split("\n");
+          streamBuffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (line.trim() === "") continue;
+            try {
+              const parsedChunk = JSON.parse(line);
+              if (parsedChunk.type === "text") {
+                generatedText += parsedChunk.value;
+              } else if (parsedChunk.type === "error") {
+                throw new Error(parsedChunk.value || "Error during system prompt generation.");
+              }
+            } catch (jsonError) {
+              if (jsonError instanceof SyntaxError) {
+                console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
+              } else {
+                throw jsonError;
+              }
+            }
+          }
+        }
+
+        if (generatedText.trim()) {
+          onSystemPromptGenerated(generatedText.trim());
+          showToast("System prompt created successfully.", "success");
+        } else {
+          showToast("System prompt generation returned empty result.", "error");
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          showToast("System prompt generation cancelled.", "error");
+        } else {
+          showToast(`System prompt error: ${err instanceof Error ? err.message : String(err)}`, "error");
+          console.error("Error during system prompt generation:", err);
+        }
+      } finally {
+        setIsGeneratingSystemPrompt(false);
+        systemPromptAbortControllerRef.current = null;
+        textareaRef.current?.focus();
+      }
+    };
+
+    const handleCancelGenerateSystemPrompt = () => {
+      if (systemPromptAbortControllerRef.current) {
+        systemPromptAbortControllerRef.current.abort();
+      }
+    };
+
     const getMainButtonAction = () => {
       if (isLoading) return onCancelAction;
       if (isRecording) return submitRecordingForTranscription;
@@ -865,7 +959,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               transition duration-300 ease-in-out focus-within:ring-2 focus-within:ring-opacity-50 ${
                 isRefining
                   ? "border-purple-500 focus-within:border-purple-500 focus-within:ring-purple-500"
-                  : "border-neutral-300 focus-within:border-blue-500 focus-within:ring-blue-500"
+                  : isGeneratingSystemPrompt
+                    ? "border-amber-500 focus-within:border-amber-500 focus-within:ring-amber-500"
+                    : "border-neutral-300 focus-within:border-blue-500 focus-within:ring-blue-500"
               }`}
           >
             <div className="p-4 bg-white dark:bg-neutral-900 transition-colors duration-300 ease-in-out">
@@ -875,7 +971,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 onChange={handleInputChange}
                 onKeyDown={onKeyDown}
                 onPaste={handlePaste}
-                placeholder={isRefining ? "Refining your prompt..." : "Send a message..."}
+                placeholder={isRefining ? "Refining your prompt..." : isGeneratingSystemPrompt ? "Creating system prompt..." : "Send a message..."}
                 rows={1}
                 className="w-full resize-none border-none p-0 focus:outline-none bg-white dark:bg-neutral-900
                   transition-colors duration-300 ease-in-out placeholder-neutral-500 dark:placeholder-neutral-400"
@@ -885,7 +981,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   scrollbarGutter: "stable",
                 }}
                 disabled={
-                  isLoading || isRecording || isTranscribing || isScanning || isRefining
+                  isLoading || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt
                 }
               />
             </div>
@@ -906,7 +1002,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       isTranscribing ||
                       isScanning ||
                       uploadingFiles.length > 0 ||
-                      isRefining
+                      isRefining ||
+                      isGeneratingSystemPrompt
                     }
                     className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
                       border transition-colors duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100
@@ -932,13 +1029,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   onChange={handleFileChange}
                   multiple
                   className="hidden"
-                  disabled={isLoading || isRecording || isTranscribing || isScanning || isRefining}
+                  disabled={isLoading || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
                 />
                 <Tooltip text="Search the web">
                   <button
                     type="button"
                     onClick={() => onToggleSearch(!isSearchActive)}
-                    disabled={isRecording || isTranscribing || isScanning || isRefining}
+                    disabled={isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
                     className={` cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
                       transition-colors duration-300 ease-in-out ${
                         isSearchActive
@@ -967,7 +1064,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       ref={thinkingButtonRef}
                       type="button"
                       onClick={() => setIsThinkingMenuOpen((prev) => !prev)}
-                      disabled={isRecording || isTranscribing || isScanning || isRefining}
+                      disabled={isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
                       className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
                       transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
                       text-neutral-500 dark:bg-neutral-950 dark:border-neutral-900 dark:text-neutral-300
@@ -990,7 +1087,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   <VerbositySelector
                     verbosity={verbosity}
                     onVerbosityChange={onVerbosityChange}
-                    disabled={isRecording || isTranscribing || isScanning || isRefining}
+                    disabled={isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
                   />
                 )}
               </div>
@@ -999,6 +1096,35 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 <div className="flex h-9 items-center">
                   {!isLoading && !isTranscribing && !isScanning && (
                     <div className="flex items-center gap-2">
+                      <Tooltip text="Create system prompt">
+                        <button
+                          type="button"
+                          onClick={isGeneratingSystemPrompt ? handleCancelGenerateSystemPrompt : handleGenerateSystemPrompt}
+                          disabled={
+                            isLoading ||
+                            isRecording ||
+                            isTranscribing ||
+                            uploadingFiles.length > 0 ||
+                            isScanning ||
+                            isRefining ||
+                            (!isGeneratingSystemPrompt && !input.trim())
+                          }
+                          className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
+                            border transition-colors duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${
+                              isGeneratingSystemPrompt
+                                ? `bg-amber-500 text-white border-amber-500 hover:bg-amber-600
+                                  dark:bg-amber-600 dark:border-amber-600 dark:hover:bg-amber-700`
+                                : `bg-white border-neutral-300 hover:bg-neutral-100 text-neutral-500
+                                  dark:bg-neutral-950 dark:border-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-700`
+                            }`}
+                        >
+                          {isGeneratingSystemPrompt ? (
+                            <ArrowPathIcon className="size-4 animate-spin" />
+                          ) : (
+                            <BeakerIcon className="size-5" />
+                          )}
+                        </button>
+                      </Tooltip>
                       <Tooltip text="Refine the prompt">
                         <button
                           type="button"
@@ -1009,6 +1135,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                             isTranscribing ||
                             uploadingFiles.length > 0 ||
                             isScanning ||
+                            isGeneratingSystemPrompt ||
                             (!isRefining && !input.trim())
                           }
                           className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
@@ -1038,7 +1165,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           type="button"
                           onClick={isRecording ? cancelRecording : startRecording}
                           disabled={
-                            isLoading || isTranscribing || uploadingFiles.length > 0 || isScanning || isRefining
+                            isLoading || isTranscribing || uploadingFiles.length > 0 || isScanning || isRefining || isGeneratingSystemPrompt
                           }
                           className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
                             font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
@@ -1069,6 +1196,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           : isScanning ||
                             uploadingFiles.length > 0 ||
                             isRefining ||
+                            isGeneratingSystemPrompt ||
                             (!input.trim() && selectedFiles.length === 0)
                   }
                   className={`cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full flex

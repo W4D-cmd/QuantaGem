@@ -1873,6 +1873,7 @@ export default function Home() {
                       selectedModel={selectedModel}
                       verbosity={verbosity}
                       onVerbosityChange={handleVerbosityChange}
+                      onSystemPromptGenerated={setNewChatSystemPrompt}
                     />
                   </div>
                 </div>

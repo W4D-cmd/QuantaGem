@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import React from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { WebRProvider } from "@/components/WebRProvider";
 import localFont from "next/font/local";
 
 const roboto = localFont({
@@ -68,7 +69,9 @@ export default function RootLayout({
         className={`antialiased bg-white dark:bg-neutral-950 text-black dark:text-white transition-colors duration-300
           ease-in-out`}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <WebRProvider>{children}</WebRProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

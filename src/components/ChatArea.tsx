@@ -12,8 +12,11 @@ import React, {
   useCallback,
   KeyboardEvent,
   useMemo,
+  Children,
+  isValidElement,
 } from "react";
 import ReactMarkdown, { Components } from "react-markdown";
+import { RCodeBlock } from "@/components/RCodeBlock";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import remarkMath from "remark-math";
@@ -634,11 +637,31 @@ function ChatAreaComponent(
   };
 
   const markdownComponents: Components = {
-    pre: ({ className, children }) => (
-      <CodeBlockWithCopy chatAreaContainerRef={containerRef} className={className}>
-        {children}
-      </CodeBlockWithCopy>
-    ),
+    pre: ({ className, children }) => {
+      // Extract code element and detect language
+      const codeChild = Children.toArray(children).find(
+        (child) => isValidElement(child) && child.type === "code",
+      );
+
+      if (isValidElement(codeChild)) {
+        const codeClassName = (codeChild.props as { className?: string }).className || "";
+        // Check for R language code blocks
+        if (/language-r\b/i.test(codeClassName)) {
+          const codeContent = String((codeChild.props as { children?: React.ReactNode }).children || "").replace(
+            /\n$/,
+            "",
+          );
+          return <RCodeBlock code={codeContent} className={className} chatAreaContainerRef={containerRef} />;
+        }
+      }
+
+      // Fallback to existing code block for non-R languages
+      return (
+        <CodeBlockWithCopy chatAreaContainerRef={containerRef} className={className}>
+          {children}
+        </CodeBlockWithCopy>
+      );
+    },
   };
 
   const getAudioButtonIcon = (messageId: number) => {

@@ -203,7 +203,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     );
 
     const [isRefining, setIsRefining] = useState(false);
-    const [originalInputBeforeRefine, setOriginalInputBeforeRefine] = useState<string | null>(null);
+    const originalInputBeforeRefineRef = useRef<string | null>(null);
     const refineAbortControllerRef = useRef<AbortController | null>(null);
 
     const uploadFileWithProgress = (uploadingFile: { file: File; id: string; progress: number }) => {
@@ -684,7 +684,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const handleRefinePrompt = async () => {
       if (!input.trim() || !selectedModel) return;
 
-      setOriginalInputBeforeRefine(input);
+      originalInputBeforeRefineRef.current = input;
       setIsRefining(true);
       const controller = new AbortController();
       refineAbortControllerRef.current = controller;
@@ -746,24 +746,24 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
         if (refinedText.trim()) {
           setInput(refinedText);
-          setOriginalInputBeforeRefine(null);
+          originalInputBeforeRefineRef.current = null;
           showToast("Prompt refined successfully.", "success");
         } else {
-          setInput(originalInputBeforeRefine || "");
+          setInput(originalInputBeforeRefineRef.current || "");
           showToast("Refinement returned empty result.", "error");
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
-          setInput(originalInputBeforeRefine || "");
+          setInput(originalInputBeforeRefineRef.current || "");
           showToast("Refinement cancelled.", "error");
         } else {
-          setInput(originalInputBeforeRefine || "");
+          setInput(originalInputBeforeRefineRef.current || "");
           showToast(`Refinement error: ${err instanceof Error ? err.message : String(err)}`, "error");
           console.error("Error during refinement:", err);
         }
       } finally {
         setIsRefining(false);
-        setOriginalInputBeforeRefine(null);
+        originalInputBeforeRefineRef.current = null;
         refineAbortControllerRef.current = null;
         textareaRef.current?.focus();
       }

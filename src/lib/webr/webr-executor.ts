@@ -4,7 +4,7 @@
 import { webRSingleton } from "./webr-singleton";
 import type { ExecutionResult } from "@/types/webr";
 
-const EXECUTION_TIMEOUT = 30000; // 30 seconds
+const EXECUTION_TIMEOUT = 300000;
 const SVG_OUTPUT_PATH = "/tmp/output.svg";
 
 // Detect packages that need to be installed based on code content

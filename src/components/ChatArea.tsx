@@ -14,9 +14,37 @@ import React, {
   useMemo,
   Children,
   isValidElement,
+  ReactNode,
 } from "react";
 import ReactMarkdown, { Components } from "react-markdown";
 import { RCodeBlock } from "@/components/RCodeBlock";
+
+// Helper function to extract text content from React children recursively
+function extractTextFromChildren(children: ReactNode): string {
+  if (children === null || children === undefined) {
+    return "";
+  }
+
+  if (typeof children === "string") {
+    return children;
+  }
+
+  if (typeof children === "number") {
+    return String(children);
+  }
+
+  if (Array.isArray(children)) {
+    return children.map(extractTextFromChildren).join("");
+  }
+
+  if (isValidElement(children)) {
+    // Recursively extract text from element's children
+    const props = children.props as { children?: ReactNode };
+    return extractTextFromChildren(props.children);
+  }
+
+  return "";
+}
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import remarkMath from "remark-math";
@@ -647,10 +675,10 @@ function ChatAreaComponent(
         const codeClassName = (codeChild.props as { className?: string }).className || "";
         // Check for R language code blocks
         if (/language-r\b/i.test(codeClassName)) {
-          const codeContent = String((codeChild.props as { children?: React.ReactNode }).children || "").replace(
-            /\n$/,
-            "",
-          );
+          // Extract text content recursively from children (handles syntax-highlighted nodes)
+          const codeContent = extractTextFromChildren(
+            (codeChild.props as { children?: ReactNode }).children,
+          ).replace(/\n$/, "");
           return <RCodeBlock code={codeContent} className={className} chatAreaContainerRef={containerRef} />;
         }
       }

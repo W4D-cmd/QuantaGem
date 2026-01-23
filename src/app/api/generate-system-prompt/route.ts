@@ -20,6 +20,9 @@ You **must** use rich Markdown syntax inside the generated text to create a clea
 *   Use \`*\` or \`-\` for bulleted lists to define rules and constraints.
 *   The output must be visually distinct and highly organized.
 
+**LANGUAGE ADAPTATION:**
+Strictly detect the language of the user's input. Your generated output must be written in the **exact same language** as the user's input.
+
 **STRICT OUTPUT RULES (CRITICAL):**
 *   Your response must contain **exclusively** the text of the generated System Prompt.
 *   **NO** Markdown code blocks (do not use \`\`\` at the beginning or end).

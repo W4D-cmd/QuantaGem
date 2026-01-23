@@ -63,6 +63,7 @@ interface ChatInputProps {
   selectedModel: Model | null;
   verbosity: VerbosityOption;
   onVerbosityChange: (verbosity: VerbosityOption) => void;
+  currentSystemPrompt: string;
   onSystemPromptGenerated: (prompt: string) => void;
 }
 
@@ -169,6 +170,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       selectedModel,
       verbosity,
       onVerbosityChange,
+      currentSystemPrompt,
       onSystemPromptGenerated,
     },
     ref,
@@ -211,6 +213,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const [isGeneratingSystemPrompt, setIsGeneratingSystemPrompt] = useState(false);
     const systemPromptAbortControllerRef = useRef<AbortController | null>(null);
+    const originalSystemPromptRef = useRef<string | null>(null);
 
     const uploadFileWithProgress = (uploadingFile: { file: File; id: string; progress: number }) => {
       return new Promise<UploadedFileInfo | null>((resolve) => {
@@ -785,6 +788,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const handleGenerateSystemPrompt = async () => {
       if (!input.trim() || !selectedModel) return;
 
+      originalSystemPromptRef.current = currentSystemPrompt;
       setIsGeneratingSystemPrompt(true);
       const controller = new AbortController();
       systemPromptAbortControllerRef.current = controller;
@@ -830,6 +834,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               const parsedChunk = JSON.parse(line);
               if (parsedChunk.type === "text") {
                 generatedText += parsedChunk.value;
+                onSystemPromptGenerated(generatedText);
               } else if (parsedChunk.type === "error") {
                 throw new Error(parsedChunk.value || "Error during system prompt generation.");
               }
@@ -845,19 +850,24 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
         if (generatedText.trim()) {
           onSystemPromptGenerated(generatedText.trim());
+          originalSystemPromptRef.current = null;
           showToast("System prompt created successfully.", "success");
         } else {
+          onSystemPromptGenerated(originalSystemPromptRef.current || "");
           showToast("System prompt generation returned empty result.", "error");
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
+          onSystemPromptGenerated(originalSystemPromptRef.current || "");
           showToast("System prompt generation cancelled.", "error");
         } else {
+          onSystemPromptGenerated(originalSystemPromptRef.current || "");
           showToast(`System prompt error: ${err instanceof Error ? err.message : String(err)}`, "error");
           console.error("Error during system prompt generation:", err);
         }
       } finally {
         setIsGeneratingSystemPrompt(false);
+        originalSystemPromptRef.current = null;
         systemPromptAbortControllerRef.current = null;
         textareaRef.current?.focus();
       }

@@ -21,10 +21,9 @@ import {
   GlobeAltIcon as OutlineGlobeAltIcon,
   MicrophoneIcon,
   PaperClipIcon,
+  SparklesIcon,
   XCircleIcon,
   XMarkIcon,
-  SpeakerWaveIcon,
-  SpeakerXMarkIcon,
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
@@ -36,11 +35,7 @@ import { ArrowUpIcon } from "@heroicons/react/20/solid";
 import { StopIcon } from "@heroicons/react/16/solid";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
 import { ToastProps } from "./Toast";
-import { useLiveSession } from "@/hooks/useLiveSession";
-import { Content, Part, Model } from "@google/genai";
-import { liveModels, languageCodes, LiveModel } from "@/lib/live-models";
-import { dialogVoices, standardVoices } from "@/lib/voices";
-import LiveSessionButton from "./LiveSessionButton";
+import { Model } from "@google/genai";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -62,20 +57,6 @@ interface ChatInputProps {
   getAuthHeaders: () => HeadersInit;
   activeProjectId: number | null;
   showToast: (message: string, type?: ToastProps["type"]) => void;
-  onLiveSessionStateChange: (isActive: boolean) => void;
-  onLiveInterimText: (text: string) => void;
-  onTurnComplete: (text: string, audioBlob: Blob | null) => void;
-  onVideoStream: (stream: MediaStream | null) => void;
-  selectedLiveModel: LiveModel;
-  onLiveModelChange: (model: LiveModel) => void;
-  selectedLanguage: string;
-  onLanguageChange: (lang: string) => void;
-  selectedVoice: string;
-  onVoiceChange: (voice: string) => void;
-  isAutoMuteEnabled: boolean;
-  onAutoMuteToggle: (enabled: boolean) => void;
-  liveMode: "audio" | "video";
-  onLiveModeChange: (mode: "audio" | "video") => void;
   thinkingOption: ThinkingOption;
   onThinkingOptionChange: (option: ThinkingOption) => void;
   selectedModel: Model | null;
@@ -181,20 +162,6 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       getAuthHeaders,
       activeProjectId,
       showToast,
-      onLiveSessionStateChange,
-      onLiveInterimText,
-      onTurnComplete,
-      onVideoStream,
-      selectedLiveModel,
-      onLiveModelChange,
-      selectedLanguage,
-      onLanguageChange,
-      selectedVoice,
-      onVoiceChange,
-      isAutoMuteEnabled,
-      onAutoMuteToggle,
-      liveMode,
-      onLiveModeChange,
       thinkingOption,
       onThinkingOptionChange,
       selectedModel,
@@ -235,33 +202,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       [selectedModel]
     );
 
-    const {
-      isConnecting: isLiveConnecting,
-      isSessionActive,
-      startSession,
-      stopSession,
-    } = useLiveSession({
-      getAuthHeaders,
-      showToast,
-      onStateChange: onLiveSessionStateChange,
-      onInterimText: onLiveInterimText,
-      onTurnComplete: onTurnComplete,
-      onVideoStream: onVideoStream,
-      isAutoMuteEnabled,
-    });
-
-    const handleStartLiveSession = (withVideo: boolean) => {
-      const historyForLive: Content[] = messages.map((msg) => ({
-        role: msg.role,
-        parts: msg.parts.reduce<Part[]>((acc, part) => {
-          if (part.type === "text" && part.text) {
-            acc.push({ text: part.text });
-          }
-          return acc;
-        }, []),
-      }));
-      startSession(historyForLive, selectedLiveModel, selectedLanguage, selectedVoice, { streamVideo: withVideo });
-    };
+    const [isRefining, setIsRefining] = useState(false);
+    const [originalInputBeforeRefine, setOriginalInputBeforeRefine] = useState<string | null>(null);
+    const refineAbortControllerRef = useRef<AbortController | null>(null);
 
     const uploadFileWithProgress = (uploadingFile: { file: File; id: string; progress: number }) => {
       return new Promise<UploadedFileInfo | null>((resolve) => {
@@ -641,7 +584,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         isRecording ||
         isTranscribing ||
         isScanning ||
-        isSessionActive
+        isRefining
       )
         return;
       onSendMessageAction(input, selectedFiles, isSearchActive);
@@ -738,6 +681,100 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       }
     };
 
+    const handleRefinePrompt = async () => {
+      if (!input.trim() || !selectedModel) return;
+
+      setOriginalInputBeforeRefine(input);
+      setIsRefining(true);
+      const controller = new AbortController();
+      refineAbortControllerRef.current = controller;
+
+      try {
+        const response = await fetch("/api/refine-prompt", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({
+            prompt: input,
+            model: selectedModel.name,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to refine prompt.");
+        }
+
+        if (!response.body) {
+          throw new Error("No response body received.");
+        }
+
+        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+        let refinedText = "";
+        let streamBuffer = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          streamBuffer += value;
+          const lines = streamBuffer.split("\n");
+          streamBuffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (line.trim() === "") continue;
+            try {
+              const parsedChunk = JSON.parse(line);
+              if (parsedChunk.type === "text") {
+                refinedText += parsedChunk.value;
+                setInput(refinedText);
+              } else if (parsedChunk.type === "error") {
+                throw new Error(parsedChunk.value || "Error during refinement.");
+              }
+            } catch (jsonError) {
+              if (jsonError instanceof SyntaxError) {
+                console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
+              } else {
+                throw jsonError;
+              }
+            }
+          }
+        }
+
+        if (refinedText.trim()) {
+          setInput(refinedText);
+          setOriginalInputBeforeRefine(null);
+          showToast("Prompt refined successfully.", "success");
+        } else {
+          setInput(originalInputBeforeRefine || "");
+          showToast("Refinement returned empty result.", "error");
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setInput(originalInputBeforeRefine || "");
+          showToast("Refinement cancelled.", "error");
+        } else {
+          setInput(originalInputBeforeRefine || "");
+          showToast(`Refinement error: ${err instanceof Error ? err.message : String(err)}`, "error");
+          console.error("Error during refinement:", err);
+        }
+      } finally {
+        setIsRefining(false);
+        setOriginalInputBeforeRefine(null);
+        refineAbortControllerRef.current = null;
+        textareaRef.current?.focus();
+      }
+    };
+
+    const handleCancelRefine = () => {
+      if (refineAbortControllerRef.current) {
+        refineAbortControllerRef.current.abort();
+      }
+    };
+
     const getMainButtonAction = () => {
       if (isLoading) return onCancelAction;
       if (isRecording) return submitRecordingForTranscription;
@@ -777,7 +814,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             </div>
           )}
           <div ref={fileAnimationParent}>
-            {(selectedFiles.length > 0 || uploadingFiles.length > 0) && !isSessionActive && (
+            {(selectedFiles.length > 0 || uploadingFiles.length > 0) && (
               <div
                 className="mb-2 p-2 border border-neutral-100 dark:border-neutral-900 rounded-xl flex flex-wrap gap-2
                   transition-colors duration-300 ease-in-out"
@@ -826,8 +863,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           <div
             className={`relative flex flex-col rounded-3xl border dark:border-neutral-900 overflow-hidden shadow-lg
               transition duration-300 ease-in-out focus-within:ring-2 focus-within:ring-opacity-50 ${
-                isSessionActive
-                  ? "border-blue-500 focus-within:border-blue-500 focus-within:ring-blue-500"
+                isRefining
+                  ? "border-purple-500 focus-within:border-purple-500 focus-within:ring-purple-500"
                   : "border-neutral-300 focus-within:border-blue-500 focus-within:ring-blue-500"
               }`}
           >
@@ -838,7 +875,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 onChange={handleInputChange}
                 onKeyDown={onKeyDown}
                 onPaste={handlePaste}
-                placeholder={isSessionActive ? "Live session is active..." : "Send a message..."}
+                placeholder={isRefining ? "Refining your prompt..." : "Send a message..."}
                 rows={1}
                 className="w-full resize-none border-none p-0 focus:outline-none bg-white dark:bg-neutral-900
                   transition-colors duration-300 ease-in-out placeholder-neutral-500 dark:placeholder-neutral-400"
@@ -848,7 +885,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   scrollbarGutter: "stable",
                 }}
                 disabled={
-                  isLoading || isRecording || isTranscribing || isScanning || isSessionActive || isLiveConnecting
+                  isLoading || isRecording || isTranscribing || isScanning || isRefining
                 }
               />
             </div>
@@ -869,7 +906,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       isTranscribing ||
                       isScanning ||
                       uploadingFiles.length > 0 ||
-                      isSessionActive
+                      isRefining
                     }
                     className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
                       border transition-colors duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100
@@ -895,13 +932,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   onChange={handleFileChange}
                   multiple
                   className="hidden"
-                  disabled={isLoading || isRecording || isTranscribing || isScanning || isSessionActive}
+                  disabled={isLoading || isRecording || isTranscribing || isScanning || isRefining}
                 />
                 <Tooltip text="Search the web">
                   <button
                     type="button"
                     onClick={() => onToggleSearch(!isSearchActive)}
-                    disabled={isRecording || isTranscribing || isScanning || isSessionActive}
+                    disabled={isRecording || isTranscribing || isScanning || isRefining}
                     className={` cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
                       transition-colors duration-300 ease-in-out ${
                         isSearchActive
@@ -930,7 +967,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       ref={thinkingButtonRef}
                       type="button"
                       onClick={() => setIsThinkingMenuOpen((prev) => !prev)}
-                      disabled={isRecording || isTranscribing || isScanning || isSessionActive}
+                      disabled={isRecording || isTranscribing || isScanning || isRefining}
                       className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
                       transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
                       text-neutral-500 dark:bg-neutral-950 dark:border-neutral-900 dark:text-neutral-300
@@ -953,66 +990,55 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   <VerbositySelector
                     verbosity={verbosity}
                     onVerbosityChange={onVerbosityChange}
-                    disabled={isRecording || isTranscribing || isScanning || isSessionActive}
+                    disabled={isRecording || isTranscribing || isScanning || isRefining}
                   />
                 )}
               </div>
 
               <div className="flex items-center gap-2">
-                {isSessionActive && (
-                  <div className="flex items-center gap-2">
-                    <Tooltip text={isAutoMuteEnabled ? "Auto-mute is ON" : "Auto-mute is OFF"}>
-                      <button
-                        type="button"
-                        onClick={() => onAutoMuteToggle(!isAutoMuteEnabled)}
-                        className={`cursor-pointer w-12 h-7 flex items-center rounded-full p-1 transition-colors
-                        duration-300 ${isAutoMuteEnabled ? "bg-blue-600" : "bg-neutral-300 dark:bg-neutral-700"}`}
-                      >
-                        <span
-                          className={`bg-white size-5 rounded-full shadow-md transform transition-transform duration-300
-                          ${isAutoMuteEnabled ? "translate-x-5" : "translate-x-0"}`}
-                        />
-                      </button>
-                    </Tooltip>
-                    <label className="text-sm text-neutral-600 dark:text-neutral-300 flex items-center gap-1.5">
-                      {isAutoMuteEnabled ? (
-                        <SpeakerWaveIcon className="size-5" />
-                      ) : (
-                        <SpeakerXMarkIcon className="size-5" />
-                      )}
-                      <span>Auto-Mute</span>
-                    </label>
-                  </div>
-                )}
-
                 <div className="flex h-9 items-center">
                   {!isLoading && !isTranscribing && !isScanning && (
                     <div className="flex items-center gap-2">
-                      <LiveSessionButton
-                        isSessionActive={isSessionActive}
-                        isConnecting={isLiveConnecting}
-                        liveMode={liveMode}
-                        onLiveModeChange={onLiveModeChange}
-                        onStartSession={handleStartLiveSession}
-                        onStopSession={stopSession}
-                        disabled={isLoading || isRecording || isTranscribing || isScanning}
-                        liveModels={liveModels}
-                        selectedLiveModel={selectedLiveModel}
-                        onLiveModelChange={onLiveModelChange}
-                        languages={languageCodes}
-                        selectedLanguage={selectedLanguage}
-                        onLanguageChange={onLanguageChange}
-                        dialogVoices={dialogVoices}
-                        standardVoices={standardVoices}
-                        selectedVoice={selectedVoice}
-                        onVoiceChange={onVoiceChange}
-                      />
+                      <Tooltip text="Refine the prompt">
+                        <button
+                          type="button"
+                          onClick={isRefining ? handleCancelRefine : handleRefinePrompt}
+                          disabled={
+                            isLoading ||
+                            isRecording ||
+                            isTranscribing ||
+                            uploadingFiles.length > 0 ||
+                            isScanning ||
+                            (!isRefining && !input.trim())
+                          }
+                          className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
+                            border transition-colors duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${
+                              isRefining
+                                ? `bg-purple-500 text-white border-purple-500 hover:bg-purple-600
+                                  dark:bg-purple-600 dark:border-purple-600 dark:hover:bg-purple-700`
+                                : `bg-white border-neutral-300 hover:bg-neutral-100 text-neutral-500
+                                  dark:bg-neutral-950 dark:border-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-700`
+                            }`}
+                        >
+                          {isRefining ? (
+                            <>
+                              <ArrowPathIcon className="size-4 animate-spin" />
+                              <span>Cancel</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>Refine</span>
+                              <SparklesIcon className="size-4" />
+                            </>
+                          )}
+                        </button>
+                      </Tooltip>
                       <Tooltip text={isRecording ? "Cancel recording" : "Dictate message"}>
                         <button
                           type="button"
                           onClick={isRecording ? cancelRecording : startRecording}
                           disabled={
-                            isLoading || isTranscribing || uploadingFiles.length > 0 || isScanning || isSessionActive
+                            isLoading || isTranscribing || uploadingFiles.length > 0 || isScanning || isRefining
                           }
                           className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
                             font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
@@ -1031,7 +1057,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 </div>
 
                 <button
-                  type={isSessionActive || isLoading || isRecording || isTranscribing ? "button" : "submit"}
+                  type={isLoading || isRecording || isTranscribing ? "button" : "submit"}
                   onClick={getMainButtonAction()}
                   disabled={
                     isLoading
@@ -1042,7 +1068,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           ? false
                           : isScanning ||
                             uploadingFiles.length > 0 ||
-                            isSessionActive ||
+                            isRefining ||
                             (!input.trim() && selectedFiles.length === 0)
                   }
                   className={`cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full flex
@@ -1064,7 +1090,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       >
                         <StopIcon className="size-5" />
                       </motion.div>
-                    ) : isTranscribing || isScanning || isLiveConnecting ? (
+                    ) : isTranscribing || isScanning ? (
                       <motion.div
                         key="loading"
                         initial={{ opacity: 0, scale: 0.5 }}

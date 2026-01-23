@@ -39,10 +39,8 @@ export function useWebR(): UseWebRResult {
       setResult(null);
 
       try {
-        // Ensure WebR is initialized
-        if (webRState.status !== "ready") {
-          await initialize();
-        }
+        // Always call initialize() - it's idempotent and handles ready state internally
+        await initialize();
 
         if (abortRef.current) {
           return { success: false, error: "Execution cancelled", hasGraphicalOutput: false };
@@ -82,7 +80,7 @@ export function useWebR(): UseWebRResult {
         return errorResult;
       }
     },
-    [webRState.status, initialize],
+    [initialize], // Removed webRState.status - initialize() is idempotent
   );
 
   const reset = useCallback(() => {

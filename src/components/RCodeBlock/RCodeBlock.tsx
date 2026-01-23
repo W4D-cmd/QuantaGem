@@ -20,14 +20,15 @@ export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className }) => {
   const hasExecutedRef = useRef(false);
   const codeRef = useRef(code);
 
-  // Auto-execute on first render
+  // Auto-execute on first render only
   useEffect(() => {
     if (!hasExecutedRef.current) {
       hasExecutedRef.current = true;
       codeRef.current = code;
       execute(code);
     }
-  }, [code, execute]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [execute]); // With stable execute callback, this runs once on mount
 
   const handleRerun = useCallback(() => {
     reset();

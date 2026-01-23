@@ -21,6 +21,9 @@ Concentrate exclusively on the **Execution Layer**:
 3.  **Data Structure:** Organize input data or parameters logically.
 4.  **Output Requirements:** Define exactly *how* the result should look (format, length, style constraints) for this specific interaction.
 
+**LANGUAGE ADAPTATION:**
+Strictly detect the language of the user's input. Your generated output must be written in the **exact same language** as the user's input.
+
 **STRICT OUTPUT RULES:**
 *   Your response must contain **exclusively** the refined task prompt.
 *   **NO** Markdown code blocks (do not use \`\`\` at the beginning or end).

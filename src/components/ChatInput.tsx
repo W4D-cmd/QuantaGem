@@ -968,9 +968,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             className={`relative flex flex-col rounded-3xl border dark:border-neutral-900 overflow-hidden shadow-lg
               transition duration-300 ease-in-out focus-within:ring-2 focus-within:ring-opacity-50 ${
                 isRefining
-                  ? "border-purple-500 focus-within:border-purple-500 focus-within:ring-purple-500"
+                  ? "border-teal-600 focus-within:border-teal-600 focus-within:ring-teal-600"
                   : isGeneratingSystemPrompt
-                    ? "border-amber-500 focus-within:border-amber-500 focus-within:ring-amber-500"
+                    ? "border-indigo-500 focus-within:border-indigo-500 focus-within:ring-indigo-500"
                     : "border-neutral-300 focus-within:border-blue-500 focus-within:ring-blue-500"
               }`}
           >
@@ -1122,8 +1122,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
                             border transition-colors duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${
                               isGeneratingSystemPrompt
-                                ? `bg-amber-500 text-white border-amber-500 hover:bg-amber-600
-                                  dark:bg-amber-600 dark:border-amber-600 dark:hover:bg-amber-700`
+                                ? `bg-indigo-500 text-white border-indigo-500 hover:bg-indigo-600
+                                  dark:bg-indigo-600 dark:border-indigo-600 dark:hover:bg-indigo-700`
                                 : `bg-white border-neutral-300 hover:bg-neutral-100 text-neutral-500
                                   dark:bg-neutral-950 dark:border-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-700`
                             }`}
@@ -1151,8 +1151,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
                             border transition-colors duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${
                               isRefining
-                                ? `bg-purple-500 text-white border-purple-500 hover:bg-purple-600
-                                  dark:bg-purple-600 dark:border-purple-600 dark:hover:bg-purple-700`
+                                ? `bg-teal-600 text-white border-teal-600 hover:bg-teal-700
+                                  dark:bg-teal-700 dark:border-teal-700 dark:hover:bg-teal-800`
                                 : `bg-white border-neutral-300 hover:bg-neutral-100 text-neutral-500
                                   dark:bg-neutral-950 dark:border-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-700`
                             }`}

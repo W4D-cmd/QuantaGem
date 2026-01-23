@@ -19,6 +19,28 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://webr.r-wasm.org blob:;
+    script-src-elem 'self' 'unsafe-inline' https://webr.r-wasm.org;
+    worker-src 'self' blob: https://webr.r-wasm.org;
+    connect-src 'self' https://webr.r-wasm.org https://repo.r-wasm.org https://*.r-wasm.org;
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: blob:;
+    font-src 'self' data:;
+    frame-src 'self' blob:;
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    upgrade-insecure-requests;
+  `;
+  const contentSecurityPolicyHeaderValue = cspHeader.replace(/\s{2,}/g, " ").trim();
+  
+  const applyCSP = (res: NextResponse) => {
+    res.headers.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
+    return res;
+  };
+
   const isPublic = publicPaths.some((publicPath) => {
     if (publicPath.endsWith("/:path*")) {
       const basePath = publicPath.replace("/:path*", "");
@@ -28,7 +50,7 @@ export async function proxy(request: NextRequest) {
   });
 
   if (pathname.startsWith("/_next/") || isPublic) {
-    return NextResponse.next();
+    return applyCSP(NextResponse.next());
   }
 
   const authTokenFromHeader = request.headers.get("Authorization");
@@ -63,12 +85,20 @@ export async function proxy(request: NextRequest) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-user-id", payload.userId.toString());
     requestHeaders.set("x-user-email", payload.email);
+    
+    requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
 
-    return NextResponse.next({
+    const response = NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     });
+
+    response.headers.set("x-user-id", payload.userId.toString());
+    response.headers.set("x-user-email", payload.email);
+    
+    return applyCSP(response);
+
   } catch (error) {
     console.error("Proxy authentication error:", error);
     loginUrl.searchParams.set("error", "internal_error");

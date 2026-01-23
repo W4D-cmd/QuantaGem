@@ -664,33 +664,38 @@ function ChatAreaComponent(
     }
   };
 
-  const markdownComponents: Components = {
-    pre: ({ className, children }) => {
-      // Extract code element and detect language
-      const codeChild = Children.toArray(children).find(
-        (child) => isValidElement(child) && child.type === "code",
-      );
+  // Memoize markdownComponents to prevent recreation on every render
+  // This prevents RCodeBlock from remounting during scroll events
+  const markdownComponents: Components = useMemo(
+    () => ({
+      pre: ({ className, children }) => {
+        // Extract code element and detect language
+        const codeChild = Children.toArray(children).find(
+          (child) => isValidElement(child) && child.type === "code",
+        );
 
-      if (isValidElement(codeChild)) {
-        const codeClassName = (codeChild.props as { className?: string }).className || "";
-        // Check for R language code blocks
-        if (/language-r\b/i.test(codeClassName)) {
-          // Extract text content recursively from children (handles syntax-highlighted nodes)
-          const codeContent = extractTextFromChildren(
-            (codeChild.props as { children?: ReactNode }).children,
-          ).replace(/\n$/, "");
-          return <RCodeBlock code={codeContent} className={className} chatAreaContainerRef={containerRef} />;
+        if (isValidElement(codeChild)) {
+          const codeClassName = (codeChild.props as { className?: string }).className || "";
+          // Check for R language code blocks
+          if (/language-r\b/i.test(codeClassName)) {
+            // Extract text content recursively from children (handles syntax-highlighted nodes)
+            const codeContent = extractTextFromChildren(
+              (codeChild.props as { children?: ReactNode }).children,
+            ).replace(/\n$/, "");
+            return <RCodeBlock code={codeContent} className={className} chatAreaContainerRef={containerRef} />;
+          }
         }
-      }
 
-      // Fallback to existing code block for non-R languages
-      return (
-        <CodeBlockWithCopy chatAreaContainerRef={containerRef} className={className}>
-          {children}
-        </CodeBlockWithCopy>
-      );
-    },
-  };
+        // Fallback to existing code block for non-R languages
+        return (
+          <CodeBlockWithCopy chatAreaContainerRef={containerRef} className={className}>
+            {children}
+          </CodeBlockWithCopy>
+        );
+      },
+    }),
+    [], // Empty deps - containerRef is a stable ref object
+  );
 
   const getAudioButtonIcon = (messageId: number) => {
     if (audioPlaybackState.messageId === messageId) {

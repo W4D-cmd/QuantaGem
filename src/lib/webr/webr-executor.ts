@@ -5,7 +5,14 @@ import { webRSingleton } from "./webr-singleton";
 import type { ExecutionResult } from "@/types/webr";
 
 const EXECUTION_TIMEOUT = 300000;
-const SVG_OUTPUT_PATH = "/tmp/output.svg";
+
+// Generate unique output path to prevent race conditions with concurrent executions
+function generateUniqueOutputPath(): string {
+  const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  return `/tmp/output-${uniqueId}.svg`;
+}
 
 // Detect packages that need to be installed based on code content
 function detectRequiredPackages(code: string): string[] {
@@ -94,11 +101,14 @@ async function executeCode(
   webR: Awaited<ReturnType<typeof webRSingleton.getInstance>>,
   code: string,
 ): Promise<ExecutionResult> {
+  // Generate unique output path for this execution
+  const outputPath = generateUniqueOutputPath();
+
   // Wrap code to capture SVG output
   const wrappedCode = `
     # Set up SVG output
     library(svglite)
-    svglite("${SVG_OUTPUT_PATH}", width = 8, height = 6)
+    svglite("${outputPath}", width = 8, height = 6)
 
     # Capture any errors
     tryCatch({
@@ -117,7 +127,7 @@ async function executeCode(
 
     // Try to read the SVG output
     try {
-      const svgContent = await webR.FS.readFile(SVG_OUTPUT_PATH, { encoding: "utf8" });
+      const svgContent = await webR.FS.readFile(outputPath, { encoding: "utf8" });
       const svgString = typeof svgContent === "string" ? svgContent : new TextDecoder().decode(svgContent);
 
       // Check if SVG has actual content (more than just the empty SVG skeleton)
@@ -128,7 +138,7 @@ async function executeCode(
 
       // Clean up the temp file
       try {
-        await webR.FS.unlink(SVG_OUTPUT_PATH);
+        await webR.FS.unlink(outputPath);
       } catch {
         // Ignore cleanup errors
       }

@@ -17,14 +17,11 @@ import {
   Cog6ToothIcon,
   EllipsisVerticalIcon,
   PaperClipIcon,
-  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import ProjectManagement from "@/components/ProjectManagement";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import { liveModels, LiveModel } from "@/lib/live-models";
-import { dialogVoices, standardVoices } from "@/lib/voices";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ThinkingOption,
@@ -224,18 +221,9 @@ export default function Home() {
     message: "",
     onConfirm: () => {},
   });
-  const [isLiveSessionActive, setIsLiveSessionActive] = useState(false);
-  const [liveInterimText, setLiveInterimText] = useState("");
-  const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
   const [thinkingOption, setThinkingOption] = useState<ThinkingOption>("dynamic");
   const [verbosity, setVerbosity] = useState<VerbosityOption>("medium");
   const [newChatSystemPrompt, setNewChatSystemPrompt] = useState<string>("");
-
-  const [selectedLiveModel, setSelectedLiveModel] = useState<LiveModel>(liveModels[0]);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("de-DE");
-  const [selectedVoice, setSelectedVoice] = useState<string>("Sulafat");
-  const [isAutoMuteEnabled, setIsAutoMuteEnabled] = useState(true);
-  const [liveMode, setLiveMode] = useState<"audio" | "video">("audio");
 
   const [ttsVoice, setTtsVoice] = useState<string>("Sulafat");
   const [ttsModel, setTtsModel] = useState<string>(DEFAULT_TTS_MODEL);
@@ -535,19 +523,6 @@ export default function Home() {
   const handleVerbosityChange = useCallback((newVerbosity: VerbosityOption) => {
     setVerbosity(newVerbosity);
   }, []);
-
-  const handleLiveModelChange = (model: LiveModel) => {
-    setSelectedLiveModel(model);
-    if (model.configType === "dialog") {
-      if (!dialogVoices.some((v) => v.name === selectedVoice)) {
-        setSelectedVoice(dialogVoices[0].name);
-      }
-    } else {
-      if (!standardVoices.includes(selectedVoice)) {
-        setSelectedVoice(standardVoices[0]);
-      }
-    }
-  };
 
   useEffect(() => {
     const manualModelList: Model[] = customModels.map((cm) => ({
@@ -1314,53 +1289,6 @@ export default function Home() {
     setIsLoading(false);
   };
 
-  const handleLiveSessionTurnComplete = async (text: string, audioBlob: Blob | null) => {
-    if (!text.trim() && !audioBlob) return;
-
-    const newParts: MessagePart[] = [];
-    if (text.trim()) {
-      newParts.push({ type: "text", text: text.trim() });
-    }
-
-    if (audioBlob) {
-      try {
-        const formData = new FormData();
-        formData.append("file", audioBlob, "live-session-audio.wav");
-        const res = await fetch("/api/files/upload", {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: formData,
-        });
-        if (!res.ok) {
-          throw new Error("Failed to upload live audio.");
-        }
-        const audioInfo: UploadedFileInfo = await res.json();
-        newParts.push({
-          type: "file",
-          fileName: "Live Audio Response",
-          mimeType: audioInfo.mimeType,
-          objectName: audioInfo.objectName,
-          size: audioInfo.size,
-        });
-      } catch (err) {
-        showToast(extractErrorMessage(err), "error");
-      }
-    }
-
-    if (newParts.length > 0) {
-      setMessages((prevMessages) => {
-        const lastMessage = prevMessages[prevMessages.length - 1];
-        const newModelMessage: Message = {
-          role: "model",
-          parts: newParts,
-          id: Date.now(),
-          position: (lastMessage?.position || 0) + 1,
-        };
-        return [...prevMessages, newModelMessage];
-      });
-    }
-  };
-
   const handleEditSave = async (index: number, newParts: MessagePart[]) => {
     if (!activeChatId || !messages[index] || isLoading) return;
 
@@ -1762,7 +1690,7 @@ export default function Home() {
         onDrop={handleDrop}
       >
         <AnimatePresence>
-          {isDraggingOver && !isLiveSessionActive && (
+          {isDraggingOver && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -1905,26 +1833,6 @@ export default function Home() {
                   }`}
                 >
                   <div className="mx-auto max-w-[52rem] relative">
-                    <AnimatePresence>
-                      {isLiveSessionActive && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 10 }}
-                          transition={{ duration: 0.3 }}
-                          className="absolute bottom-full mb-4 w-full bg-neutral-100/80 dark:bg-neutral-900/80
-                            backdrop-blur-sm p-4 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800
-                            flex items-center gap-3"
-                        >
-                          <ChatBubbleLeftRightIcon
-                            className="size-6 flex-shrink-0 text-red-500 dark:text-red-400 animate-pulse"
-                          />
-                          <p className="text-sm text-neutral-800 dark:text-neutral-200 flex-1 min-h-[1.25rem]">
-                            {liveInterimText || "Listening..."}
-                          </p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                     <div className="relative h-0">
                       <AnimatePresence>
                         {!isAutoScrollActive && messages.length > 0 && (
@@ -1960,20 +1868,6 @@ export default function Home() {
                       getAuthHeaders={getAuthHeaders}
                       activeProjectId={currentChatProjectId}
                       showToast={showToast}
-                      onLiveSessionStateChange={setIsLiveSessionActive}
-                      onLiveInterimText={setLiveInterimText}
-                      onTurnComplete={handleLiveSessionTurnComplete}
-                      onVideoStream={setLocalVideoStream}
-                      selectedLiveModel={selectedLiveModel}
-                      onLiveModelChange={handleLiveModelChange}
-                      selectedLanguage={selectedLanguage}
-                      onLanguageChange={setSelectedLanguage}
-                      selectedVoice={selectedVoice}
-                      onVoiceChange={setSelectedVoice}
-                      isAutoMuteEnabled={isAutoMuteEnabled}
-                      onAutoMuteToggle={setIsAutoMuteEnabled}
-                      liveMode={liveMode}
-                      onLiveModeChange={setLiveMode}
                       thinkingOption={thinkingOption}
                       onThinkingOptionChange={handleThinkingOptionChange}
                       selectedModel={selectedModel}
@@ -1987,29 +1881,6 @@ export default function Home() {
           </AnimatePresence>
         </div>
       </main>
-      <AnimatePresence>
-        {localVideoStream && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8, x: 50 }}
-            animate={{ opacity: 1, scale: 1, x: 0 }}
-            exit={{ opacity: 0, scale: 0.8, x: 50 }}
-            className="fixed bottom-24 right-4 w-48 h-auto bg-black border-2 border-red-500 rounded-lg shadow-2xl z-50
-              animate-pulse"
-          >
-            <video
-              ref={(el) => {
-                if (el) el.srcObject = localVideoStream;
-              }}
-              autoPlay
-              muted
-              className="w-full h-full rounded-lg"
-            />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs font-bold">
-              SCREEN SHARING
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       <AnimatePresence>
         {isSettingsModalOpen && (
           <SettingsModal

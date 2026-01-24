@@ -8,6 +8,8 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -23,6 +25,8 @@ services:
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
+    networks:
+      - app-network
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -43,6 +47,8 @@ services:
       WHISPER_MODEL_DIR: /app/models
     volumes:
       - stt_models:/app/models
+    networks:
+      - app-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/ping"]
       interval: 10s
@@ -60,6 +66,8 @@ services:
       - DOCLING_NUM_THREADS=1
       - OMP_NUM_THREADS=4
       - MKL_NUM_THREADS=4
+    networks:
+      - app-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/ping"]
       interval: 10s
@@ -70,6 +78,8 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
+    networks:
+      - app-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -85,6 +95,7 @@ services:
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-key.json
       GOOGLE_GENAI_USE_VERTEXAI: "True"
+      NODE_OPTIONS: "--dns-result-order=ipv6first"
     depends_on:
       db:
         condition: service_healthy
@@ -97,9 +108,11 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./secrets/gcp-key.json:/run/secrets/gcp-key.json:ro
+    networks:
+      - app-network
     read_only: true
     cap_drop:
       - ALL
@@ -107,6 +120,14 @@ services:
     tmpfs:
       - /tmp:size=50M,mode=1777
       - /app/.next/cache:size=50M,mode=1777
+
+networks:
+  app-network:
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+        # - subnet: fd00:cafe:face:b00c::/64
 
 volumes:
   db_data:

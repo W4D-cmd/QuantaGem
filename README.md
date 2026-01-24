@@ -48,6 +48,8 @@ GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
 GOOGLE_CLOUD_LOCATION="global"
 GOOGLE_GENAI_USE_VERTEXAI="True"
 
+OPENAI_API_KEY="your-openai-api-key"
+
 JWT_SECRET="generate-a-32-char-random-string"
 
 POSTGRES_USER=quantagemuser
@@ -69,7 +71,11 @@ mkdir secrets
 cp /path/to/your/service-account-key.json secrets/gcp-key.json
 ```
 
-### 4. Deploy with Docker
+### 4. OpenAI Authentication (Optional)
+
+To use OpenAI models add your OpenAI API key to the `.env.local` file at `OPENAI_API_KEY`.
+
+### 5. Deploy with Docker
 
 Start the entire stack in production mode:
 
@@ -78,6 +84,37 @@ docker compose up -d --build
 ```
 
 The application will be available at `http://localhost:3000`.
+
+### 6. Enable IPv6 (Optional)
+
+To enable IPv6 support with Docker open the file `/etc/docker/daemon.json` and add the following content:
+
+```json
+{
+  "ipv6": true,
+  "fixed-cidr-v6": "fd00:db8:1::/64",
+  "experimental": true,
+  "ip6tables": true
+}
+```
+
+Restart Docker `sudo systemctl restart docker`.
+
+Enable IPv6 masquerading by running `sudo firewall-cmd --permanent --zone=public --add-masquerade && sudo firewall-cmd --reload`. This is required to allow containers with internal IPv6 addresses to access the external network through the host's public IP address.
+
+In the root directory of this project create a `docker-compose.override.yml` file with the following content:
+
+```yaml
+networks:
+  app-network:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
+        - subnet: fd00:cafe:face:b00c::/64
+```
+
+Restart the application using `docker compose up --build --force-recreate -d`.
 
 ## 🎤 Speech-to-Text (STT) Customization
 

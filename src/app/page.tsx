@@ -22,6 +22,7 @@ import ThemeToggleButton from "@/components/ThemeToggleButton";
 import ProjectManagement from "@/components/ProjectManagement";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import ConfirmationModal from "@/components/ConfirmationModal";
+import SearchModal from "@/components/SearchModal";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ThinkingOption,
@@ -202,6 +203,7 @@ export default function Home() {
   const [toast, setToast] = useState<Omit<ToastProps, "onClose"> | null>(null);
   const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [editingChatId, setEditingChatId] = useState<number | null>(null);
   const [editingPromptInitialValue, setEditingPromptInitialValue] = useState<string | null>(null);
   const [isThreeDotMenuOpen, setIsThreeDotMenuOpen] = useState(false);
@@ -412,6 +414,16 @@ export default function Home() {
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      // Handle Ctrl+K / Cmd+K for search modal toggle (highest priority)
+      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+        event.preventDefault();
+        setIsSearchModalOpen((prev) => !prev);
+        return;
+      }
+
+      // Don't process other shortcuts if search modal is open
+      if (isSearchModalOpen) return;
+
       if (isLoading || displayingProjectManagementId !== null) return;
       if (editingMessage) return;
 
@@ -441,7 +453,7 @@ export default function Home() {
     return () => {
       document.removeEventListener("keydown", handleGlobalKeyDown);
     };
-  }, [isLoading, displayingProjectManagementId, editingMessage]);
+  }, [isLoading, displayingProjectManagementId, editingMessage, isSearchModalOpen]);
 
   const handleAutoScrollChange = useCallback((isEnabled: boolean) => {
     setIsAutoScrollActive(isEnabled);
@@ -1896,6 +1908,15 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
+      <SearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        onSelectChat={(chatId) => {
+          handleSelectChat(chatId);
+          setIsSearchModalOpen(false);
+        }}
+        getAuthHeaders={getAuthHeaders}
+      />
     </div>
   );
 }

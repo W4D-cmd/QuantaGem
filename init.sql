@@ -1,3 +1,6 @@
+-- Enable extensions for fuzzy search
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
@@ -52,6 +55,17 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_chat_session_position ON messages (chat_session_id, position);
+
+-- Full-text search indexes for chat search functionality
+-- GIN index on chat_sessions.title for fast title searches
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_title_trgm ON chat_sessions USING GIN (title gin_trgm_ops);
+
+-- GIN index on messages.content for fast content searches
+CREATE INDEX IF NOT EXISTS idx_messages_content_trgm ON messages USING GIN (content gin_trgm_ops);
+
+-- Combined full-text search index using tsvector for weighted search
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_title_fts ON chat_sessions USING GIN (to_tsvector('english', title));
+CREATE INDEX IF NOT EXISTS idx_messages_content_fts ON messages USING GIN (to_tsvector('english', content));
 
 CREATE TABLE IF NOT EXISTS user_settings (
   id SERIAL PRIMARY KEY,

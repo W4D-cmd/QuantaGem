@@ -70,7 +70,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({ systemPrompt, onSystemPro
         className="w-full max-w-3xl"
       >
         <div
-          className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl
+          className="bg-white dark:bg-zinc-900 border border-neutral-200 dark:border-zinc-800 rounded-2xl
             shadow-lg p-8 text-center"
         >
           <div
@@ -80,19 +80,19 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({ systemPrompt, onSystemPro
             <SparklesIcon className="size-8 text-blue-600/80 dark:text-blue-400/90" />
           </div>
 
-          <h1 className="text-3xl font-bold text-neutral-800 dark:text-neutral-200 mb-2">Start a new conversation</h1>
+          <h1 className="text-3xl font-bold text-neutral-800 dark:text-zinc-300 mb-2">Start a new conversation</h1>
           {projectName ? (
-            <p className="text-md text-neutral-500 dark:text-neutral-400 mb-8">
+            <p className="text-md text-neutral-500 dark:text-zinc-500 mb-8">
               For project: <span className="font-semibold">{projectName}</span>
             </p>
           ) : (
-            <p className="text-md text-neutral-500 dark:text-neutral-400 mb-8">How can I help you today?</p>
+            <p className="text-md text-neutral-500 dark:text-zinc-500 mb-8">How can I help you today?</p>
           )}
 
           <div className="text-left w-full mb-8">
             <label
               htmlFor="new-chat-system-prompt"
-              className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2"
+              className="block text-sm font-medium text-neutral-700 dark:text-zinc-400 mb-2"
             >
               System Prompt (Optional)
             </label>
@@ -101,8 +101,8 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({ systemPrompt, onSystemPro
               rows={3}
               value={systemPrompt}
               onChange={(e) => onSystemPromptChange(e.target.value)}
-              className="w-full p-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-neutral-50
-                dark:bg-neutral-800/50 text-neutral-900 dark:text-white resize-none focus:outline-none
+              className="w-full p-3 border border-neutral-300 dark:border-zinc-700 rounded-xl bg-neutral-50
+                dark:bg-zinc-800/50 text-neutral-900 dark:text-zinc-100 resize-none focus:outline-none
                 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-300
                 ease-in-out"
               placeholder="Define the AI's behavior for this chat..."
@@ -114,14 +114,14 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({ systemPrompt, onSystemPro
               <button
                 key={suggestion.title}
                 onClick={() => onSystemPromptChange(suggestion.prompt)}
-                className="cursor-pointer p-4 border border-neutral-200 dark:border-neutral-800 rounded-xl
-                  hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors duration-200 ease-in-out group"
+                className="cursor-pointer p-4 border border-neutral-200 dark:border-zinc-800 rounded-xl
+                  hover:bg-neutral-100 dark:hover:bg-zinc-800/60 transition-colors duration-200 ease-in-out group"
               >
                 <div className="flex items-center gap-3 mb-1">
                   {suggestion.icon}
-                  <h4 className="font-semibold text-neutral-800 dark:text-neutral-200">{suggestion.title}</h4>
+                  <h4 className="font-semibold text-neutral-800 dark:text-zinc-300">{suggestion.title}</h4>
                 </div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-3">{suggestion.prompt}</p>
+                <p className="text-xs text-neutral-500 dark:text-zinc-500 line-clamp-3">{suggestion.prompt}</p>
               </button>
             ))}
           </div>

@@ -32,11 +32,11 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           <ExclamationTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-400" aria-hidden="true" />
         </div>
         <div className="mt-3 text-center sm:mt-5">
-          <h3 className="text-lg font-semibold leading-6 text-neutral-900 dark:text-white" id="modal-title">
+          <h3 className="text-lg font-semibold leading-6 text-neutral-900 dark:text-zinc-100" id="modal-title">
             {title}
           </h3>
           <div className="mt-2">
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">{message}</p>
+            <p className="text-sm text-neutral-500 dark:text-zinc-500">{message}</p>
           </div>
         </div>
       </div>
@@ -45,7 +45,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           type="button"
           className={`cursor-pointer w-full justify-center rounded-full border border-transparent px-4 py-2 text-sm
             font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2
-            focus:ring-offset-neutral-100 dark:focus:ring-offset-neutral-900 transition-all ${confirmButtonClassName}`}
+            focus:ring-offset-neutral-100 dark:focus:ring-offset-zinc-900 transition-all ${confirmButtonClassName}`}
           onClick={() => {
             onConfirm();
             onClose();
@@ -55,10 +55,10 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         </button>
         <button
           type="button"
-          className="cursor-pointer w-full justify-center rounded-full border border-neutral-300 dark:border-neutral-700
-            px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800
-            hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-sm focus:outline-none focus:ring-2
-            focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-neutral-100 dark:focus:ring-offset-neutral-900
+          className="cursor-pointer w-full justify-center rounded-full border border-neutral-300 dark:border-zinc-700
+            px-4 py-2 text-sm font-medium text-neutral-700 dark:text-zinc-200 bg-white dark:bg-zinc-800
+            hover:bg-neutral-50 dark:hover:bg-zinc-700 shadow-sm focus:outline-none focus:ring-2
+            focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-neutral-100 dark:focus:ring-offset-zinc-900
             transition-colors"
           onClick={onClose}
         >

@@ -3,9 +3,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+    read_only: false
+    user: "0:0"
+    cap_drop: []
+    cap_add:
+      - ALL
+    tmpfs: []
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+      - NEXT_TELEMETRY_DISABLED=1
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
     volumes:
       - .:/app
       - /app/node_modules
+      - /app/.next
+    ports:
+      - "127.0.0.1:48222:3000"
     command: npm run dev
-    stdin_open: true
-    tty: true
+

@@ -271,16 +271,16 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
         </div>
       )}
 
-      <h2 className="text-2xl font-bold mb-4 text-neutral-900 dark:text-white">{projectTitle}</h2>
+      <h2 className="text-2xl font-bold mb-4 text-neutral-900 dark:text-zinc-100">{projectTitle}</h2>
 
       <div
-        className="bg-white dark:bg-neutral-900 p-6 rounded-2xl shadow-lg border border-neutral-200
-          dark:border-neutral-800 mb-6"
+        className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-lg border border-neutral-200
+          dark:border-zinc-800 mb-6"
       >
-        <h3 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-white">Project System Prompt</h3>
+        <h3 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-zinc-100">Project System Prompt</h3>
 
         <div className="mb-4">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">
+          <p className="text-xs text-neutral-500 dark:text-zinc-500 mb-2">
             Define the default behavior and persona for the AI in chats within this project. This will override the
             global system prompt. Individual chats can further override this.
           </p>
@@ -289,8 +289,8 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
             rows={6}
             value={projectSystemPrompt}
             onChange={handleSystemPromptChange}
-            className="w-full p-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-neutral-50
-              dark:bg-neutral-800 text-neutral-900 dark:text-white resize-y focus:outline-none focus:border-blue-500
+            className="w-full p-2 border border-neutral-300 dark:border-zinc-700 rounded-lg bg-neutral-50
+              dark:bg-zinc-800 text-neutral-900 dark:text-zinc-100 resize-y focus:outline-none focus:border-blue-500
               focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out"
             placeholder="e.g., You are an expert in software development and only respond with code examples."
             disabled={isSaving}
@@ -309,13 +309,13 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
       </div>
 
       <div
-        className="bg-white dark:bg-neutral-900 p-6 rounded-2xl shadow-lg border border-neutral-200
-          dark:border-neutral-800"
+        className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-lg border border-neutral-200
+          dark:border-zinc-800"
       >
-        <h3 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-white">Project Files</h3>
+        <h3 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-zinc-100">Project Files</h3>
 
         {projectFiles.length === 0 && uploadingFiles.length === 0 && (
-          <p className="text-neutral-500 dark:text-neutral-400 mb-4">No files uploaded for this project yet.</p>
+          <p className="text-neutral-500 dark:text-zinc-500 mb-4">No files uploaded for this project yet.</p>
         )}
 
         {projectFiles.length > 0 && (
@@ -323,10 +323,10 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
             {projectFiles.map((file) => (
               <li
                 key={file.id}
-                className="flex items-center justify-between p-3 bg-neutral-100 dark:bg-neutral-800 rounded-lg border
-                  border-neutral-200 dark:border-neutral-700"
+                className="flex items-center justify-between p-3 bg-neutral-100 dark:bg-zinc-800 rounded-lg border
+                  border-neutral-200 dark:border-zinc-700"
               >
-                <span className="text-sm text-neutral-800 dark:text-neutral-200 truncate pr-2">
+                <span className="text-sm text-neutral-800 dark:text-zinc-300 truncate pr-2">
                   {file.fileName} ({`${(file.size / 1024).toFixed(1)} KB`})
                 </span>
                 <button

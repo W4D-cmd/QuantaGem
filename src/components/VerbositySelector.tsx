@@ -60,8 +60,8 @@ export default function VerbositySelector({
           disabled={disabled}
           className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
             transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
-            text-neutral-500 dark:bg-neutral-950 dark:border-neutral-900 dark:text-neutral-300
-            dark:hover:bg-neutral-700 disabled:opacity-50`}
+            text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400
+            dark:hover:bg-zinc-700 disabled:opacity-50`}
         >
           <ChatBubbleBottomCenterTextIcon className="size-5" />
           <span>{VERBOSITY_LABELS[verbosity]}</span>

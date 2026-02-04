@@ -144,7 +144,7 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
           type="button"
           onClick={onStopSession}
           className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium border
-            transition-colors duration-300 ease-in-out bg-white border-red-500 hover:bg-red-100 dark:bg-neutral-900
+            transition-colors duration-300 ease-in-out bg-white border-red-500 hover:bg-red-100 dark:bg-zinc-900
             dark:border-red-500 dark:hover:bg-red-900/50 animate-pulse`}
         >
           {isConnecting ? (
@@ -161,7 +161,7 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
     <div
       ref={dropdownRef}
       style={{ position: "absolute", top: `${dropdownCoords.top}px`, left: `${dropdownCoords.left}px` }}
-      className="w-64 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl
+      className="w-64 bg-white dark:bg-zinc-900 border border-neutral-200 dark:border-zinc-800 rounded-2xl
         shadow-lg p-2 z-50"
       onMouseLeave={handleMouseLeaveMenu}
     >
@@ -170,7 +170,7 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
           onClick={() => handleModeSelect("audio")}
           onMouseEnter={() => setIsSettingsOpen(false)}
           className="w-full text-left px-3 py-2 text-sm rounded-lg flex justify-between items-center
-            hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+            hover:bg-neutral-100 dark:hover:bg-zinc-800 cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <ChatBubbleLeftRightIcon className="size-5" />
@@ -182,7 +182,7 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
           onClick={() => handleModeSelect("video")}
           onMouseEnter={() => setIsSettingsOpen(false)}
           className="w-full text-left px-3 py-2 text-sm rounded-lg flex justify-between items-center
-            hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+            hover:bg-neutral-100 dark:hover:bg-zinc-800 cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <VideoCameraIcon className="size-5" />
@@ -190,7 +190,7 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
           </div>
           {liveMode === "video" && <CheckIcon className="size-5 text-blue-500" />}
         </button>
-        <div className="border-t border-neutral-200 dark:border-neutral-700 my-1 !mx-2"></div>
+        <div className="border-t border-neutral-200 dark:border-zinc-700 my-1 !mx-2"></div>
         <div
           ref={settingsMenuItemRef}
           onMouseEnter={() => {
@@ -198,7 +198,7 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
             setIsSettingsOpen(true);
           }}
           className="w-full text-left px-3 py-2 text-sm rounded-lg flex justify-between items-center
-            hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+            hover:bg-neutral-100 dark:hover:bg-zinc-800 cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <Cog8ToothIcon className="size-5" />
@@ -224,9 +224,9 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
 
   const primaryActionIcon =
     liveMode === "video" ? (
-      <VideoCameraIcon className="size-5 text-neutral-500 dark:text-neutral-300" />
+      <VideoCameraIcon className="size-5 text-neutral-500 dark:text-zinc-400" />
     ) : (
-      <ChatBubbleLeftRightIcon className="size-5 text-neutral-500 dark:text-neutral-300" />
+      <ChatBubbleLeftRightIcon className="size-5 text-neutral-500 dark:text-zinc-400" />
     );
 
   const primaryActionTooltip = liveMode === "video" ? "Start Live Chat + Screen" : "Start Live Chat (Audio Only)";
@@ -234,8 +234,8 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
   return (
     <div ref={buttonRef} className="relative flex items-center">
       <div
-        className="flex items-center rounded-full border bg-white border-neutral-300 dark:bg-neutral-900
-          dark:border-neutral-800"
+        className="flex items-center rounded-full border bg-white border-neutral-300 dark:bg-zinc-900
+          dark:border-zinc-800"
       >
         <Tooltip text={primaryActionTooltip}>
           <button
@@ -243,21 +243,21 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
             onClick={handlePrimaryAction}
             disabled={disabled}
             className="cursor-pointer h-9 pl-3 pr-2 flex items-center justify-center rounded-l-full hover:bg-neutral-100
-              dark:hover:bg-neutral-700 disabled:opacity-50 transition-colors"
+              dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
           >
             {primaryActionIcon}
           </button>
         </Tooltip>
-        <div className="w-px h-5 bg-neutral-300 dark:bg-neutral-700"></div>
+        <div className="w-px h-5 bg-neutral-300 dark:bg-zinc-700"></div>
         <Tooltip text="More options">
           <button
             type="button"
             onClick={() => setIsDropdownOpen((prev) => !prev)}
             disabled={disabled}
             className="cursor-pointer h-9 px-2 flex items-center justify-center rounded-r-full hover:bg-neutral-100
-              dark:hover:bg-neutral-700 disabled:opacity-50 transition-colors"
+              dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
           >
-            <ChevronUpIcon className="size-4 text-neutral-500 dark:text-neutral-300" />
+            <ChevronUpIcon className="size-4 text-neutral-500 dark:text-zinc-400" />
           </button>
         </Tooltip>
       </div>

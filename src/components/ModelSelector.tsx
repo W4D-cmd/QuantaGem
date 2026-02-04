@@ -74,17 +74,17 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
           setOpen(false);
         }}
         className="w-full flex items-start justify-between gap-4 px-4 py-2 hover:bg-neutral-100
-          dark:hover:bg-neutral-800 rounded-lg transition-colors duration-300 ease-in-out cursor-pointer"
+          dark:hover:bg-zinc-800 rounded-lg transition-colors duration-300 ease-in-out cursor-pointer"
       >
         <div className="flex flex-col text-left">
           <span
-            className="font-medium text-neutral-600 dark:text-neutral-300 transition-colors duration-300
+            className="font-medium text-neutral-600 dark:text-zinc-400 transition-colors duration-300
               ease-in-out"
           >
             {m.displayName}
           </span>
           <div
-            className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-2 mt-1
+            className="text-xs text-neutral-500 dark:text-zinc-500 flex items-center gap-2 mt-1
               transition-colors duration-300 ease-in-out"
           >
             <ArrowDownTrayIcon className="size-3 transition-colors duration-300 ease-in-out" />
@@ -107,7 +107,7 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
       <button
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center h-11 px-3 py-2 rounded-lg cursor-pointer hover:bg-neutral-100
-          dark:hover:bg-neutral-900 text-neutral-600 dark:text-neutral-300 text-[18px] font-medium focus:outline-none
+          dark:hover:bg-zinc-900 text-neutral-600 dark:text-zinc-400 text-[18px] font-medium focus:outline-none
           transition-colors duration-300 ease-in-out"
         disabled={models.length === 0}
       >
@@ -133,7 +133,7 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
           transition={{ duration: 0.2 }}
         >
           <ChevronDownIcon
-            className="size-3 stroke-3 text-neutral-400 dark:text-neutral-600 transition-colors duration-300
+            className="size-3 stroke-3 text-neutral-400 dark:text-zinc-500 transition-colors duration-300
               ease-in-out"
           />
         </motion.div>
@@ -147,12 +147,12 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
             style={{ transformOrigin: "top center" }}
-            className="absolute left-0 top-full mt-2 min-w-md border bg-white dark:bg-neutral-900 border-neutral-200
-              dark:border-neutral-800 transition-colors duration-300 ease-in-out rounded-2xl shadow-lg z-50
+            className="absolute left-0 top-full mt-2 min-w-md border bg-white dark:bg-zinc-900 border-neutral-200
+              dark:border-zinc-800 transition-colors duration-300 ease-in-out rounded-2xl shadow-lg z-50
               overflow-hidden"
           >
             <div
-              className="px-4 py-2 flex items-center justify-between text-neutral-500 dark:text-neutral-400
+              className="px-4 py-2 flex items-center justify-between text-neutral-500 dark:text-zinc-500
                 transition-colors duration-300 ease-in-out"
             >
               <span className="font-semibold text-sm">Model</span>

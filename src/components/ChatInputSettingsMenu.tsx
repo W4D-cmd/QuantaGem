@@ -16,11 +16,11 @@ interface SubMenuProps {
 const SubMenu: React.FC<SubMenuProps> = ({ items, onSelect, title }) => (
   <div
     onMouseDown={(e) => e.stopPropagation()}
-    className="w-72 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-lg
+    className="w-72 bg-white dark:bg-zinc-900 border border-neutral-200 dark:border-zinc-800 rounded-2xl shadow-lg
       z-20"
   >
     <div className="p-2">
-      <h4 className="px-3 py-1 text-xs font-semibold text-neutral-500 dark:text-neutral-400">{title}</h4>
+      <h4 className="px-3 py-1 text-xs font-semibold text-neutral-500 dark:text-zinc-500">{title}</h4>
       <div className="max-h-36 overflow-y-auto space-y-1 mt-1">
         {items.map((item) => (
           <Tooltip key={item.id} text={item.secondaryLabel || ""}>
@@ -33,12 +33,12 @@ const SubMenu: React.FC<SubMenuProps> = ({ items, onSelect, title }) => (
               cursor-pointer ${
                 item.selected
                   ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold"
-                  : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  : "hover:bg-neutral-100 dark:hover:bg-zinc-800"
               }`}
             >
               <span className="truncate">{item.label}</span>
               {item.secondaryLabel && (
-                <span className="text-xs text-neutral-400 dark:text-neutral-500 ml-2 truncate">
+                <span className="text-xs text-neutral-400 dark:text-zinc-500 ml-2 truncate">
                   {item.secondaryLabel}
                 </span>
               )}
@@ -92,14 +92,14 @@ const MainMenuItem: React.FC<MainMenuItemProps> = ({
       ref={itemRef}
       onMouseEnter={onMouseEnter}
       className={`relative flex items-center justify-between px-3 py-2 rounded-lg ${
-        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-neutral-100 dark:hover:bg-zinc-800 cursor-pointer"
       }`}
     >
       <div className="flex items-center gap-3">
         {icon}
         <div className="flex flex-col">
           <span className="text-sm font-medium">{label}</span>
-          <span className="text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-40">{value}</span>
+          <span className="text-xs text-neutral-500 dark:text-zinc-500 truncate max-w-40">{value}</span>
         </div>
       </div>
       {!disabled && <ChevronRightIcon className="size-4 text-neutral-400" />}
@@ -167,7 +167,7 @@ const ChatInputSettingsMenu: React.FC<ChatInputSettingsMenuProps> = ({
   return (
     <div
       ref={menuRef}
-      className="relative w-64 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800
+      className="relative w-64 bg-white dark:bg-zinc-900 border border-neutral-200 dark:border-zinc-800
         rounded-2xl shadow-lg p-2"
     >
       <div className="space-y-1">

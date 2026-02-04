@@ -75,7 +75,7 @@ export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className }) => {
 
   return (
     <div
-      className={`rounded-xl overflow-hidden border border-neutral-400/30 dark:border-neutral-600/30 ${className || ""}`}
+      className={`rounded-xl overflow-hidden border border-neutral-400/30 dark:border-zinc-600/30 ${className || ""}`}
     >
       <RCodeBlockControls
         view={view}
@@ -89,7 +89,7 @@ export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className }) => {
         isExecuting={isLoading}
       />
 
-      <div className="bg-neutral-100 dark:bg-neutral-900">
+      <div className="bg-neutral-100 dark:bg-zinc-900">
         {/* Loading State */}
         {isLoading && <RCodeBlockLoading progress={progress} message={loadingMessage} />}
 

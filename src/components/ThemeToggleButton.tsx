@@ -54,7 +54,7 @@ export default function ThemeToggleButton() {
           ref={buttonRef}
           onClick={() => setIsOpen((prev) => !prev)}
           className="cursor-pointer size-9 flex items-center justify-center rounded-full text-neutral-500
-            hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors duration-300 ease-in-out"
+            hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors duration-300 ease-in-out"
           aria-label="Toggle theme"
         >
           {getIconForTheme(resolvedTheme)}

@@ -58,17 +58,17 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
 
   return (
     <div
-      className="flex items-center justify-between gap-2 px-3 py-2 bg-neutral-200/50 dark:bg-neutral-800/50
-        border-b border-neutral-400/30 dark:border-neutral-600/30 rounded-t-xl"
+      className="flex items-center justify-between gap-2 px-3 py-2 bg-neutral-200/50 dark:bg-zinc-800/50
+        border-b border-neutral-400/30 dark:border-zinc-600/30 rounded-t-xl"
     >
       {/* View Toggle */}
-      <div className="flex items-center bg-neutral-300/50 dark:bg-neutral-700/50 rounded-lg p-0.5">
+      <div className="flex items-center bg-neutral-300/50 dark:bg-zinc-700/50 rounded-lg p-0.5">
         <button
           onClick={() => onViewChange("code")}
           className={`cursor-pointer px-3 py-1 text-sm font-medium rounded-md transition-all ${
             view === "code"
-              ? "bg-white dark:bg-neutral-600 text-neutral-900 dark:text-white shadow-sm"
-              : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+              ? "bg-white dark:bg-zinc-600 text-neutral-900 dark:text-zinc-100 shadow-sm"
+              : "text-neutral-600 dark:text-zinc-500 hover:text-neutral-900 dark:hover:text-zinc-100"
           }`}
         >
           Code
@@ -79,8 +79,8 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
           className={`cursor-pointer px-3 py-1 text-sm font-medium rounded-md transition-all flex items-center gap-1
             ${
               view === "output"
-                ? "bg-white dark:bg-neutral-600 text-neutral-900 dark:text-white shadow-sm"
-                : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                ? "bg-white dark:bg-zinc-600 text-neutral-900 dark:text-zinc-100 shadow-sm"
+                : "text-neutral-600 dark:text-zinc-500 hover:text-neutral-900 dark:hover:text-zinc-100"
             }
             ${!hasOutput ? "opacity-50 cursor-not-allowed" : ""}`}
         >
@@ -96,8 +96,8 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
           <button
             onClick={onRerun}
             disabled={isExecuting}
-            className={`cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-neutral-400
-              hover:bg-neutral-300/50 dark:hover:bg-neutral-700/50 transition-colors
+            className={`cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-zinc-400
+              hover:bg-neutral-300/50 dark:hover:bg-zinc-700/50 transition-colors
               ${isExecuting ? "animate-spin" : ""}`}
           >
             <ArrowPathIcon className="size-4" />
@@ -110,8 +110,8 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
             <Tooltip text="Download">
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-neutral-400
-                  hover:bg-neutral-300/50 dark:hover:bg-neutral-700/50 transition-colors flex items-center gap-0.5"
+                className="cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-zinc-500
+                  hover:bg-neutral-300/50 dark:hover:bg-zinc-700/50 transition-colors flex items-center gap-0.5"
               >
                 <ArrowDownTrayIcon className="size-4" />
                 <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -122,16 +122,16 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
 
             {dropdownOpen && (
               <div
-                className="absolute right-0 top-full mt-1 bg-white dark:bg-neutral-800 border border-neutral-200
-                  dark:border-neutral-700 rounded-lg shadow-lg py-1 z-50 min-w-[100px]"
+                className="absolute right-0 top-full mt-1 bg-white dark:bg-zinc-800 border border-neutral-200
+                  dark:border-zinc-700 rounded-lg shadow-lg py-1 z-50 min-w-[100px]"
               >
                 <button
                   onClick={() => {
                     onDownloadSVG();
                     setDropdownOpen(false);
                   }}
-                  className="cursor-pointer w-full px-3 py-1.5 text-sm text-left text-neutral-700 dark:text-neutral-300
-                    hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                  className="cursor-pointer w-full px-3 py-1.5 text-sm text-left text-neutral-700 dark:text-zinc-400
+                    hover:bg-neutral-100 dark:hover:bg-zinc-700 transition-colors"
                 >
                   SVG
                 </button>
@@ -140,8 +140,8 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
                     onDownloadPNG();
                     setDropdownOpen(false);
                   }}
-                  className="cursor-pointer w-full px-3 py-1.5 text-sm text-left text-neutral-700 dark:text-neutral-300
-                    hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                  className="cursor-pointer w-full px-3 py-1.5 text-sm text-left text-neutral-700 dark:text-zinc-400
+                    hover:bg-neutral-100 dark:hover:bg-zinc-700 transition-colors"
                 >
                   PNG
                 </button>
@@ -150,8 +150,8 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
                     onDownloadPDF();
                     setDropdownOpen(false);
                   }}
-                  className="cursor-pointer w-full px-3 py-1.5 text-sm text-left text-neutral-700 dark:text-neutral-300
-                    hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                  className="cursor-pointer w-full px-3 py-1.5 text-sm text-left text-neutral-700 dark:text-zinc-400
+                    hover:bg-neutral-100 dark:hover:bg-zinc-700 transition-colors"
                 >
                   PDF
                 </button>
@@ -164,8 +164,8 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
         <Tooltip text={copied ? "Copied!" : "Copy code"}>
           <button
             onClick={handleCopy}
-            className="cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-neutral-400
-              hover:bg-neutral-300/50 dark:hover:bg-neutral-700/50 transition-colors"
+            className="cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-zinc-400
+              hover:bg-neutral-300/50 dark:hover:bg-zinc-700/50 transition-colors"
           >
             {copied ? <CheckIcon className="size-4 text-green-600" /> : <ClipboardDocumentListIcon className="size-4" />}
           </button>

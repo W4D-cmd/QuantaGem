@@ -124,7 +124,7 @@ const EditableItem: React.FC<{
           onChange={(e) => setEditText(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleSave}
-          className="w-full text-sm p-1 rounded-md bg-white dark:bg-neutral-950 border-2 border-blue-500
+          className="w-full text-sm p-1 rounded-md bg-white dark:bg-zinc-950 border-2 border-blue-500
             focus:outline-none"
         />
       </div>
@@ -135,10 +135,10 @@ const EditableItem: React.FC<{
     <button
       onClick={onSelect}
       className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none text-neutral-900
-        dark:text-white transition-colors duration-200 ease-in-out flex items-center justify-between ${
+        dark:text-zinc-50 transition-colors duration-200 ease-in-out flex items-center justify-between ${
           isActive
-            ? "font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-neutral-700 hover:dark:bg-neutral-700"
-            : "hover:bg-neutral-200 dark:hover:bg-neutral-800"
+            ? "font-semibold bg-neutral-300 hover:bg-neutral-300 dark:bg-zinc-700 hover:dark:bg-zinc-700"
+            : "hover:bg-neutral-200 dark:hover:bg-zinc-800"
         }`}
     >
       {children}
@@ -361,8 +361,8 @@ export default function Sidebar({
 
   return (
     <div
-      className="w-70 h-full bg-neutral-100 dark:bg-neutral-900 pt-2 pb-4 pl-4 pr-1 overflow-y-hidden overflow-x-hidden
-        flex flex-col transition-colors duration-300 ease-in-out border-r border-neutral-200 dark:border-neutral-800
+      className="w-70 h-full bg-neutral-100 dark:bg-zinc-900 pt-2 pb-4 pl-4 pr-1 overflow-y-hidden overflow-x-hidden
+        flex flex-col transition-colors duration-300 ease-in-out border-r border-neutral-200 dark:border-zinc-800
         shadow-xl z-10"
     >
       <div className="flex-none mb-4">
@@ -370,10 +370,10 @@ export default function Sidebar({
           <Tooltip text={"Delete all chats (no project chats)"}>
             <button
               onClick={onDeleteAllGlobalChats}
-              className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors
+              className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-zinc-800 transition-colors
                 duration-300 ease-in-out"
             >
-              <TrashIcon className="size-6 text-neutral-500 dark:text-neutral-400" />
+              <TrashIcon className="size-6 text-neutral-500 dark:text-zinc-500" />
             </button>
           </Tooltip>
 
@@ -381,20 +381,20 @@ export default function Sidebar({
             <Tooltip text={"New project"}>
               <button
                 onClick={onNewProject}
-                className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800
+                className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-zinc-800
                   transition-colors duration-300 ease-in-out"
               >
-                <FolderPlusIcon className="size-6 text-neutral-500 dark:text-neutral-400" />
+                <FolderPlusIcon className="size-6 text-neutral-500 dark:text-zinc-500" />
               </button>
             </Tooltip>
 
             <Tooltip text={"New chat"}>
               <button
                 onClick={() => onNewChat(null)}
-                className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800
+                className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-zinc-800
                   transition-colors duration-300 ease-in-out"
               >
-                <PencilSquareIcon className="size-6 text-neutral-500 dark:text-neutral-400" />
+                <PencilSquareIcon className="size-6 text-neutral-500 dark:text-zinc-500" />
               </button>
             </Tooltip>
           </div>
@@ -421,7 +421,7 @@ export default function Sidebar({
           <AnimatePresence>
             {groupedGlobalChats.map((group) => (
               <motion.div key={group.label} variants={animationVariants.item} className="mb-4">
-                <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2">
+                <h3 className="text-xs font-semibold text-neutral-500 dark:text-zinc-500 uppercase mb-2">
                   {group.label}
                 </h3>
                 <ul>
@@ -462,7 +462,7 @@ export default function Sidebar({
                                 menuAnchorRef.current = e.currentTarget;
                                 setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
                               }}
-                              className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                              className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-zinc-500"
                             >
                               <EllipsisHorizontalIcon className="size-5" />
                             </button>
@@ -513,7 +513,7 @@ export default function Sidebar({
 
         {projects.length > 0 && (
           <motion.div key="projects-section" variants={animationVariants.item} className="mb-4">
-            <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase mb-2">Projects</h3>
+            <h3 className="text-xs font-semibold text-neutral-500 dark:text-zinc-500 uppercase mb-2">Projects</h3>
             <ul>
               <AnimatePresence>
                 {projects.map((project) => (
@@ -536,7 +536,7 @@ export default function Sidebar({
                     >
                       <motion.button
                         onClick={() => toggleProjectExpansion(project.id)}
-                        className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                        className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-zinc-500"
                         animate={{ rotate: expandedProjects.has(project.id) ? 90 : 0 }}
                         transition={{ duration: 0.2 }}
                       >
@@ -566,7 +566,7 @@ export default function Sidebar({
                                 menuAnchorRef.current = e.currentTarget;
                                 setOpenMenuId(openMenuId === `project-${project.id}` ? null : `project-${project.id}`);
                               }}
-                              className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-neutral-400"
+                              className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-zinc-500"
                             >
                               <EllipsisHorizontalIcon className="size-5" />
                             </button>
@@ -609,7 +609,7 @@ export default function Sidebar({
                           animate="open"
                           exit="collapsed"
                           variants={animationVariants.accordion}
-                          className="ms-6 border-l border-neutral-300 dark:border-neutral-700 mt-1 ps-2 overflow-hidden"
+                          className="ms-6 border-l border-neutral-300 dark:border-zinc-700 mt-1 ps-2 overflow-hidden"
                         >
                           <ul>
                             <AnimatePresence>
@@ -651,7 +651,7 @@ export default function Sidebar({
                                             setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
                                           }}
                                           className="cursor-pointer p-1 rounded-full text-neutral-500
-                                            dark:text-neutral-400"
+                                            dark:text-zinc-500"
                                         >
                                           <EllipsisHorizontalIcon className="size-5" />
                                         </button>
@@ -694,7 +694,7 @@ export default function Sidebar({
                                   </motion.li>
                                 ))
                               ) : (
-                                <li className="text-neutral-500 dark:text-neutral-400 text-sm py-2 ps-2">
+                                <li className="text-neutral-500 dark:text-zinc-500 text-sm py-2 ps-2">
                                   No chats in this project.
                                 </li>
                               )}

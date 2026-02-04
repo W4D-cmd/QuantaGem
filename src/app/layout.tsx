@@ -66,7 +66,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${roboto.variable} ${jetbrainsMono.variable}`}>
       <body
-        className={`antialiased bg-white dark:bg-neutral-950 text-black dark:text-white transition-colors duration-300
+        className={`antialiased bg-white dark:bg-zinc-800 text-black dark:text-zinc-100 transition-colors duration-300
           ease-in-out`}
       >
         <ThemeProvider>

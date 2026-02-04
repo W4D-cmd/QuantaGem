@@ -42,7 +42,7 @@ function HighlightedHeadline({ html }: { html: string }): React.ReactElement {
 
   return (
     <span
-      className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2 [&_.search-highlight]:bg-amber-200
+      className="text-sm text-neutral-600 dark:text-zinc-500 line-clamp-2 [&_.search-highlight]:bg-amber-200
         [&_.search-highlight]:dark:bg-amber-500/40 [&_.search-highlight]:text-amber-900
         [&_.search-highlight]:dark:text-amber-200 [&_.search-highlight]:px-0.5 [&_.search-highlight]:rounded
         [&_.search-highlight]:font-medium"
@@ -55,11 +55,11 @@ function SearchResultSkeleton(): React.ReactElement {
   return (
     <div className="px-4 py-3 animate-pulse">
       <div className="flex items-center gap-2 mb-2">
-        <div className="h-4 bg-neutral-200 dark:bg-neutral-700 rounded w-1/3" />
-        <div className="h-3 bg-neutral-200 dark:bg-neutral-700 rounded w-16" />
+        <div className="h-4 bg-neutral-200 dark:bg-zinc-700 rounded w-1/3" />
+        <div className="h-3 bg-neutral-200 dark:bg-zinc-700 rounded w-16" />
       </div>
-      <div className="h-3 bg-neutral-200 dark:bg-neutral-700 rounded w-full mb-1" />
-      <div className="h-3 bg-neutral-200 dark:bg-neutral-700 rounded w-2/3" />
+      <div className="h-3 bg-neutral-200 dark:bg-zinc-700 rounded w-full mb-1" />
+      <div className="h-3 bg-neutral-200 dark:bg-zinc-700 rounded w-2/3" />
     </div>
   );
 }
@@ -266,33 +266,33 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
         >
           <motion.div
             variants={modalVariants}
-            className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl
-              border border-neutral-200 dark:border-neutral-800 overflow-hidden"
+            className="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl
+              border border-neutral-200 dark:border-zinc-800 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={handleKeyDown}
           >
             {/* Search Input */}
-            <div className="flex items-center gap-3 px-4 py-4 border-b border-neutral-200 dark:border-neutral-800">
-              <MagnifyingGlassIcon className="size-5 text-neutral-400 dark:text-neutral-500 flex-shrink-0" />
+            <div className="flex items-center gap-3 px-4 py-4 border-b border-neutral-200 dark:border-zinc-800">
+              <MagnifyingGlassIcon className="size-5 text-neutral-400 dark:text-zinc-500 flex-shrink-0" />
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={handleInputChange}
                 placeholder="Search chats..."
-                className="flex-1 bg-transparent text-base text-neutral-900 dark:text-white
-                  placeholder-neutral-400 dark:placeholder-neutral-500 outline-none"
+                className="flex-1 bg-transparent text-base text-neutral-900 dark:text-zinc-100
+                  placeholder-neutral-400 dark:placeholder-zinc-500 outline-none"
                 autoComplete="off"
                 spellCheck={false}
               />
-              <div className="flex items-center gap-2 text-xs text-neutral-400 dark:text-neutral-500">
-                <kbd className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 font-mono">Esc</kbd>
+              <div className="flex items-center gap-2 text-xs text-neutral-400 dark:text-zinc-500">
+                <kbd className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-zinc-800 font-mono">Esc</kbd>
                 <span>to close</span>
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-neutral-400 dark:text-neutral-500 hover:bg-neutral-100
-                  dark:hover:bg-neutral-800 transition-colors"
+                className="p-1.5 rounded-lg text-neutral-400 dark:text-zinc-400 hover:bg-neutral-100
+                  dark:hover:bg-zinc-800 transition-colors"
                 aria-label="Close search"
               >
                 <XMarkIcon className="size-5" />
@@ -302,7 +302,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
             {/* Results Area */}
             <div
               ref={resultsContainerRef}
-              className="max-h-[50vh] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-200 dark:scrollbar-thumb-neutral-700"
+              className="max-h-[50vh] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-200 dark:scrollbar-thumb-zinc-700"
             >
               {/* Loading State */}
               {isLoading && (
@@ -326,15 +326,15 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
                       className={`px-4 py-3 cursor-pointer transition-colors duration-100
                         ${
                           index === selectedIndex
-                            ? "bg-neutral-100 dark:bg-neutral-800"
-                            : "hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+                            ? "bg-neutral-100 dark:bg-zinc-800"
+                            : "hover:bg-neutral-50 dark:hover:bg-zinc-800/50"
                         }`}
                       onClick={() => handleResultClick(result.chatId)}
                       onMouseEnter={() => setSelectedIndex(index)}
                     >
                       {/* Title and Project Badge */}
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium text-neutral-900 dark:text-white truncate">
+                        <h4 className="font-medium text-neutral-900 dark:text-zinc-100 truncate">
                           {result.chatTitle}
                         </h4>
                         {result.projectTitle && (
@@ -352,7 +352,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
                       <HighlightedHeadline html={result.headline} />
 
                       {/* Timestamp */}
-                      <div className="flex items-center gap-1 mt-1.5 text-xs text-neutral-400 dark:text-neutral-500">
+                      <div className="flex items-center gap-1 mt-1.5 text-xs text-neutral-400 dark:text-zinc-500">
                         <ClockIcon className="size-3" />
                         <span>{formatRelativeTime(result.updatedAt)}</span>
                       </div>
@@ -364,9 +364,9 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
               {/* Empty State */}
               {!isLoading && hasSearched && results.length === 0 && (
                 <div className="py-12 text-center">
-                  <MagnifyingGlassIcon className="size-12 mx-auto text-neutral-300 dark:text-neutral-700 mb-3" />
-                  <p className="text-neutral-500 dark:text-neutral-400">No results found</p>
-                  <p className="text-sm text-neutral-400 dark:text-neutral-500 mt-1">
+                  <MagnifyingGlassIcon className="size-12 mx-auto text-neutral-300 dark:text-zinc-600 mb-3" />
+                  <p className="text-neutral-500 dark:text-zinc-500">No results found</p>
+                  <p className="text-sm text-neutral-400 dark:text-zinc-500 mt-1">
                     Try different keywords or check spelling
                   </p>
                 </div>
@@ -375,9 +375,9 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
               {/* Initial State */}
               {!isLoading && !hasSearched && (
                 <div className="py-12 text-center">
-                  <MagnifyingGlassIcon className="size-12 mx-auto text-neutral-300 dark:text-neutral-700 mb-3" />
-                  <p className="text-neutral-500 dark:text-neutral-400">Search your chats</p>
-                  <p className="text-sm text-neutral-400 dark:text-neutral-500 mt-1">
+                  <MagnifyingGlassIcon className="size-12 mx-auto text-neutral-300 dark:text-zinc-600 mb-3" />
+                  <p className="text-neutral-500 dark:text-zinc-500">Search your chats</p>
+                  <p className="text-sm text-neutral-400 dark:text-zinc-500 mt-1">
                     Search by title or message content
                   </p>
                 </div>
@@ -388,17 +388,17 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
             {results.length > 0 && (
               <div
                 className="flex items-center justify-between px-4 py-2.5 border-t border-neutral-200
-                  dark:border-neutral-800 text-xs text-neutral-400 dark:text-neutral-500"
+                  dark:border-zinc-800 text-xs text-neutral-400 dark:text-zinc-500"
               >
                 <div className="flex items-center gap-4">
                   <span className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 font-mono">
+                    <kbd className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-zinc-800 font-mono">
                       <span className="text-[10px]">&#8593;&#8595;</span>
                     </kbd>
                     navigate
                   </span>
                   <span className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 font-mono">
+                    <kbd className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-zinc-800 font-mono">
                       Enter
                     </kbd>
                     select

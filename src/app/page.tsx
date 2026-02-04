@@ -1657,8 +1657,8 @@ export default function Home() {
   ];
 
   const menuHeader = userEmail ? (
-    <div className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-200">
-      <p className="text-xs text-neutral-500 dark:text-neutral-400">Logged in as</p>
+    <div className="px-4 py-3 text-sm text-neutral-700 dark:text-zinc-300">
+      <p className="text-xs text-neutral-500 dark:text-zinc-500">Logged in as</p>
       <p className="font-semibold truncate">{userEmail}</p>
     </div>
   ) : null;
@@ -1719,7 +1719,7 @@ export default function Home() {
           )}
         </AnimatePresence>
         <div
-          className="flex-none sticky min-h-16 top-0 z-10 px-4 py-2 border-b border-neutral-100 dark:border-neutral-950
+          className="flex-none sticky min-h-16 top-0 z-10 px-4 py-2 border-b border-neutral-100 dark:border-zinc-900
             transition-colors duration-300 ease-in-out flex items-center justify-between"
         >
           {displayingProjectManagementId === null ? (
@@ -1728,7 +1728,7 @@ export default function Home() {
 
               <div className="flex items-center ml-4">
                 <Tooltip text="Total tokens for this chat session">
-                  <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+                  <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-zinc-500">
                     <span>Tokens:</span>
                     {isCountingTokens ? (
                       <div
@@ -1828,7 +1828,7 @@ export default function Home() {
                 ) : (
                   <div
                     className="absolute inset-0 overflow-y-auto z-0 scrollbar-thin scrollbar-thumb-neutral-200
-                      dark:scrollbar-thumb-neutral-800"
+                      dark:scrollbar-thumb-zinc-800"
                   >
                     <NewChatScreen
                       systemPrompt={newChatSystemPrompt}
@@ -1860,7 +1860,7 @@ export default function Home() {
                               className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
                                 font-medium transition-colors duration-300 ease-in-out bg-white border
                                 border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-900
-                                dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 shadow-lg"
+                                dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-neutral-700 shadow-lg"
                             >
                               <ArrowDownIcon className="size-5" />
                             </button>

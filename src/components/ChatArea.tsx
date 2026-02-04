@@ -97,8 +97,8 @@ const ThinkingLabel = memo(() => (
   <span className="flex items-center gap-1.5">
     Thinking
     <div
-      className="size-3 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-600
-        dark:border-t-neutral-300 rounded-full animate-spin"
+      className="size-3 border-2 border-neutral-300 dark:border-zinc-600 border-t-neutral-600
+        dark:border-t-zinc-300 rounded-full animate-spin"
     ></div>
   </span>
 ));
@@ -112,7 +112,7 @@ const ThinkingSummary: React.FC<{ summary: string; isStreaming: boolean }> = ({ 
       <button
         onClick={() => setIsOpen((prev) => !prev)}
         className="w-full cursor-pointer list-none flex items-center gap-1 font-medium text-neutral-600
-          dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors"
+          dark:text-zinc-600 hover:text-neutral-900 dark:hover:text-zinc-400 transition-colors"
       >
         <motion.div animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
           <ChevronRightIcon className="size-4" />
@@ -140,8 +140,8 @@ const ThinkingSummary: React.FC<{ summary: string; isStreaming: boolean }> = ({ 
             className="overflow-hidden"
           >
             <div
-              className="mt-2 p-3 border border-neutral-200 dark:border-neutral-700 rounded-xl bg-neutral-50
-                dark:bg-neutral-800/50 prose dark:prose-invert prose-neutral max-w-none prose-sm"
+              className="mt-2 p-3 border border-neutral-200 dark:border-zinc-700 rounded-xl bg-neutral-50
+                dark:bg-zinc-800/50 prose dark:prose-invert prose-neutral max-w-none prose-sm"
             >
               <ReactMarkdown
                 remarkPlugins={[remarkMath, remarkGfm]}
@@ -354,8 +354,8 @@ const CodeBlockWithCopy: React.FC<CodeBlockWithCopyProps> = ({ children, chatAre
           ref={buttonRef}
           onClick={handleCopy}
           style={{ top: `${buttonRelativeTop}px`, right: `${BUTTON_OFFSET_RIGHT}px` }}
-          className="cursor-pointer absolute p-1 rounded-md text-neutral-400 dark:text-neutral-500 hover:bg-neutral-200
-            dark:hover:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10
+          className="cursor-pointer absolute p-1 rounded-md text-neutral-400 dark:text-zinc-500 hover:bg-neutral-200
+            dark:hover:bg-zinc-700 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10
             group-hover:scale-100 scale-95"
         >
           {copied ? <CheckIcon className="size-4 text-green-600" /> : <ClipboardDocumentListIcon className="size-4" />}
@@ -734,13 +734,13 @@ function ChatAreaComponent(
                 }`}
               >
                 {isBeingEdited ? (
-                  <div className="p-4 rounded-3xl bg-white dark:bg-neutral-800 border-2 border-blue-500">
+                  <div className="p-4 rounded-3xl bg-white dark:bg-zinc-800 border-2 border-blue-500">
                     {editedFileParts.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-3">
                         {editedFileParts.map((part) => (
                           <div
                             key={part.objectName}
-                            className="bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200 px-3
+                            className="bg-neutral-200 dark:bg-zinc-700 text-neutral-800 dark:text-zinc-400 px-3
                               py-1.5 rounded-full text-sm flex items-center gap-2"
                           >
                             <span>{part.fileName}</span>
@@ -766,7 +766,7 @@ function ChatAreaComponent(
                       <button
                         onClick={() => setEditingMessage(null)}
                         className="cursor-pointer px-4 py-1.5 rounded-full text-sm font-medium transition-colors
-                          bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-700 dark:hover:bg-neutral-600"
+                          bg-neutral-200 hover:bg-neutral-300 dark:bg-zinc-700 dark:hover:bg-zinc-600"
                       >
                         Cancel
                       </button>
@@ -781,7 +781,7 @@ function ChatAreaComponent(
                     </div>
                   </div>
                 ) : (
-                  <div className={`p-4 rounded-3xl ${isUserMessage ? "bg-neutral-100 dark:bg-neutral-800" : ""}`}>
+                  <div className={`p-4 rounded-3xl ${isUserMessage ? "bg-neutral-100 dark:bg-zinc-900" : ""}`}>
                     {msg.role === "model" && msg.thoughtSummary && (
                       <motion.div
                         initial={{ opacity: 0, y: -10 }}
@@ -800,15 +800,17 @@ function ChatAreaComponent(
                           <div
                             key={j}
                             className="prose dark:prose-invert prose-neutral prose-code:font-normal
-                              prose-code:text-black dark:prose-code:text-white prose-li:text-neutral-950
-                              dark:prose-li:text-neutral-50 prose-p:text-neutral-950 dark:prose-p:text-neutral-50
-                              prose-headings:text-black dark:prose-headings:text-white prose-pre:rounded-xl
-                              prose-code:rounded prose-pre:border prose-pre:bg-neutral-100
-                              prose-pre:border-neutral-400/30 dark:prose-pre:bg-neutral-900
-                              dark:prose-pre:border-neutral-600/30 prose-code:bg-neutral-200
-                              dark:prose-code:bg-neutral-700 max-w-none transition-colors duration-300 ease-in-out
-                              prose-code:before:content-none prose-code:after:content-none prose-code:py-0.5
-                              prose-code:px-1"
+                              prose-code:text-black dark:prose-code:text-zinc-200
+                              prose-li:text-neutral-950 dark:prose-li:text-zinc-200
+                              prose-p:text-neutral-950 dark:prose-p:text-zinc-200
+                              prose-headings:text-black dark:prose-headings:text-zinc-200
+                              prose-pre:rounded-xl prose-code:rounded prose-pre:border
+                              prose-pre:bg-neutral-100 dark:prose-pre:bg-zinc-900
+                              prose-pre:border-neutral-400/30 dark:prose-pre:border-zinc-600/30
+                              prose-code:bg-neutral-200 dark:prose-code:bg-zinc-700
+                              max-w-none transition-colors duration-300 ease-in-out
+                              prose-code:before:content-none prose-code:after:content-none
+                              prose-code:py-0.5 prose-code:px-1"
                           >
                             {isUserMessage ? (
                               <LazyMarkdownRenderer content={part.text} components={markdownComponents} />
@@ -862,7 +864,7 @@ function ChatAreaComponent(
                     })}
                     {msg.role === "model" && msg.sources && msg.sources.length > 0 && (
                       <div
-                        className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800 text-xs
+                        className="mt-4 pt-3 border-t border-neutral-200 dark:border-zinc-800 text-xs
                           text-neutral-600"
                       >
                         <p className="font-semibold mb-2">Sources:</p>
@@ -897,7 +899,7 @@ function ChatAreaComponent(
                       onClick={() => handleCopyMessage(msg)}
                       disabled={isLoading}
                       className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
-                        hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                        hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
                     >
                       {copiedMessageId === msg.id ? (
                         <CheckIcon className="size-4 text-green-500" />
@@ -912,7 +914,7 @@ function ChatAreaComponent(
                         onClick={() => setEditingMessage({ index: i, message: msg })}
                         disabled={isLoading}
                         className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
-                          hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                          hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
                       >
                         <PencilIcon className="size-4" />
                       </button>
@@ -924,7 +926,7 @@ function ChatAreaComponent(
                         onClick={() => onRegenerate(i)}
                         disabled={isLoading}
                         className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
-                          hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                          hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
                       >
                         <ArrowPathIcon className="size-4" />
                       </button>
@@ -950,7 +952,7 @@ function ChatAreaComponent(
                         }}
                         disabled={isLoading && audioPlaybackState.status !== "playing"}
                         className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
-                          hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                          hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
                       >
                         {getAudioButtonIcon(msg.id)}
                       </button>

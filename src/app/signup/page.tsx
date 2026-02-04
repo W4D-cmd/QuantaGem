@@ -50,20 +50,20 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-50 dark:bg-neutral-950 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-neutral-50 dark:bg-zinc-950 p-4">
       <AnimatePresence>{error && <Toast message={error} onClose={() => setError(null)} />}</AnimatePresence>
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeInOut" }}
-        className="w-full max-w-md rounded-2xl bg-white dark:bg-neutral-900 p-8 shadow-lg"
+        className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-8 shadow-lg"
       >
-        <h2 className="mb-6 text-center text-3xl font-bold text-neutral-900 dark:text-white">
+        <h2 className="mb-6 text-center text-3xl font-bold text-neutral-900 dark:text-zinc-100">
           Create Your QuantaGem Account
         </h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            <label htmlFor="email" className="block text-sm font-medium text-neutral-700 dark:text-zinc-400">
               Email address
             </label>
             <div className="mt-1">
@@ -76,17 +76,17 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
-                className="w-full appearance-none rounded-xl border border-neutral-300 dark:border-neutral-700 px-3 py-2
-                  placeholder-neutral-400 dark:placeholder-neutral-500 shadow-sm focus:border-blue-500
-                  focus:outline-none focus:ring-blue-500 bg-white dark:bg-neutral-950 text-black dark:text-white
-                  disabled:bg-neutral-100 dark:disabled:bg-neutral-800 disabled:text-neutral-500
-                  dark:disabled:text-neutral-400"
+                className="w-full appearance-none rounded-xl border border-neutral-300 dark:border-zinc-700 px-3 py-2
+                  placeholder-neutral-400 dark:placeholder-zinc-500 shadow-sm focus:border-blue-500
+                  focus:outline-none focus:ring-blue-500 bg-white dark:bg-zinc-950 text-black dark:text-zinc-100
+                  disabled:bg-neutral-100 dark:disabled:bg-zinc-800 disabled:text-neutral-500
+                  dark:disabled:text-zinc-500"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-zinc-400">
               Password
             </label>
             <div className="mt-1">
@@ -99,14 +99,14 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
-                className="w-full appearance-none rounded-xl border border-neutral-300 dark:border-neutral-700 px-3 py-2
-                  placeholder-neutral-400 dark:placeholder-neutral-500 shadow-sm focus:border-blue-500
-                  focus:outline-none focus:ring-blue-500 bg-white dark:bg-neutral-950 text-black dark:text-white
-                  disabled:bg-neutral-100 dark:disabled:bg-neutral-800 disabled:text-neutral-500
-                  dark:disabled:text-neutral-400"
+                className="w-full appearance-none rounded-xl border border-neutral-300 dark:border-zinc-700 px-3 py-2
+                  placeholder-neutral-400 dark:placeholder-zinc-500 shadow-sm focus:border-blue-500
+                  focus:outline-none focus:ring-blue-500 bg-white dark:bg-zinc-950 text-black dark:text-zinc-100
+                  disabled:bg-neutral-100 dark:disabled:bg-zinc-800 disabled:text-neutral-500
+                  dark:disabled:text-zinc-500"
               />
             </div>
-            <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+            <p className="mt-2 text-xs text-neutral-600 dark:text-zinc-500">
               Password must be at least 8 characters long.
             </p>
           </div>
@@ -126,7 +126,7 @@ export default function SignupPage() {
           </div>
         </form>
 
-        <p className="mt-8 text-center text-sm text-neutral-600 dark:text-neutral-400">
+        <p className="mt-8 text-center text-sm text-neutral-600 dark:text-zinc-500">
           Already have an account?{" "}
           <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
             Sign In

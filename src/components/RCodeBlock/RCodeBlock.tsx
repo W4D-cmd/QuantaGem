@@ -19,26 +19,21 @@ export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className, isStrea
   const { execute, result, status, progressMessage, webRState, reset } = useWebR();
   const [view, setView] = useState<ViewMode>("output");
   const hasExecutedRef = useRef(false);
-  const codeRef = useRef(code);
-
-  // Update stored code when it changes during streaming
-  useEffect(() => {
-    codeRef.current = code;
-  }, [code]);
 
   // Auto-execute only when streaming is complete
+  // Single effect handles both streaming and non-streaming cases
   useEffect(() => {
-    // Wait until streaming is done before executing
+    // Don't execute during streaming - wait for complete code
     if (isStreaming) {
       return;
     }
 
-    // Only execute once
+    // Only execute once per component instance
     if (!hasExecutedRef.current) {
       hasExecutedRef.current = true;
-      execute(codeRef.current);
+      execute(code);
     }
-  }, [execute, isStreaming]);
+  }, [code, execute, isStreaming]);
 
   const handleRerun = useCallback(() => {
     reset();

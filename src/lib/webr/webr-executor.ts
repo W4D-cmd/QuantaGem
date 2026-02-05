@@ -15,6 +15,11 @@ function detectRequiredPackages(code: string): string[] {
     packages.push("ggplot2");
   }
 
+  // Check for viridis usage (standalone package or viridis scales in ggplot2)
+  if (/\b(viridis|scale_\w+_viridis)\b/.test(code)) {
+    packages.push("viridis");
+  }
+
   // Check for tidyverse packages
   if (/\b(dplyr|tidyr|purrr|tibble|readr|stringr)\b/.test(code)) {
     const tidyversePackages = ["dplyr", "tidyr", "purrr", "tibble", "readr", "stringr"];

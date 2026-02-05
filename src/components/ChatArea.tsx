@@ -664,11 +664,11 @@ function ChatAreaComponent(
     }
   };
 
-  // Memoize markdownComponents to prevent recreation on every render
-  // This prevents RCodeBlock from remounting during scroll events
-  // We include isLoading so RCodeBlock knows when streaming is complete
-  const markdownComponents: Components = useMemo(
-    () => ({
+  // Factory function to create markdown components for a specific message
+  // This keeps the function reference stable (empty deps) while allowing
+  // per-message streaming state to be passed at render time
+  const createMarkdownComponents = useCallback(
+    (isMessageStreaming: boolean): Components => ({
       pre: ({ className, children }) => {
         // Extract code element and detect language
         const codeChild = Children.toArray(children).find(
@@ -688,7 +688,7 @@ function ChatAreaComponent(
                 code={codeContent}
                 className={className}
                 chatAreaContainerRef={containerRef}
-                isStreaming={isLoading}
+                isStreaming={isMessageStreaming}
               />
             );
           }
@@ -702,7 +702,7 @@ function ChatAreaComponent(
         );
       },
     }),
-    [isLoading], // Include isLoading so RCodeBlock knows when streaming is complete
+    [], // Empty deps - stable function reference
   );
 
   const getAudioButtonIcon = (messageId: number) => {
@@ -728,6 +728,11 @@ function ChatAreaComponent(
           const isUserMessage = msg.role === "user";
           const isBeingEdited = editingMessage?.index === i;
           const hasText = msg.parts.some((p) => p.type === "text" && p.text && p.text.trim().length > 0);
+          // Only the last model message during loading is actually streaming
+          // All other messages always get isStreaming=false to prevent re-execution
+          const isLastMessage = i === messages.length - 1;
+          const isMessageStreaming = isLoading && isLastMessage && msg.role === "model";
+          const messageComponents = createMarkdownComponents(isMessageStreaming);
 
           return (
             <div
@@ -821,12 +826,12 @@ function ChatAreaComponent(
                               prose-code:py-0.5 prose-code:px-1"
                           >
                             {isUserMessage ? (
-                              <LazyMarkdownRenderer content={part.text} components={markdownComponents} />
+                              <LazyMarkdownRenderer content={part.text} components={messageComponents} />
                             ) : (
                               <ReactMarkdown
                                 remarkPlugins={[remarkMath, remarkGfm]}
                                 rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeHighlight, { detect: true }]]}
-                                components={markdownComponents}
+                                components={messageComponents}
                               >
                                 {part.text}
                               </ReactMarkdown>

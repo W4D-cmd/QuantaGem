@@ -15,8 +15,8 @@ function detectRequiredPackages(code: string): string[] {
     packages.push("ggplot2");
   }
 
-  // Check for viridis usage (standalone package or viridis scales in ggplot2)
-  if (/\b(viridis|scale_\w+_viridis)\b/.test(code)) {
+  // Check for viridis usage (standalone package or viridis scales like scale_color_viridis_d)
+  if (/\b(viridis|scale_\w*viridis\w*)\b/.test(code)) {
     packages.push("viridis");
   }
 
@@ -104,6 +104,7 @@ async function executeCode(
     : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const outputPath = `/tmp/output-${uniqueId}.svg`;
   const codePath = `/tmp/code-${uniqueId}.R`;
+  const errorPath = `/tmp/errors-${uniqueId}.txt`;
 
   // Write user code to a temp file to avoid escaping issues with quotes and special characters
   await webR.FS.writeFile(codePath, code);
@@ -117,6 +118,7 @@ async function executeCode(
 
     # Store execution errors for reporting
     .webr_exec_errors <- character(0)
+    .webr_success_count <- 0
 
     # Parse and evaluate code expression-by-expression (REPL simulation)
     tryCatch({
@@ -130,6 +132,7 @@ async function executeCode(
         tryCatch({
           # Evaluate with visibility information
           .webr_result <- withVisible(eval(.webr_expr, envir = globalenv()))
+          .webr_success_count <- .webr_success_count + 1
 
           # If result is visible, print it (triggers ggplot rendering, shows data frames, etc.)
           if (.webr_result$visible) {
@@ -140,21 +143,19 @@ async function executeCode(
           .webr_exec_errors <<- c(.webr_exec_errors, paste("Error in expression", .webr_i, ":", e$message))
         })
       }
-
-      # Report any collected errors
-      if (length(.webr_exec_errors) > 0) {
-        for (.webr_err in .webr_exec_errors) {
-          message(.webr_err)
-        }
-      }
     }, error = function(e) {
       # Parse-level error (syntax error in user code)
-      message(paste("Parse error:", e$message))
+      .webr_exec_errors <<- c(.webr_exec_errors, paste("Parse error:", e$message))
     })
+
+    # Write errors to file for retrieval
+    if (length(.webr_exec_errors) > 0) {
+      writeLines(.webr_exec_errors, "${errorPath}")
+    }
 
     # Clean up temporary variables from global environment (safely)
     tryCatch({
-      .webr_cleanup_vars <- c(".webr_parsed_code", ".webr_i", ".webr_expr", ".webr_result", ".webr_exec_errors", ".webr_err")
+      .webr_cleanup_vars <- c(".webr_parsed_code", ".webr_i", ".webr_expr", ".webr_result", ".webr_exec_errors", ".webr_err", ".webr_success_count")
       .webr_existing_vars <- .webr_cleanup_vars[.webr_cleanup_vars %in% ls(envir = globalenv())]
       if (length(.webr_existing_vars) > 0) {
         rm(list = .webr_existing_vars, envir = globalenv())
@@ -168,9 +169,35 @@ async function executeCode(
     dev.off()
   `;
 
+  // Helper to read and clean up error file
+  const readErrors = async (): Promise<string | null> => {
+    try {
+      const errorContent = await webR.FS.readFile(errorPath, { encoding: "utf8" });
+      const errorString = typeof errorContent === "string" ? errorContent : new TextDecoder().decode(errorContent);
+      return errorString.trim() || null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Helper to clean up temp files
+  const cleanup = async () => {
+    const filesToClean = [outputPath, codePath, errorPath];
+    for (const file of filesToClean) {
+      try {
+        await webR.FS.unlink(file);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  };
+
   try {
     // Execute the R code
     await webR.evalRVoid(wrappedCode);
+
+    // Check for R-level errors that were caught
+    const rErrors = await readErrors();
 
     // Try to read the SVG output
     try {
@@ -183,47 +210,38 @@ async function executeCode(
                         svgString.includes("<line") || svgString.includes("<text") ||
                         svgString.includes("<polyline");
 
-      // Clean up the temp files
-      try {
-        await webR.FS.unlink(outputPath);
-        await webR.FS.unlink(codePath);
-      } catch {
-        // Ignore cleanup errors
-      }
+      await cleanup();
 
       if (hasContent) {
         return {
           success: true,
           svg: svgString,
           hasGraphicalOutput: true,
+          // Include any non-fatal errors as warnings
+          error: rErrors || undefined,
         };
       } else {
+        // No graphical output - report R errors if any, otherwise generic message
+        const errorMsg = rErrors || "Code executed but produced no graphical output. Use plot(), ggplot(), or similar.";
         return {
-          success: true,
+          success: !rErrors, // If there were R errors, mark as unsuccessful
           hasGraphicalOutput: false,
-          error: "Code executed but produced no graphical output. Use plot(), ggplot(), or similar.",
+          error: errorMsg,
         };
       }
     } catch {
-      // No SVG file was created - still clean up code file
-      try {
-        await webR.FS.unlink(codePath);
-      } catch {
-        // Ignore cleanup errors
-      }
+      // No SVG file was created
+      await cleanup();
+      const errorMsg = rErrors || "Code executed but produced no graphical output. Use plot(), ggplot(), or similar.";
       return {
-        success: true,
+        success: !rErrors,
         hasGraphicalOutput: false,
-        error: "Code executed but produced no graphical output. Use plot(), ggplot(), or similar.",
+        error: errorMsg,
       };
     }
   } catch (error) {
-    // R execution error - still clean up code file
-    try {
-      await webR.FS.unlink(codePath);
-    } catch {
-      // Ignore cleanup errors
-    }
+    // R execution error at JavaScript level
+    await cleanup();
 
     const errorMessage = error instanceof Error ? error.message : String(error);
 

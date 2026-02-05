@@ -104,20 +104,72 @@ async function executeCode(
   // Generate unique output path for this execution
   const outputPath = generateUniqueOutputPath();
 
-  // Wrap code to capture SVG output
+  // Escape the user code for safe embedding in R string
+  // Replace backslashes first, then quotes, then line endings
+  const escapedCode = code
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\r\n/g, "\\n")  // Windows line endings
+    .replace(/\r/g, "\\n")    // Old Mac line endings
+    .replace(/\n/g, "\\n");
+
+  // Wrap code to capture SVG output with REPL-style evaluation
+  // This simulates R's interactive behavior where visible results are auto-printed
   const wrappedCode = `
     # Set up SVG output
     library(svglite)
     svglite("${outputPath}", width = 8, height = 6)
 
-    # Capture any errors
+    # Store execution errors for reporting
+    .webr_exec_errors <- character(0)
+
+    # Parse and evaluate code expression-by-expression (REPL simulation)
     tryCatch({
-      ${code}
+      # Parse user code into individual expressions
+      .webr_parsed_code <- parse(text = "${escapedCode}")
+
+      # Iterate over each expression and evaluate with visibility check
+      for (.webr_i in seq_along(.webr_parsed_code)) {
+        .webr_expr <- .webr_parsed_code[[.webr_i]]
+
+        tryCatch({
+          # Evaluate with visibility information
+          .webr_result <- withVisible(eval(.webr_expr, envir = globalenv()))
+
+          # If result is visible, print it (triggers ggplot rendering, shows data frames, etc.)
+          if (.webr_result$visible) {
+            print(.webr_result$value)
+          }
+        }, error = function(e) {
+          # Store error but continue execution for remaining expressions
+          .webr_exec_errors <<- c(.webr_exec_errors, paste("Error in expression", .webr_i, ":", e$message))
+        })
+      }
+
+      # Report any collected errors
+      if (length(.webr_exec_errors) > 0) {
+        for (.webr_err in .webr_exec_errors) {
+          message(.webr_err)
+        }
+      }
     }, error = function(e) {
-      message(paste("Error:", e$message))
+      # Parse-level error (syntax error in user code)
+      message(paste("Parse error:", e$message))
     })
 
-    # Close device and check if output was created
+    # Clean up temporary variables from global environment (safely)
+    tryCatch({
+      .webr_cleanup_vars <- c(".webr_parsed_code", ".webr_i", ".webr_expr", ".webr_result", ".webr_exec_errors", ".webr_err")
+      .webr_existing_vars <- .webr_cleanup_vars[.webr_cleanup_vars %in% ls(envir = globalenv())]
+      if (length(.webr_existing_vars) > 0) {
+        rm(list = .webr_existing_vars, envir = globalenv())
+      }
+      rm(".webr_cleanup_vars", ".webr_existing_vars", envir = globalenv())
+    }, error = function(e) {
+      # Ignore cleanup errors
+    })
+
+    # Close device (always executed)
     dev.off()
   `;
 

@@ -12,23 +12,33 @@ interface RCodeBlockProps {
   code: string;
   className?: string;
   chatAreaContainerRef?: React.RefObject<HTMLDivElement | null>;
+  isStreaming?: boolean;
 }
 
-export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className }) => {
+export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className, isStreaming = false }) => {
   const { execute, result, status, progressMessage, webRState, reset } = useWebR();
   const [view, setView] = useState<ViewMode>("output");
   const hasExecutedRef = useRef(false);
   const codeRef = useRef(code);
 
-  // Auto-execute on first render only
+  // Update stored code when it changes during streaming
   useEffect(() => {
+    codeRef.current = code;
+  }, [code]);
+
+  // Auto-execute only when streaming is complete
+  useEffect(() => {
+    // Wait until streaming is done before executing
+    if (isStreaming) {
+      return;
+    }
+
+    // Only execute once
     if (!hasExecutedRef.current) {
       hasExecutedRef.current = true;
-      codeRef.current = code;
-      execute(code);
+      execute(codeRef.current);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [execute]); // With stable execute callback, this runs once on mount
+  }, [execute, isStreaming]);
 
   const handleRerun = useCallback(() => {
     reset();

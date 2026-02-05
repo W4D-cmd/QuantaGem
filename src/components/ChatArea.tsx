@@ -666,6 +666,7 @@ function ChatAreaComponent(
 
   // Memoize markdownComponents to prevent recreation on every render
   // This prevents RCodeBlock from remounting during scroll events
+  // We include isLoading so RCodeBlock knows when streaming is complete
   const markdownComponents: Components = useMemo(
     () => ({
       pre: ({ className, children }) => {
@@ -682,7 +683,14 @@ function ChatAreaComponent(
             const codeContent = extractTextFromChildren(
               (codeChild.props as { children?: ReactNode }).children,
             ).replace(/\n$/, "");
-            return <RCodeBlock code={codeContent} className={className} chatAreaContainerRef={containerRef} />;
+            return (
+              <RCodeBlock
+                code={codeContent}
+                className={className}
+                chatAreaContainerRef={containerRef}
+                isStreaming={isLoading}
+              />
+            );
           }
         }
 
@@ -694,7 +702,7 @@ function ChatAreaComponent(
         );
       },
     }),
-    [], // Empty deps - containerRef is a stable ref object
+    [isLoading], // Include isLoading so RCodeBlock knows when streaming is complete
   );
 
   const getAudioButtonIcon = (messageId: number) => {

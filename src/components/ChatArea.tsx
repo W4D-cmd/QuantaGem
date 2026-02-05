@@ -664,22 +664,20 @@ function ChatAreaComponent(
     }
   };
 
-  // Factory function to create markdown components for a specific message
-  // This keeps the function reference stable (empty deps) while allowing
-  // per-message streaming state to be passed at render time
-  const createMarkdownComponents = useCallback(
-    (isMessageStreaming: boolean): Components => ({
+  // Pre-memoized component sets - stable references prevent remounting
+  // Using two separate memoized objects instead of a factory function ensures
+  // ReactMarkdown receives the same object reference on each render,
+  // preventing component remounts during scroll events
+  const streamingComponents: Components = useMemo(
+    () => ({
       pre: ({ className, children }) => {
-        // Extract code element and detect language
         const codeChild = Children.toArray(children).find(
           (child) => isValidElement(child) && child.type === "code",
         );
 
         if (isValidElement(codeChild)) {
           const codeClassName = (codeChild.props as { className?: string }).className || "";
-          // Check for R language code blocks
           if (/language-r\b/i.test(codeClassName)) {
-            // Extract text content recursively from children (handles syntax-highlighted nodes)
             const codeContent = extractTextFromChildren(
               (codeChild.props as { children?: ReactNode }).children,
             ).replace(/\n$/, "");
@@ -688,13 +686,12 @@ function ChatAreaComponent(
                 code={codeContent}
                 className={className}
                 chatAreaContainerRef={containerRef}
-                isStreaming={isMessageStreaming}
+                isStreaming={true}
               />
             );
           }
         }
 
-        // Fallback to existing code block for non-R languages
         return (
           <CodeBlockWithCopy chatAreaContainerRef={containerRef} className={className}>
             {children}
@@ -702,7 +699,41 @@ function ChatAreaComponent(
         );
       },
     }),
-    [], // Empty deps - stable function reference
+    [], // Empty deps - stable reference
+  );
+
+  const notStreamingComponents: Components = useMemo(
+    () => ({
+      pre: ({ className, children }) => {
+        const codeChild = Children.toArray(children).find(
+          (child) => isValidElement(child) && child.type === "code",
+        );
+
+        if (isValidElement(codeChild)) {
+          const codeClassName = (codeChild.props as { className?: string }).className || "";
+          if (/language-r\b/i.test(codeClassName)) {
+            const codeContent = extractTextFromChildren(
+              (codeChild.props as { children?: ReactNode }).children,
+            ).replace(/\n$/, "");
+            return (
+              <RCodeBlock
+                code={codeContent}
+                className={className}
+                chatAreaContainerRef={containerRef}
+                isStreaming={false}
+              />
+            );
+          }
+        }
+
+        return (
+          <CodeBlockWithCopy chatAreaContainerRef={containerRef} className={className}>
+            {children}
+          </CodeBlockWithCopy>
+        );
+      },
+    }),
+    [], // Empty deps - stable reference
   );
 
   const getAudioButtonIcon = (messageId: number) => {
@@ -732,7 +763,8 @@ function ChatAreaComponent(
           // All other messages always get isStreaming=false to prevent re-execution
           const isLastMessage = i === messages.length - 1;
           const isMessageStreaming = isLoading && isLastMessage && msg.role === "model";
-          const messageComponents = createMarkdownComponents(isMessageStreaming);
+          // Select pre-memoized component set (stable reference)
+          const messageComponents = isMessageStreaming ? streamingComponents : notStreamingComponents;
 
           return (
             <div

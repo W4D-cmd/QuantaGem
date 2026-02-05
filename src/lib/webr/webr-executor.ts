@@ -6,14 +6,6 @@ import type { ExecutionResult } from "@/types/webr";
 
 const EXECUTION_TIMEOUT = 300000;
 
-// Generate unique output path to prevent race conditions with concurrent executions
-function generateUniqueOutputPath(): string {
-  const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-  return `/tmp/output-${uniqueId}.svg`;
-}
-
 // Detect packages that need to be installed based on code content
 function detectRequiredPackages(code: string): string[] {
   const packages: string[] = [];
@@ -101,17 +93,15 @@ async function executeCode(
   webR: Awaited<ReturnType<typeof webRSingleton.getInstance>>,
   code: string,
 ): Promise<ExecutionResult> {
-  // Generate unique output path for this execution
-  const outputPath = generateUniqueOutputPath();
+  // Generate unique paths for this execution
+  const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  const outputPath = `/tmp/output-${uniqueId}.svg`;
+  const codePath = `/tmp/code-${uniqueId}.R`;
 
-  // Escape the user code for safe embedding in R string
-  // Replace backslashes first, then quotes, then line endings
-  const escapedCode = code
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\r\n/g, "\\n")  // Windows line endings
-    .replace(/\r/g, "\\n")    // Old Mac line endings
-    .replace(/\n/g, "\\n");
+  // Write user code to a temp file to avoid escaping issues with quotes and special characters
+  await webR.FS.writeFile(codePath, code);
 
   // Wrap code to capture SVG output with REPL-style evaluation
   // This simulates R's interactive behavior where visible results are auto-printed
@@ -125,8 +115,8 @@ async function executeCode(
 
     # Parse and evaluate code expression-by-expression (REPL simulation)
     tryCatch({
-      # Parse user code into individual expressions
-      .webr_parsed_code <- parse(text = "${escapedCode}")
+      # Parse user code from file (avoids escaping issues)
+      .webr_parsed_code <- parse(file = "${codePath}")
 
       # Iterate over each expression and evaluate with visibility check
       for (.webr_i in seq_along(.webr_parsed_code)) {
@@ -188,9 +178,10 @@ async function executeCode(
                         svgString.includes("<line") || svgString.includes("<text") ||
                         svgString.includes("<polyline");
 
-      // Clean up the temp file
+      // Clean up the temp files
       try {
         await webR.FS.unlink(outputPath);
+        await webR.FS.unlink(codePath);
       } catch {
         // Ignore cleanup errors
       }
@@ -209,7 +200,12 @@ async function executeCode(
         };
       }
     } catch {
-      // No SVG file was created
+      // No SVG file was created - still clean up code file
+      try {
+        await webR.FS.unlink(codePath);
+      } catch {
+        // Ignore cleanup errors
+      }
       return {
         success: true,
         hasGraphicalOutput: false,
@@ -217,7 +213,13 @@ async function executeCode(
       };
     }
   } catch (error) {
-    // R execution error
+    // R execution error - still clean up code file
+    try {
+      await webR.FS.unlink(codePath);
+    } catch {
+      // Ignore cleanup errors
+    }
+
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     // Try to extract R-specific error message

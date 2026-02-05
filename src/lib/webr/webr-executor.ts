@@ -110,77 +110,42 @@ async function executeCode(
   const encoder = new TextEncoder();
   await webR.FS.writeFile(codePath, encoder.encode(code));
 
-  const debugPath = `/tmp/debug-${uniqueId}.txt`;
-
   // Wrap code to capture SVG output with REPL-style evaluation
   // This simulates R's interactive behavior where visible results are auto-printed
   const wrappedCode = `
-    # Debug log
-    .webr_debug <- character(0)
-    .webr_debug <- c(.webr_debug, "Starting execution...")
-
     # Set up SVG output
-    tryCatch({
-      library(svglite)
-      .webr_debug <- c(.webr_debug, "svglite loaded")
-    }, error = function(e) {
-      .webr_debug <- c(.webr_debug, paste("svglite load error:", e$message))
-    })
-
-    tryCatch({
-      svglite("${outputPath}", width = 8, height = 6)
-      .webr_debug <- c(.webr_debug, paste("SVG device opened:", "${outputPath}"))
-      .webr_debug <- c(.webr_debug, paste("Current device:", dev.cur()))
-    }, error = function(e) {
-      .webr_debug <- c(.webr_debug, paste("svglite() error:", e$message))
-    })
+    library(svglite)
+    svglite("${outputPath}", width = 8, height = 6)
 
     # Store execution errors for reporting
     .webr_exec_errors <- character(0)
-    .webr_success_count <- 0
-
-    # Check if code file exists
-    .webr_debug <- c(.webr_debug, paste("Code file exists:", file.exists("${codePath}")))
 
     # Parse and evaluate code expression-by-expression (REPL simulation)
     tryCatch({
       # Parse user code from file (avoids escaping issues)
       .webr_parsed_code <- parse(file = "${codePath}")
-      .webr_debug <- c(.webr_debug, paste("Parsed", length(.webr_parsed_code), "expressions"))
 
       # Iterate over each expression and evaluate with visibility check
       for (.webr_i in seq_along(.webr_parsed_code)) {
         .webr_expr <- .webr_parsed_code[[.webr_i]]
-        .webr_debug <- c(.webr_debug, paste("Evaluating expression", .webr_i))
 
         tryCatch({
           # Evaluate with visibility information
           .webr_result <- withVisible(eval(.webr_expr, envir = globalenv()))
-          .webr_success_count <- .webr_success_count + 1
-          .webr_debug <- c(.webr_debug, paste("  Success, visible:", .webr_result$visible))
 
           # If result is visible, print it (triggers ggplot rendering, shows data frames, etc.)
           if (.webr_result$visible) {
             print(.webr_result$value)
-            .webr_debug <- c(.webr_debug, "  Printed result")
           }
         }, error = function(e) {
           # Store error but continue execution for remaining expressions
           .webr_exec_errors <<- c(.webr_exec_errors, paste("Error in expression", .webr_i, ":", e$message))
-          .webr_debug <<- c(.webr_debug, paste("  Error:", e$message))
         })
       }
     }, error = function(e) {
       # Parse-level error (syntax error in user code)
       .webr_exec_errors <<- c(.webr_exec_errors, paste("Parse error:", e$message))
-      .webr_debug <<- c(.webr_debug, paste("Parse error:", e$message))
     })
-
-    .webr_debug <- c(.webr_debug, paste("Total successful:", .webr_success_count))
-    .webr_debug <- c(.webr_debug, paste("Device before close:", dev.cur()))
-
-    # Write debug log
-    writeLines(.webr_debug, "${debugPath}")
 
     # Write errors to file for retrieval
     if (length(.webr_exec_errors) > 0) {
@@ -189,7 +154,7 @@ async function executeCode(
 
     # Clean up temporary variables from global environment (safely)
     tryCatch({
-      .webr_cleanup_vars <- c(".webr_parsed_code", ".webr_i", ".webr_expr", ".webr_result", ".webr_exec_errors", ".webr_err", ".webr_success_count", ".webr_debug")
+      .webr_cleanup_vars <- c(".webr_parsed_code", ".webr_i", ".webr_expr", ".webr_result", ".webr_exec_errors", ".webr_err")
       .webr_existing_vars <- .webr_cleanup_vars[.webr_cleanup_vars %in% ls(envir = globalenv())]
       if (length(.webr_existing_vars) > 0) {
         rm(list = .webr_existing_vars, envir = globalenv())
@@ -216,7 +181,7 @@ async function executeCode(
 
   // Helper to clean up temp files
   const cleanup = async () => {
-    const filesToClean = [outputPath, codePath, errorPath, debugPath];
+    const filesToClean = [outputPath, codePath, errorPath];
     for (const file of filesToClean) {
       try {
         await webR.FS.unlink(file);
@@ -230,9 +195,8 @@ async function executeCode(
     // Execute the R code
     await webR.evalRVoid(wrappedCode);
 
-    // Check for R-level errors and debug info
+    // Check for R-level errors
     const rErrors = await readFile(errorPath);
-    const debugLog = await readFile(debugPath);
 
     // Try to read the SVG output
     try {
@@ -256,12 +220,9 @@ async function executeCode(
           error: rErrors || undefined,
         };
       } else {
-        // No graphical output - report R errors and debug info
-        const errorParts: string[] = [];
-        if (rErrors) errorParts.push(`Errors: ${rErrors}`);
-        if (debugLog) errorParts.push(`Debug: ${debugLog}`);
-        const errorMsg = errorParts.length > 0
-          ? errorParts.join('\n\n')
+        // No graphical output - report R errors
+        const errorMsg = rErrors
+          ? rErrors
           : "Code executed but produced no graphical output. Use plot(), ggplot(), or similar.";
         return {
           success: !rErrors,
@@ -272,11 +233,8 @@ async function executeCode(
     } catch {
       // No SVG file was created
       await cleanup();
-      const errorParts: string[] = [];
-      if (rErrors) errorParts.push(`Errors: ${rErrors}`);
-      if (debugLog) errorParts.push(`Debug: ${debugLog}`);
-      const errorMsg = errorParts.length > 0
-        ? errorParts.join('\n\n')
+      const errorMsg = rErrors
+        ? rErrors
         : "Code executed but produced no graphical output. Use plot(), ggplot(), or similar.";
       return {
         success: !rErrors,
@@ -286,7 +244,6 @@ async function executeCode(
     }
   } catch (error) {
     // R execution error at JavaScript level
-    const debugLog = await readFile(debugPath);
     await cleanup();
 
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -297,7 +254,7 @@ async function executeCode(
 
     return {
       success: false,
-      error: debugLog ? `${cleanError}\n\nDebug: ${debugLog}` : cleanError,
+      error: cleanError,
       hasGraphicalOutput: false,
     };
   }

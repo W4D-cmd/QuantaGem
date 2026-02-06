@@ -54,10 +54,13 @@ export async function POST(request: NextRequest) {
 Title:`;
 
     const result = await genAI.models.generateContent({
-      model: "gemini-2.0-flash-lite-001",
+      model: "gemini-2.5-flash-lite",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
         safetySettings: safetySettings,
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
       },
     });
 

@@ -2,6 +2,8 @@ export type ThinkingOption = "dynamic" | "off" | "low" | "medium" | "high" | "xh
 
 export type OpenAIReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh";
 
+export type AnthropicEffort = "low" | "medium" | "high";
+
 export type VerbosityOption = "low" | "medium" | "high";
 
 interface ThinkingModelConfig {
@@ -34,6 +36,53 @@ const openAIReasoningModelConfigs: Record<string, OpenAIReasoningModelConfig> = 
     supportsVerbosity: true,
   },
 };
+
+interface AnthropicReasoningModelConfig {
+  supportedEfforts: AnthropicEffort[];
+  defaultEffort: AnthropicEffort;
+}
+
+const anthropicReasoningModelConfigs: Record<string, AnthropicReasoningModelConfig> = {
+  "claude-opus-4-6": {
+    supportedEfforts: ["low", "medium", "high"],
+    defaultEffort: "high",
+  },
+};
+
+function getAnthropicModelBase(modelName: string): string | null {
+  if (modelName.startsWith("claude-opus-4-6")) return "claude-opus-4-6";
+  return null;
+}
+
+export function isAnthropicReasoningModel(modelName: string | null | undefined): boolean {
+  if (!modelName) return false;
+  const baseModel = getAnthropicModelBase(modelName);
+  return baseModel !== null && baseModel in anthropicReasoningModelConfigs;
+}
+
+export function getAnthropicReasoningConfig(modelName: string | null | undefined): AnthropicReasoningModelConfig | null {
+  if (!modelName) return null;
+  const baseModel = getAnthropicModelBase(modelName);
+  if (!baseModel) return null;
+  return anthropicReasoningModelConfigs[baseModel] ?? null;
+}
+
+export function mapBudgetToAnthropicEffort(
+  modelName: string | null | undefined,
+  budget: number | undefined,
+): AnthropicEffort {
+  const config = getAnthropicReasoningConfig(modelName);
+  if (!config) return "high";
+
+  if (budget === undefined || budget === -1) {
+    return config.defaultEffort;
+  }
+
+  // Map budget values: 0/1=low, 2=medium, 3/4=high
+  if (budget <= 1) return "low";
+  if (budget === 2) return "medium";
+  return "high";
+}
 
 function getOpenAIModelBase(modelName: string): string | null {
   if (modelName.startsWith("gpt-5.2")) return "gpt-5.2";
@@ -94,11 +143,25 @@ export function getThinkingConfigForModel(modelName: string | null | undefined):
     const canBeOff = config?.supportedEfforts.includes("none") ?? false;
     return { min: 0, max: 0, canBeOff, medium: 0 };
   }
+  if (isAnthropicReasoningModel(modelName)) {
+    return { min: 0, max: 0, canBeOff: false, medium: 0 };
+  }
   return null;
 }
 
 export function getThinkingBudgetMap(modelName: string | null | undefined): Record<ThinkingOption, number> | null {
   if (!modelName) return null;
+
+  if (isAnthropicReasoningModel(modelName)) {
+    return {
+      dynamic: -1,
+      off: -1,
+      low: 1,
+      medium: 2,
+      high: 3,
+      xhigh: -1,
+    };
+  }
 
   if (isOpenAIReasoningModel(modelName)) {
     const config = getOpenAIReasoningConfig(modelName);
@@ -128,6 +191,15 @@ export function getThinkingBudgetMap(modelName: string | null | undefined): Reco
 
 export function getThinkingValueMap(modelName: string | null | undefined): { [key: number]: ThinkingOption } | null {
   if (!modelName) return null;
+
+  if (isAnthropicReasoningModel(modelName)) {
+    return {
+      [-1]: "dynamic",
+      1: "low",
+      2: "medium",
+      3: "high",
+    };
+  }
 
   if (isOpenAIReasoningModel(modelName)) {
     const config = getOpenAIReasoningConfig(modelName);

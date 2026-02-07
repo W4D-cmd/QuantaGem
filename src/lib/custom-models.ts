@@ -1,4 +1,4 @@
-export type ModelProvider = "gemini" | "openai";
+export type ModelProvider = "gemini" | "openai" | "anthropic";
 
 export interface CustomModelEntry {
   displayName: string;
@@ -75,5 +75,13 @@ export const customModels: CustomModelEntry[] = [
     provider: "openai",
     supportsReasoning: true,
     supportsVerbosity: true,
+  },
+  {
+    displayName: "Claude Opus 4.6",
+    modelId: "claude-opus-4-6",
+    inputTokenLimit: 200000,
+    outputTokenLimit: 128000,
+    provider: "anthropic",
+    supportsReasoning: true,
   },
 ];

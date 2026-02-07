@@ -21,6 +21,7 @@ interface ModelWithProvider extends Model {
 interface GroupedModels {
   gemini: ModelWithProvider[];
   openai: ModelWithProvider[];
+  anthropic: ModelWithProvider[];
 }
 
 export default function ModelSelector({ models, selected, onChangeAction }: Props) {
@@ -46,7 +47,7 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
 
   const groupedModels = useMemo((): GroupedModels => {
     if (!models || models.length === 0) {
-      return { gemini: [], openai: [] };
+      return { gemini: [], openai: [], anthropic: [] };
     }
     const availableModelMap = new Map(models.map((m) => [m.name, m]));
     const modelsWithProvider: ModelWithProvider[] = customModels
@@ -60,6 +61,7 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
     return {
       gemini: modelsWithProvider.filter((m) => m.provider === "gemini"),
       openai: modelsWithProvider.filter((m) => m.provider === "openai"),
+      anthropic: modelsWithProvider.filter((m) => m.provider === "anthropic"),
     };
   }, [models]);
 
@@ -100,7 +102,8 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
     </Tooltip>
   );
 
-  const providerLabel = selectedProvider === "openai" ? "OpenAI" : "Google";
+  const providerLabel =
+    selectedProvider === "openai" ? "OpenAI" : selectedProvider === "anthropic" ? "Anthropic" : "Google";
 
   return (
     <div className="relative" ref={ref}>
@@ -117,7 +120,9 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
               className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                 selectedProvider === "openai"
                   ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                  : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                  : selectedProvider === "anthropic"
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
               }`}
             >
               {providerLabel}
@@ -174,6 +179,15 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
                     OpenAI
                   </div>
                   {groupedModels.openai.map(renderModelButton)}
+                </>
+              )}
+              {groupedModels.anthropic.length > 0 && (
+                <>
+                  <div className="px-4 py-1.5 mt-2 text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    Anthropic
+                  </div>
+                  {groupedModels.anthropic.map(renderModelButton)}
                 </>
               )}
             </div>

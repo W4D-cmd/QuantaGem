@@ -26,6 +26,14 @@ export function modelSupportsReasoning(modelId: string): boolean {
 }
 
 export const customModels: CustomModelEntry[] = [
+   {
+    displayName: "Gemini 3.1 Pro Preview",
+    modelId: "gemini-3.1-pro-preview",
+    inputTokenLimit: 1048576,
+    outputTokenLimit: 65536,
+    provider: "gemini",
+	supportsReasoning: true,
+  },
   {
     displayName: "Gemini 3 Pro Preview",
     modelId: "gemini-3-pro-preview",

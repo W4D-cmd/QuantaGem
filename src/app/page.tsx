@@ -234,6 +234,7 @@ export default function Home() {
     status: "idle",
   });
   const [fetchedCustomModels, setFetchedCustomModels] = useState<{ id: string; displayName: string }[]>([]);
+  const [isLoadingCustomModels, setIsLoadingCustomModels] = useState<boolean>(true);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const dragCounter = useRef(0);
@@ -263,6 +264,7 @@ export default function Home() {
   }, []);
 
   const fetchCustomModels = useCallback(async () => {
+    setIsLoadingCustomModels(true);
     try {
       const res = await fetch("/api/models/custom", { headers: getAuthHeaders() });
       if (!res.ok) return;
@@ -276,6 +278,8 @@ export default function Home() {
       }
     } catch (err) {
       console.error("Failed to fetch custom models:", extractErrorMessage(err));
+    } finally {
+      setIsLoadingCustomModels(false);
     }
   }, [getAuthHeaders]);
 
@@ -1749,6 +1753,7 @@ export default function Home() {
                 selected={selectedModel}
                 onChangeAction={handleModelChange}
                 customModelsList={fetchedCustomModels}
+                isLoadingCustomModels={isLoadingCustomModels}
               />
 
               <div className="flex items-center ml-4">

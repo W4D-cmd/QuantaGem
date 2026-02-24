@@ -6,12 +6,18 @@ import Tooltip from "@/components/Tooltip";
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { motion, AnimatePresence } from "framer-motion";
-import { customModels, ModelProvider, getProviderForModel } from "@/lib/custom-models";
+import {
+  customModels,
+  ModelProvider,
+  getProviderForModel,
+  createCustomModelId,
+} from "@/lib/custom-models";
 
 export interface Props {
   models: Model[];
   selected: Model | null;
   onChangeAction: (model: Model) => void;
+  customModelsList?: { id: string; displayName: string }[];
 }
 
 interface ModelWithProvider extends Model {
@@ -22,9 +28,15 @@ interface GroupedModels {
   gemini: ModelWithProvider[];
   openai: ModelWithProvider[];
   anthropic: ModelWithProvider[];
+  custom: ModelWithProvider[];
 }
 
-export default function ModelSelector({ models, selected, onChangeAction }: Props) {
+export default function ModelSelector({
+  models,
+  selected,
+  onChangeAction,
+  customModelsList = [],
+}: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -46,10 +58,20 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
   }, [open]);
 
   const groupedModels = useMemo((): GroupedModels => {
+    const result: GroupedModels = {
+      gemini: [],
+      openai: [],
+      anthropic: [],
+      custom: [],
+    };
+
     if (!models || models.length === 0) {
-      return { gemini: [], openai: [], anthropic: [] };
+      return result;
     }
+
     const availableModelMap = new Map(models.map((m) => [m.name, m]));
+
+    // Process built-in models
     const modelsWithProvider: ModelWithProvider[] = customModels
       .map((cm) => {
         const model = availableModelMap.get(cm.modelId);
@@ -58,12 +80,27 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
       })
       .filter((m): m is ModelWithProvider => !!m);
 
-    return {
-      gemini: modelsWithProvider.filter((m) => m.provider === "gemini"),
-      openai: modelsWithProvider.filter((m) => m.provider === "openai"),
-      anthropic: modelsWithProvider.filter((m) => m.provider === "anthropic"),
-    };
-  }, [models]);
+    result.gemini = modelsWithProvider.filter((m) => m.provider === "gemini");
+    result.openai = modelsWithProvider.filter((m) => m.provider === "openai");
+    result.anthropic = modelsWithProvider.filter((m) => m.provider === "anthropic");
+
+    // Process custom models from the custom provider
+    if (customModelsList.length > 0) {
+      result.custom = customModelsList.map((cm) => {
+        const customModelId = createCustomModelId(cm.id);
+        return {
+          name: customModelId,
+          displayName: cm.displayName || cm.id,
+          description: `Custom model from local provider`,
+          inputTokenLimit: 128000, // Default for custom models
+          outputTokenLimit: 4096,
+          provider: "custom-openai" as ModelProvider,
+        } as ModelWithProvider;
+      });
+    }
+
+    return result;
+  }, [models, customModelsList]);
 
   const selectedProvider = selected?.name ? getProviderForModel(selected.name) : undefined;
 
@@ -72,7 +109,7 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
       <button
         data-selected={m.name === selected?.name}
         onClick={() => {
-          onChangeAction(m);
+          onChangeAction(m as Model);
           setOpen(false);
         }}
         className="w-full flex items-start justify-between gap-4 px-4 py-2 hover:bg-neutral-100
@@ -102,8 +139,32 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
     </Tooltip>
   );
 
-  const providerLabel =
-    selectedProvider === "openai" ? "OpenAI" : selectedProvider === "anthropic" ? "Anthropic" : "Google";
+  const getProviderLabel = (): string => {
+    if (selectedProvider === "custom-openai") return "Custom";
+    if (selectedProvider === "openai") return "OpenAI";
+    if (selectedProvider === "anthropic") return "Anthropic";
+    return "Google";
+  };
+
+  const getProviderColorClasses = (): string => {
+    if (selectedProvider === "custom-openai") {
+      return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
+    }
+    if (selectedProvider === "openai") {
+      return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+    }
+    if (selectedProvider === "anthropic") {
+      return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+    }
+    return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+  };
+
+  // Check if there are any models available
+  const hasModels =
+    groupedModels.gemini.length > 0 ||
+    groupedModels.openai.length > 0 ||
+    groupedModels.anthropic.length > 0 ||
+    groupedModels.custom.length > 0;
 
   return (
     <div className="relative" ref={ref}>
@@ -112,20 +173,12 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
         className="inline-flex items-center h-11 px-3 py-2 rounded-lg cursor-pointer hover:bg-neutral-100
           dark:hover:bg-zinc-900 text-neutral-600 dark:text-zinc-400 text-[18px] font-medium focus:outline-none
           transition-colors duration-300 ease-in-out"
-        disabled={models.length === 0}
+        disabled={!hasModels}
       >
         {selected ? (
           <span className="flex items-center gap-2">
-            <span
-              className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                selectedProvider === "openai"
-                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                  : selectedProvider === "anthropic"
-                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-              }`}
-            >
-              {providerLabel}
+            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${getProviderColorClasses()}`}>
+              {getProviderLabel()}
             </span>
             {selected.displayName}
           </span>
@@ -163,6 +216,15 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
               <span className="font-semibold text-sm">Model</span>
             </div>
             <div ref={listRef} className="flex-auto h-96 overflow-y-auto p-2 space-y-1">
+              {groupedModels.custom.length > 0 && (
+                <>
+                  <div className="px-4 py-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-purple-500" />
+                    Custom Provider
+                  </div>
+                  {groupedModels.custom.map(renderModelButton)}
+                </>
+              )}
               {groupedModels.gemini.length > 0 && (
                 <>
                   <div className="px-4 py-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-2">
@@ -189,6 +251,11 @@ export default function ModelSelector({ models, selected, onChangeAction }: Prop
                   </div>
                   {groupedModels.anthropic.map(renderModelButton)}
                 </>
+              )}
+              {!hasModels && (
+                <div className="px-4 py-8 text-center text-neutral-500 dark:text-zinc-400">
+                  No models available
+                </div>
               )}
             </div>
           </motion.div>

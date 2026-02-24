@@ -6,7 +6,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
 import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
-import { getProviderForModel, ModelProvider, modelSupportsVerbosity } from "@/lib/custom-models";
+import {
+  getProviderForModel,
+  ModelProvider,
+  modelSupportsVerbosity,
+  isCustomModel,
+  getOriginalModelId,
+} from "@/lib/custom-models";
 import {
   isOpenAIReasoningModel,
   isGPT5FamilyModel,
@@ -870,6 +876,278 @@ type ResponsesAPIInputItem =
       >;
     };
 
+async function handleCustomOpenAIRequest(
+  model: string,
+  newMessageAppParts: MessagePart[],
+  clientHistoryWithAppParts: Array<{ role: string; parts: MessagePart[] }>,
+  systemPromptText: string | null,
+  userId: number,
+): Promise<Response> {
+  // Fetch custom endpoint and key from database
+  const settingsResult = await pool.query(
+    "SELECT custom_openai_endpoint, custom_openai_key FROM user_settings WHERE user_id = $1",
+    [userId],
+  );
+
+  const settings = settingsResult.rows[0];
+  if (!settings?.custom_openai_endpoint) {
+    return NextResponse.json(
+      { error: "Custom OpenAI endpoint not configured. Please set it in Settings > Providers." },
+      { status: 400 },
+    );
+  }
+
+  const baseURL = settings.custom_openai_endpoint;
+  const apiKey = settings.custom_openai_key || "no-key";
+
+  // Create OpenAI client with custom baseURL
+  const openai = new OpenAI({ apiKey, baseURL });
+
+  // Get the original model ID (remove "custom:" prefix)
+  const actualModelId = getOriginalModelId(model);
+
+  const messages: ChatCompletionMessageParam[] = [];
+
+  if (systemPromptText && systemPromptText.trim() !== "") {
+    messages.push({
+      role: "system",
+      content: systemPromptText,
+    });
+  }
+
+  // Build history messages
+  if (clientHistoryWithAppParts) {
+    for (const prevMsg of clientHistoryWithAppParts) {
+      const contentParts: ChatCompletionContentPart[] = [];
+
+      if (prevMsg.parts && Array.isArray(prevMsg.parts)) {
+        for (const appPart of prevMsg.parts) {
+          if (appPart.type === "text" && appPart.text) {
+            contentParts.push({ type: "text", text: appPart.text });
+          } else if (appPart.type === "scraped_url" && appPart.text) {
+            contentParts.push({ type: "text", text: appPart.text });
+          } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
+            const mimeType = appPart.mimeType.toLowerCase();
+
+            if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType)) {
+              try {
+                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const chunks: Buffer[] = [];
+                for await (const chunk of fileStream) {
+                  chunks.push(chunk as Buffer);
+                }
+                const fileBuffer = Buffer.concat(chunks);
+                const base64Data = fileBuffer.toString("base64");
+                contentParts.push({
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${mimeType};base64,${base64Data}`,
+                  },
+                });
+              } catch (fileError) {
+                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
+                return NextResponse.json(
+                  { error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}` },
+                  { status: 500 },
+                );
+              }
+            } else {
+              const extension = getFileExtension(appPart.fileName);
+              const isTextFile =
+                SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
+                mimeType.startsWith("text/") ||
+                mimeType === "application/json";
+
+              if (isTextFile) {
+                try {
+                  const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                  const chunks: Buffer[] = [];
+                  for await (const chunk of fileStream) {
+                    chunks.push(chunk as Buffer);
+                  }
+                  const fileBuffer = Buffer.concat(chunks);
+                  const textContent = fileBuffer.toString("utf-8");
+                  const fileHeader = appPart.fileName ? `--- File: ${appPart.fileName} ---\n` : "";
+                  contentParts.push({ type: "text", text: fileHeader + textContent });
+                } catch (fileError) {
+                  console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
+                }
+              } else {
+                console.warn(
+                  `Skipping historical file ${appPart.fileName || appPart.objectName} for Custom OpenAI due to unsupported MIME type: ${appPart.mimeType}`,
+                );
+              }
+            }
+          }
+        }
+      }
+
+      if (contentParts.length > 0) {
+        if (prevMsg.role === "model") {
+          const textContent = contentParts
+            .filter((p): p is { type: "text"; text: string } => p.type === "text")
+            .map((p) => p.text)
+            .join("\n");
+          if (textContent) {
+            messages.push({
+              role: "assistant",
+              content: textContent,
+            });
+          }
+        } else {
+          messages.push({
+            role: "user",
+            content: contentParts,
+          });
+        }
+      }
+    }
+  }
+
+  // Build new message content parts
+  const newMessageContentParts: ChatCompletionContentPart[] = [];
+
+  for (const appPart of newMessageAppParts) {
+    if (appPart.type === "text" && appPart.text) {
+      newMessageContentParts.push({ type: "text", text: appPart.text });
+    } else if (appPart.type === "scraped_url" && appPart.text) {
+      newMessageContentParts.push({ type: "text", text: appPart.text });
+    } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
+      const mimeType = appPart.mimeType.toLowerCase();
+
+      if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType)) {
+        try {
+          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+          const chunks: Buffer[] = [];
+          for await (const chunk of fileStream) {
+            chunks.push(chunk as Buffer);
+          }
+          const fileBuffer = Buffer.concat(chunks);
+          const base64Data = fileBuffer.toString("base64");
+          newMessageContentParts.push({
+            type: "image_url",
+            image_url: {
+              url: `data:${mimeType};base64,${base64Data}`,
+            },
+          });
+        } catch (fileError) {
+          console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
+          return NextResponse.json(
+            { error: `Failed to process file: ${appPart.fileName || appPart.objectName}` },
+            { status: 500 },
+          );
+        }
+      } else {
+        const extension = getFileExtension(appPart.fileName);
+        const isTextFile =
+          SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
+          mimeType.startsWith("text/") ||
+          mimeType === "application/json";
+
+        if (isTextFile) {
+          try {
+            const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+            const chunks: Buffer[] = [];
+            for await (const chunk of fileStream) {
+              chunks.push(chunk as Buffer);
+            }
+            const fileBuffer = Buffer.concat(chunks);
+            const textContent = fileBuffer.toString("utf-8");
+            const fileHeader = appPart.fileName ? `--- File: ${appPart.fileName} ---\n` : "";
+            newMessageContentParts.push({ type: "text", text: fileHeader + textContent });
+          } catch (fileError) {
+            console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
+            return NextResponse.json(
+              { error: `Failed to process file: ${appPart.fileName || appPart.objectName}` },
+              { status: 500 },
+            );
+          }
+        } else {
+          console.warn(
+            `Skipping new file ${appPart.fileName || appPart.objectName} for Custom OpenAI due to unsupported MIME type: ${appPart.mimeType}`,
+          );
+        }
+      }
+    }
+  }
+
+  if (newMessageContentParts.length === 0) {
+    const hasActualTextContent = newMessageAppParts.some((p) => p.type === "text" && p.text && p.text.trim() !== "");
+    if (!hasActualTextContent && newMessageAppParts.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "All uploaded files have types unsupported by the custom provider or could not be processed. Supported types include images and text files.",
+        },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json(
+      { error: "No valid content to send to custom provider (message empty or all files unsupported/unprocessed)." },
+      { status: 400 },
+    );
+  }
+
+  messages.push({
+    role: "user",
+    content: newMessageContentParts,
+  });
+
+  const stream = await openai.chat.completions.create({
+    model: actualModelId,
+    messages,
+    stream: true,
+  });
+
+  const encoder = new TextEncoder();
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      let modelOutput = "";
+
+      try {
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta;
+
+          if (delta?.content) {
+            modelOutput += delta.content;
+            const jsonChunk = { type: "text", value: delta.content };
+            controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+          }
+        }
+
+        if (modelOutput.trim() === "") {
+          console.warn("Custom OpenAI model returned an empty message.");
+          const emptyMessageError = {
+            type: "error",
+            value: "Model returned an empty message. Please try again.",
+          };
+          controller.enqueue(encoder.encode(JSON.stringify(emptyMessageError) + "\n"));
+        }
+      } catch (streamError) {
+        console.error("Error during Custom OpenAI stream processing:", streamError);
+        const errorMessage = {
+          type: "error",
+          value: "An error occurred during stream processing. Please try again.",
+        };
+        controller.enqueue(encoder.encode(JSON.stringify(errorMessage) + "\n"));
+      } finally {
+        controller.close();
+      }
+    },
+    cancel() {
+      console.log("Custom OpenAI stream cancelled for chat session");
+    },
+  });
+
+  return new Response(readableStream, {
+    headers: {
+      "Content-Type": "application/jsonl; charset=utf-8",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
+
 async function handleOpenAIResponsesAPIRequest(
   model: string,
   newMessageAppParts: MessagePart[],
@@ -1640,6 +1918,14 @@ export async function POST(request: NextRequest) {
           verbosity,
         );
       }
+    } else if (provider === "custom-openai") {
+      return await handleCustomOpenAIRequest(
+        model,
+        newMessageAppParts,
+        clientHistoryWithAppParts,
+        systemPromptText,
+        userId,
+      );
     } else {
       return await handleGeminiRequest(
         model,

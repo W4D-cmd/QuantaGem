@@ -73,5 +73,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
   system_prompt TEXT,
   tts_voice TEXT DEFAULT 'Sulafat',
   tts_model TEXT DEFAULT 'gemini-2.5-flash-preview-tts',
+  custom_openai_endpoint TEXT DEFAULT NULL,
+  custom_openai_key TEXT DEFAULT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

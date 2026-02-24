@@ -243,7 +243,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors
+                    className={`cursor-pointer flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors
                       ${
                         activeTab === tab.id
                           ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
@@ -258,7 +258,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto px-1">
               {activeTab === "general" && (
                 <div className="space-y-6">
                   <div>

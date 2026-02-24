@@ -5,7 +5,7 @@ import { getEncoding } from "js-tiktoken";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
 import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
-import { getProviderForModel } from "@/lib/custom-models";
+import { getProviderForModel, isCustomModel } from "@/lib/custom-models";
 
 interface CountTokensRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
@@ -563,7 +563,8 @@ export async function POST(request: NextRequest) {
 
     if (provider === "anthropic") {
       totalTokens = await countTokensForAnthropic(history ?? [], model, systemPromptText);
-    } else if (provider === "openai") {
+    } else if (provider === "openai" || provider === "custom-openai") {
+      // Use tiktoken for both OpenAI and custom OpenAI-compatible providers
       totalTokens = await countTokensForOpenAI(history ?? [], systemPromptText);
     } else {
       totalTokens = await countTokensForGemini(history ?? [], model, systemPromptText);

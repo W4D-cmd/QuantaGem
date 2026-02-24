@@ -233,6 +233,7 @@ export default function Home() {
     messageId: null,
     status: "idle",
   });
+  const [fetchedCustomModels, setFetchedCustomModels] = useState<{ id: string; displayName: string }[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const dragCounter = useRef(0);
@@ -260,6 +261,23 @@ export default function Home() {
     const token = localStorage.getItem("__session");
     return token ? { Authorization: `Bearer ${token}` } : {};
   }, []);
+
+  const fetchCustomModels = useCallback(async () => {
+    try {
+      const res = await fetch("/api/models/custom", { headers: getAuthHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.models && Array.isArray(data.models)) {
+        const formattedModels = data.models.map((m: { id: string }) => ({
+          id: m.id,
+          displayName: m.id,
+        }));
+        setFetchedCustomModels(formattedModels);
+      }
+    } catch (err) {
+      console.error("Failed to fetch custom models:", extractErrorMessage(err));
+    }
+  }, [getAuthHeaders]);
 
   const handleDragEnter = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
@@ -481,8 +499,9 @@ export default function Home() {
     if (userEmail) {
       fetchAllChats();
       fetchAllProjects();
+      fetchCustomModels();
     }
-  }, [fetchAllChats, fetchAllProjects, userEmail]);
+  }, [fetchAllChats, fetchAllProjects, fetchCustomModels, userEmail]);
 
   const handleScrollToBottomClick = () => {
     chatAreaRef.current?.scrollToBottomAndEnableAutoscroll();
@@ -1613,13 +1632,14 @@ export default function Home() {
       }
       await fetchAllChats();
       await fetchAllProjects();
+      await fetchCustomModels();
       if (activeChatId !== null) {
         await loadChat(activeChatId);
       }
       closeSettingsModal();
       showToast("Settings saved successfully.", "success");
     },
-    [activeChatId, fetchAllChats, fetchAllProjects, loadChat, showToast],
+    [activeChatId, fetchAllChats, fetchAllProjects, fetchCustomModels, loadChat, showToast],
   );
 
   const toggleThreeDotMenu = () => {
@@ -1724,7 +1744,12 @@ export default function Home() {
         >
           {displayingProjectManagementId === null ? (
             <>
-              <ModelSelector models={models} selected={selectedModel} onChangeAction={handleModelChange} />
+              <ModelSelector
+                models={models}
+                selected={selectedModel}
+                onChangeAction={handleModelChange}
+                customModelsList={fetchedCustomModels}
+              />
 
               <div className="flex items-center ml-4">
                 <Tooltip text="Total tokens for this chat session">

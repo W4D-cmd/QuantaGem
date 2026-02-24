@@ -18,6 +18,7 @@ export interface Props {
   selected: Model | null;
   onChangeAction: (model: Model) => void;
   customModelsList?: { id: string; displayName: string }[];
+  isLoadingCustomModels?: boolean;
 }
 
 interface ModelWithProvider extends Model {
@@ -36,6 +37,7 @@ export default function ModelSelector({
   selected,
   onChangeAction,
   customModelsList = [],
+  isLoadingCustomModels = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -216,15 +218,6 @@ export default function ModelSelector({
               <span className="font-semibold text-sm">Model</span>
             </div>
             <div ref={listRef} className="flex-auto h-96 overflow-y-auto p-2 space-y-1">
-              {groupedModels.custom.length > 0 && (
-                <>
-                  <div className="px-4 py-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-purple-500" />
-                    Custom Provider
-                  </div>
-                  {groupedModels.custom.map(renderModelButton)}
-                </>
-              )}
               {groupedModels.gemini.length > 0 && (
                 <>
                   <div className="px-4 py-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-2">
@@ -252,7 +245,39 @@ export default function ModelSelector({
                   {groupedModels.anthropic.map(renderModelButton)}
                 </>
               )}
-              {!hasModels && (
+              {/* Custom Provider Section - Always show loading state or models */}
+              <div className="mt-2">
+                <div className="px-4 py-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-purple-500" />
+                  Custom Provider
+                </div>
+                {isLoadingCustomModels ? (
+                  <div className="px-4 py-3">
+                    <div className="h-2 bg-neutral-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-purple-500 rounded-full"
+                        animate={{
+                          x: ["-100%", "100%"],
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                        }}
+                        style={{ width: "50%" }}
+                      />
+                    </div>
+                    <p className="text-xs text-neutral-400 dark:text-zinc-500 mt-2">Loading custom models...</p>
+                  </div>
+                ) : groupedModels.custom.length > 0 ? (
+                  groupedModels.custom.map(renderModelButton)
+                ) : (
+                  <div className="px-4 py-2 text-xs text-neutral-400 dark:text-zinc-500 italic">
+                    No custom provider configured
+                  </div>
+                )}
+              </div>
+              {!hasModels && !isLoadingCustomModels && (
                 <div className="px-4 py-8 text-center text-neutral-500 dark:text-zinc-400">
                   No models available
                 </div>

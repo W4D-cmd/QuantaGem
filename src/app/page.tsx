@@ -33,7 +33,7 @@ import {
 } from "@/lib/thinking";
 import { showApiErrorToast } from "@/lib/errors";
 import NewChatScreen from "@/components/NewChatScreen";
-import { customModels } from "@/lib/custom-models";
+import { customModels, isCustomModel, getOriginalModelId, createCustomModelId } from "@/lib/custom-models";
 
 const FALLBACK_DEFAULT_MODEL_NAME = "gemini-2.5-pro";
 const DEFAULT_MODEL_NAME = process.env.NEXT_PUBLIC_DEFAULT_MODEL_ID || FALLBACK_DEFAULT_MODEL_NAME;
@@ -934,7 +934,23 @@ export default function Home() {
       if (activeChatId !== prevActiveChatIdRef.current) {
         const chat = allChats.find((c) => c.id === activeChatId);
         if (chat?.lastModel) {
-          const modelForThisChat = models.find((m) => m.name === chat.lastModel);
+          let modelForThisChat = models.find((m) => m.name === chat.lastModel);
+
+          // If not found in built-in models and it's a custom model, check fetchedCustomModels
+          if (!modelForThisChat && isCustomModel(chat.lastModel)) {
+            const originalId = getOriginalModelId(chat.lastModel);
+            const fetchedModel = fetchedCustomModels.find((m) => m.id === originalId);
+            if (fetchedModel) {
+              modelForThisChat = {
+                name: chat.lastModel,
+                displayName: fetchedModel.displayName || originalId,
+                description: "Custom model from local provider",
+                inputTokenLimit: 128000,
+                outputTokenLimit: 4096,
+              };
+            }
+          }
+
           if (modelForThisChat && selectedModel?.name !== modelForThisChat.name) {
             setSelectedModel(modelForThisChat);
           }

@@ -89,6 +89,39 @@ interface ChatAreaProps {
   audioPlaybackState: AudioPlaybackState;
 }
 
+// Wrapper to provide stable callback reference for MessageEditor
+const EditWrapper = memo(function EditWrapper({
+  editingMessage,
+  setEditingMessage,
+  onEditSave,
+  getAuthHeaders,
+}: {
+  editingMessage: { index: number; message: Message };
+  setEditingMessage: React.Dispatch<React.SetStateAction<{ index: number; message: Message } | null>>;
+  onEditSave: (index: number, newParts: MessagePart[]) => void;
+  getAuthHeaders: GetAuthHeaders;
+}) {
+  const handleSave = useCallback(
+    (parts: MessagePart[]) => {
+      onEditSave(editingMessage.index, parts);
+    },
+    [onEditSave, editingMessage.index],
+  );
+
+  const handleCancel = useCallback(() => {
+    setEditingMessage(null);
+  }, [setEditingMessage]);
+
+  return (
+    <MessageEditor
+      message={editingMessage.message}
+      onSave={handleSave}
+      onCancel={handleCancel}
+      getAuthHeaders={getAuthHeaders}
+    />
+  );
+});
+
 export interface ChatAreaHandle {
   scrollToBottomAndEnableAutoscroll: () => void;
 }
@@ -103,6 +136,118 @@ const ThinkingLabel = memo(() => (
   </span>
 ));
 ThinkingLabel.displayName = "ThinkingLabel";
+
+const MessageEditor = memo(function MessageEditor({
+  message,
+  onSave,
+  onCancel,
+  getAuthHeaders,
+}: {
+  message: Message;
+  onSave: (parts: MessagePart[]) => void;
+  onCancel: () => void;
+  getAuthHeaders: GetAuthHeaders;
+}) {
+  const [editedText, setEditedText] = useState(() => {
+    const textPart = message.parts.find((p) => p.type === "text");
+    return textPart?.text || "";
+  });
+  const [editedFileParts, setEditedFileParts] = useState<MessagePart[]>(() =>
+    message.parts.filter((p) => p.type === "file"),
+  );
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [editedText]);
+
+  const handleRemoveFilePart = useCallback((objectNameToRemove: string) => {
+    setEditedFileParts((prev) => prev.filter((p) => p.objectName !== objectNameToRemove));
+  }, []);
+
+  const handleSave = useCallback(() => {
+    const finalParts: MessagePart[] = [...editedFileParts];
+    if (editedText.trim()) {
+      finalParts.push({ type: "text", text: editedText.trim() });
+    }
+    if (finalParts.length === 0) return;
+    onSave(finalParts);
+  }, [editedFileParts, editedText, onSave]);
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSave();
+      }
+      if (e.key === "Escape") {
+        onCancel();
+      }
+    },
+    [handleSave, onCancel],
+  );
+
+  return (
+    <div className="p-4 rounded-3xl bg-white dark:bg-zinc-800 border-2 border-blue-500">
+      {editedFileParts.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {editedFileParts.map((part) => (
+            <div
+              key={part.objectName}
+              className="bg-neutral-200 dark:bg-zinc-700 text-neutral-800 dark:text-zinc-400 px-3
+                py-1.5 rounded-full text-sm flex items-center gap-2"
+            >
+              <span>{part.fileName}</span>
+              <button
+                onClick={() => handleRemoveFilePart(part.objectName!)}
+                className="text-neutral-500 hover:text-red-500 dark:hover:text-red-400"
+              >
+                <XCircleIcon className="size-5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <textarea
+        ref={textareaRef}
+        value={editedText}
+        onChange={(e) => setEditedText(e.target.value)}
+        onKeyDown={handleKeyDown}
+        rows={4}
+        className="w-full resize-none border-none p-0 focus:outline-none bg-transparent max-h-96"
+      />
+      <div className="flex justify-end gap-2 mt-2">
+        <button
+          onClick={onCancel}
+          className="cursor-pointer px-4 py-1.5 rounded-full text-sm font-medium transition-colors
+            bg-neutral-200 hover:bg-neutral-300 dark:bg-zinc-700 dark:hover:bg-zinc-600"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={!editedText.trim() && editedFileParts.length === 0}
+          className="cursor-pointer px-4 py-1.5 rounded-full text-sm font-medium transition-colors
+            bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  );
+});
 
 const ThinkingSummary: React.FC<{ summary: string; isStreaming: boolean }> = ({ summary, isStreaming }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -404,19 +549,6 @@ function ChatAreaComponent(
   const lastScrollTopRef = useRef(0);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null);
-  const editingTextareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const [editedText, setEditedText] = useState("");
-  const [editedFileParts, setEditedFileParts] = useState<MessagePart[]>([]);
-
-  useEffect(() => {
-    if (editingMessage) {
-      const textPart = editingMessage.message.parts.find((p) => p.type === "text");
-      const fileParts = editingMessage.message.parts.filter((p) => p.type === "file");
-      setEditedText(textPart?.text || "");
-      setEditedFileParts(fileParts);
-    }
-  }, [editingMessage]);
 
   useImperativeHandle(ref, () => ({
     scrollToBottomAndEnableAutoscroll: () => {
@@ -620,50 +752,6 @@ function ChatAreaComponent(
     };
   }, [messages, autoScrollEnabled, editingMessage]);
 
-  useEffect(() => {
-    if (editingMessage && editingTextareaRef.current) {
-      const textarea = editingTextareaRef.current;
-      textarea.style.height = "auto";
-      textarea.style.height = `${textarea.scrollHeight}px`;
-      textarea.focus();
-      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-    }
-  }, [editingMessage, editedFileParts]);
-
-  useEffect(() => {
-    if (editingMessage && editingTextareaRef.current) {
-      const textarea = editingTextareaRef.current;
-      textarea.style.height = "auto";
-      textarea.style.height = `${textarea.scrollHeight}px`;
-    }
-  }, [editedText, editingMessage]);
-
-  const handleRemoveFilePart = (objectNameToRemove: string) => {
-    setEditedFileParts((prev) => prev.filter((p) => p.objectName !== objectNameToRemove));
-  };
-
-  const handleSaveClick = (index: number) => {
-    const finalParts: MessagePart[] = [...editedFileParts];
-    if (editedText.trim()) {
-      finalParts.push({ type: "text", text: editedText.trim() });
-    }
-
-    if (finalParts.length === 0) {
-      return;
-    }
-    onEditSave(index, finalParts);
-  };
-
-  const handleEditKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>, index: number) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSaveClick(index);
-    }
-    if (e.key === "Escape") {
-      setEditingMessage(null);
-    }
-  };
-
   // Pre-memoized component sets - stable references prevent remounting
   // Using two separate memoized objects instead of a factory function ensures
   // ReactMarkdown receives the same object reference on each render,
@@ -779,52 +867,12 @@ function ChatAreaComponent(
                 }`}
               >
                 {isBeingEdited ? (
-                  <div className="p-4 rounded-3xl bg-white dark:bg-zinc-800 border-2 border-blue-500">
-                    {editedFileParts.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {editedFileParts.map((part) => (
-                          <div
-                            key={part.objectName}
-                            className="bg-neutral-200 dark:bg-zinc-700 text-neutral-800 dark:text-zinc-400 px-3
-                              py-1.5 rounded-full text-sm flex items-center gap-2"
-                          >
-                            <span>{part.fileName}</span>
-                            <button
-                              onClick={() => handleRemoveFilePart(part.objectName!)}
-                              className="text-neutral-500 hover:text-red-500 dark:hover:text-red-400"
-                            >
-                              <XCircleIcon className="size-5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <textarea
-                      ref={editingTextareaRef}
-                      value={editedText}
-                      onChange={(e) => setEditedText(e.target.value)}
-                      onKeyDown={(e) => handleEditKeyDown(e, i)}
-                      rows={4}
-                      className="w-full resize-none border-none p-0 focus:outline-none bg-transparent max-h-96"
-                    />
-                    <div className="flex justify-end gap-2 mt-2">
-                      <button
-                        onClick={() => setEditingMessage(null)}
-                        className="cursor-pointer px-4 py-1.5 rounded-full text-sm font-medium transition-colors
-                          bg-neutral-200 hover:bg-neutral-300 dark:bg-zinc-700 dark:hover:bg-zinc-600"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleSaveClick(i)}
-                        disabled={!editedText.trim() && editedFileParts.length === 0}
-                        className="cursor-pointer px-4 py-1.5 rounded-full text-sm font-medium transition-colors
-                          bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
+                  <EditWrapper
+                    editingMessage={editingMessage}
+                    setEditingMessage={setEditingMessage}
+                    onEditSave={onEditSave}
+                    getAuthHeaders={getAuthHeaders}
+                  />
                 ) : (
                   <div className={`p-4 rounded-3xl ${isUserMessage ? "bg-neutral-100 dark:bg-zinc-900" : ""}`}>
                     {msg.role === "model" && msg.thoughtSummary && (

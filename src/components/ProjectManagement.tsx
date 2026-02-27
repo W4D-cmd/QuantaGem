@@ -12,7 +12,7 @@ interface ProjectManagementProps {
   onProjectUpdated: () => void;
   showToast: (message: string, type?: ToastProps["type"]) => void;
   openConfirmationModal: React.Dispatch<
-    React.SetStateAction<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>
+    React.SetStateAction<{ isOpen: boolean; title: string; message: React.ReactNode; onConfirm: () => void }>
   >;
   onProjectSystemPromptUpdated: () => void;
 }

@@ -92,7 +92,7 @@ export interface ProjectFile {
 interface ConfirmationModalState {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: React.ReactNode;
   onConfirm: () => void;
 }
 

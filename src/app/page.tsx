@@ -233,6 +233,7 @@ export default function Home() {
     title: string;
     systemPrompt: string;
   } | null>(null);
+  const [suggestionsVersion, setSuggestionsVersion] = useState(0);
 
   const [ttsVoice, setTtsVoice] = useState<string>("Sulafat");
   const [ttsModel, setTtsModel] = useState<string>(DEFAULT_TTS_MODEL);
@@ -706,6 +707,7 @@ export default function Home() {
           await showApiErrorToast(res, showToast);
           return;
         }
+        setSuggestionsVersion((v) => v + 1);
         showToast("Suggestion saved successfully.", "success");
       } catch (err: unknown) {
         showToast(extractErrorMessage(err), "error");
@@ -1922,6 +1924,7 @@ export default function Home() {
                       projectId={currentChatProjectId}
                       projects={allProjects}
                       getAuthHeaders={getAuthHeaders}
+                      suggestionsVersion={suggestionsVersion}
                     />
                   </div>
                 )}

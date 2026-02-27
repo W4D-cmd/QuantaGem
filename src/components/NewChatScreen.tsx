@@ -20,6 +20,7 @@ interface NewChatScreenProps {
   projectId: number | null;
   projects: ProjectListItem[];
   getAuthHeaders: () => HeadersInit;
+  suggestionsVersion?: number;
 }
 
 const NewChatScreen: React.FC<NewChatScreenProps> = ({
@@ -28,6 +29,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({
   projectId,
   projects,
   getAuthHeaders,
+  suggestionsVersion = 0,
 }) => {
   const projectName = projectId ? projects.find((p) => p.id === projectId)?.title : null;
   const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
@@ -38,7 +40,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({
 
   useEffect(() => {
     fetchSuggestions();
-  }, []);
+  }, [suggestionsVersion]);
 
   const fetchSuggestions = async () => {
     setIsLoading(true);
@@ -168,7 +170,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({
                     >
                       <button
                         onClick={(e) => openDeleteConfirm(suggestion, e)}
-                        className="absolute top-2 right-2 p-1 rounded-lg opacity-0 group-hover:opacity-100
+                        className="cursor-pointer absolute top-2 right-2 p-1 rounded-lg opacity-0 group-hover:opacity-100
                       bg-neutral-200 dark:bg-zinc-700 hover:bg-red-100 dark:hover:bg-red-900/30
                       text-neutral-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400
                       transition-all"

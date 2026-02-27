@@ -155,7 +155,7 @@ const AddSuggestionModal: React.FC<AddSuggestionModalProps> = ({
                 key={icon.name}
                 type="button"
                 onClick={() => setSelectedIcon(icon.name)}
-                className={`p-3 rounded-xl border transition-all flex items-center justify-center ${
+                className={`cursor-pointer p-3 rounded-xl border transition-all flex items-center justify-center ${
                   selectedIcon === icon.name
                     ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-500"
                     : "border-neutral-300 dark:border-zinc-700 hover:bg-neutral-100 dark:hover:bg-zinc-800"
@@ -171,17 +171,18 @@ const AddSuggestionModal: React.FC<AddSuggestionModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer px-4 py-2 text-sm font-medium text-neutral-700 dark:text-zinc-300
-              bg-neutral-100 dark:bg-zinc-800 rounded-full hover:bg-neutral-200 dark:hover:bg-zinc-700
-              transition-colors"
+            className="cursor-pointer h-9 px-4 rounded-full text-sm font-medium transition-colors bg-white
+              dark:bg-zinc-900 border border-neutral-300 dark:border-zinc-800 hover:bg-neutral-100
+              dark:hover:bg-zinc-800 text-neutral-500 dark:text-zinc-300 focus:outline-none"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="cursor-pointer px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-full
-              hover:bg-blue-700 transition-colors"
+            className="cursor-pointer h-9 px-4 rounded-full text-sm font-medium transition-colors bg-black
+              dark:bg-blue-600 text-white border border-transparent shadow-sm hover:bg-neutral-600
+              dark:hover:bg-blue-700 focus:outline-none"
           >
             {mode === "add" ? "Add" : "Save"}
           </button>

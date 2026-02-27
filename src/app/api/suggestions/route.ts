@@ -58,7 +58,8 @@ export async function POST(request: NextRequest) {
       "SELECT COALESCE(MAX(sort_order), -1) as max_order FROM prompt_suggestions WHERE user_id = $1",
       [userId],
     );
-    const nextSortOrder = maxOrderResult.rows[0].max_order + 1;
+    const currentMax = maxOrderResult.rows[0]?.max_order ?? -1;
+    const nextSortOrder = currentMax + 1;
 
     const { rows } = await pool.query<PromptSuggestion>(
       `INSERT INTO prompt_suggestions (user_id, title, prompt, icon, sort_order, created_at)

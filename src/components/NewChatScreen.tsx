@@ -67,7 +67,7 @@ function SortableSuggestionCard({ suggestion, onDelete, onClick }: SortableSugge
       {...attributes}
       {...listeners}
       onClick={() => onClick(suggestion)}
-      className={`p-4 border rounded-xl transition-colors duration-200 ease-in-out
+      className={`cursor-pointer p-4 border rounded-xl transition-colors duration-200 ease-in-out
       group relative select-none border-neutral-200 dark:border-zinc-800
       hover:bg-neutral-100 dark:hover:bg-zinc-800/60 ${isDragging ? "z-50" : ""}`}
     >

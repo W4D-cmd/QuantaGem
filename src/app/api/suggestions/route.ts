@@ -6,6 +6,7 @@ export interface PromptSuggestion {
   title: string;
   prompt: string;
   icon: string;
+  sort_order: number;
 }
 
 export async function GET(request: NextRequest) {
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const { rows } = await pool.query<PromptSuggestion>(
-      "SELECT id, title, prompt, icon FROM prompt_suggestions WHERE user_id = $1 ORDER BY created_at ASC",
+      "SELECT id, title, prompt, icon, sort_order FROM prompt_suggestions WHERE user_id = $1 ORDER BY sort_order ASC, created_at ASC",
       [userId],
     );
 
@@ -53,11 +54,17 @@ export async function POST(request: NextRequest) {
 
     const finalIcon = icon || "SparklesIcon";
 
+    const maxOrderResult = await pool.query<{ max_order: number | null }>(
+      "SELECT COALESCE(MAX(sort_order), -1) as max_order FROM prompt_suggestions WHERE user_id = $1",
+      [userId],
+    );
+    const nextSortOrder = maxOrderResult.rows[0].max_order + 1;
+
     const { rows } = await pool.query<PromptSuggestion>(
-      `INSERT INTO prompt_suggestions (user_id, title, prompt, icon, created_at)
-       VALUES ($1, $2, $3, $4, NOW())
-       RETURNING id, title, prompt, icon`,
-      [userId, title.trim(), prompt.trim(), finalIcon],
+      `INSERT INTO prompt_suggestions (user_id, title, prompt, icon, sort_order, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       RETURNING id, title, prompt, icon, sort_order`,
+      [userId, title.trim(), prompt.trim(), finalIcon, nextSortOrder],
     );
 
     return NextResponse.json(rows[0], { status: 201 });
@@ -65,6 +72,47 @@ export async function POST(request: NextRequest) {
     console.error(`Error creating prompt suggestion for user ${userId}:`, error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
     return NextResponse.json({ error: "Failed to create suggestion", details: errorMessage }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
+  }
+  const userId = userIdHeader;
+
+  try {
+    const { orderedIds } = (await request.json()) as { orderedIds?: number[] };
+
+    if (!orderedIds || !Array.isArray(orderedIds)) {
+      return NextResponse.json({ error: "orderedIds array is required" }, { status: 400 });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      for (let i = 0; i < orderedIds.length; i++) {
+        await client.query("UPDATE prompt_suggestions SET sort_order = $1 WHERE id = $2 AND user_id = $3", [
+          i,
+          orderedIds[i],
+          userId,
+        ]);
+      }
+
+      await client.query("COMMIT");
+      return NextResponse.json({ message: "Order updated successfully" }, { status: 200 });
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error(`Error reordering prompt suggestions for user ${userId}:`, error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return NextResponse.json({ error: "Failed to reorder suggestions", details: errorMessage }, { status: 500 });
   }
 }
 

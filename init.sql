@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS prompt_suggestions (
   title TEXT NOT NULL,
   prompt TEXT NOT NULL,
   icon TEXT NOT NULL DEFAULT 'SparklesIcon',
+  sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -101,8 +102,8 @@ CREATE INDEX IF NOT EXISTS idx_prompt_suggestions_user_id ON prompt_suggestions 
 CREATE OR REPLACE FUNCTION copy_default_prompt_suggestions()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO prompt_suggestions (user_id, title, prompt, icon)
-  SELECT NEW.id, title, prompt, icon
+  INSERT INTO prompt_suggestions (user_id, title, prompt, icon, sort_order)
+  SELECT NEW.id, title, prompt, icon, sort_order
   FROM prompt_suggestion_templates
   ORDER BY sort_order;
   RETURN NEW;

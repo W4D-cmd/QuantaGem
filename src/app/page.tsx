@@ -618,10 +618,15 @@ export default function Home() {
   };
 
   const confirmDeleteChat = (chatId: number) => {
+    const chat = allChats.find((c) => c.id === chatId);
     setConfirmationModal({
       isOpen: true,
       title: "Delete Chat",
-      message: "Are you sure you want to delete this chat? This action cannot be undone.",
+      message: (
+        <span>
+          Are you sure you want to delete <strong>{chat?.title || "this chat"}</strong>? This action cannot be undone.
+        </span>
+      ),
       onConfirm: () => handleDeleteChat(chatId),
     });
   };

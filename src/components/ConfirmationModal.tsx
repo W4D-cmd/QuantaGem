@@ -55,10 +55,10 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         </button>
         <button
           type="button"
+          tabIndex={-1}
           className="cursor-pointer w-full justify-center rounded-full border border-neutral-300 dark:border-zinc-700
             px-4 py-2 text-sm font-medium text-neutral-700 dark:text-zinc-200 bg-white dark:bg-zinc-800
-            hover:bg-neutral-50 dark:hover:bg-zinc-700 shadow-sm focus:outline-none focus:ring-2
-            focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-neutral-100 dark:focus:ring-offset-zinc-900
+            hover:bg-neutral-50 dark:hover:bg-zinc-700 shadow-sm focus:outline-none
             transition-colors"
           onClick={onClose}
         >

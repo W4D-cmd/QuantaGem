@@ -67,7 +67,7 @@ function SortableSuggestionCard({ suggestion, onDelete, onClick }: SortableSugge
       {...attributes}
       {...listeners}
       onClick={() => onClick(suggestion)}
-      className={`cursor-grab active:cursor-grabbing p-4 border rounded-xl transition-colors duration-200 ease-in-out
+      className={`p-4 border rounded-xl transition-colors duration-200 ease-in-out
       group relative select-none border-neutral-200 dark:border-zinc-800
       hover:bg-neutral-100 dark:hover:bg-zinc-800/60 ${isDragging ? "z-50" : ""}`}
     >
@@ -333,7 +333,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({
                 <DragOverlay>
                   {activeSuggestion ? (
                     <div
-                      className="cursor-grabbing p-4 border rounded-xl border-blue-400 dark:border-blue-500
+                      className="p-4 border rounded-xl border-blue-400 dark:border-blue-500
                       bg-white dark:bg-zinc-800 shadow-2xl scale-110 rotate-2 select-none"
                     >
                       <div className="flex items-center gap-3 mb-1">

@@ -33,6 +33,7 @@ import {
 } from "@/lib/thinking";
 import { showApiErrorToast } from "@/lib/errors";
 import NewChatScreen from "@/components/NewChatScreen";
+import AddSuggestionModal from "@/components/AddSuggestionModal";
 import { customModels, isCustomModel, getOriginalModelId, createCustomModelId } from "@/lib/custom-models";
 
 const FALLBACK_DEFAULT_MODEL_NAME = "gemini-2.5-pro";
@@ -226,6 +227,12 @@ export default function Home() {
   const [thinkingOption, setThinkingOption] = useState<ThinkingOption>("dynamic");
   const [verbosity, setVerbosity] = useState<VerbosityOption>("medium");
   const [newChatSystemPrompt, setNewChatSystemPrompt] = useState<string>("");
+  const [isSaveSuggestionModalOpen, setIsSaveSuggestionModalOpen] = useState(false);
+  const [saveSuggestionData, setSaveSuggestionData] = useState<{
+    chatId: number;
+    title: string;
+    systemPrompt: string;
+  } | null>(null);
 
   const [ttsVoice, setTtsVoice] = useState<string>("Sulafat");
   const [ttsModel, setTtsModel] = useState<string>(DEFAULT_TTS_MODEL);
@@ -673,6 +680,38 @@ export default function Home() {
       }
     },
     [getAuthHeaders, router, fetchAllChats, setActiveChatId, setDisplayingProjectManagementId, showToast],
+  );
+
+  const handleOpenSaveSuggestionModal = useCallback((chatId: number, title: string, systemPrompt: string) => {
+    setSaveSuggestionData({ chatId, title, systemPrompt });
+    setIsSaveSuggestionModalOpen(true);
+  }, []);
+
+  const handleSaveAsSuggestion = useCallback(
+    async (title: string, prompt: string, icon: string) => {
+      try {
+        const res = await fetch("/api/suggestions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({ title, prompt, icon }),
+        });
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          await showApiErrorToast(res, showToast);
+          return;
+        }
+        showToast("Suggestion saved successfully.", "success");
+      } catch (err: unknown) {
+        showToast(extractErrorMessage(err), "error");
+      }
+    },
+    [getAuthHeaders, router, showToast],
   );
 
   const handleMoveChat = useCallback(
@@ -1733,6 +1772,7 @@ export default function Home() {
         expandedProjects={expandedProjects}
         onToggleProjectExpansion={setExpandedProjects}
         onMoveChat={handleMoveChat}
+        onSaveAsSuggestion={handleOpenSaveSuggestionModal}
       />
       <main
         className="flex-1 flex flex-col relative"
@@ -1881,6 +1921,7 @@ export default function Home() {
                       onSystemPromptChange={setNewChatSystemPrompt}
                       projectId={currentChatProjectId}
                       projects={allProjects}
+                      getAuthHeaders={getAuthHeaders}
                     />
                   </div>
                 )}
@@ -1962,6 +2003,17 @@ export default function Home() {
           setIsSearchModalOpen(false);
         }}
         getAuthHeaders={getAuthHeaders}
+      />
+      <AddSuggestionModal
+        isOpen={isSaveSuggestionModalOpen}
+        onClose={() => {
+          setIsSaveSuggestionModalOpen(false);
+          setSaveSuggestionData(null);
+        }}
+        onSave={handleSaveAsSuggestion}
+        initialTitle={saveSuggestionData?.title || ""}
+        initialPrompt={saveSuggestionData?.systemPrompt || ""}
+        mode="add"
       />
     </div>
   );

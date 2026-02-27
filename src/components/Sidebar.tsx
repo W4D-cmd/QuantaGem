@@ -12,6 +12,7 @@ import {
   PencilIcon,
   PencilSquareIcon,
   TrashIcon,
+  BookmarkSquareIcon,
 } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import TruncatedTooltip from "./TruncatedTooltip";
@@ -35,6 +36,7 @@ interface SidebarProps {
   expandedProjects: Set<number>;
   onToggleProjectExpansion: React.Dispatch<React.SetStateAction<Set<number>>>;
   onMoveChat?: (chatId: number, targetProjectId: number | null) => void;
+  onSaveAsSuggestion?: (chatId: number, title: string, systemPrompt: string) => void;
 }
 
 const groupChatsByDate = (chats: ChatListItem[]) => {
@@ -198,6 +200,7 @@ export default function Sidebar({
   expandedProjects,
   onToggleProjectExpansion,
   onMoveChat,
+  onSaveAsSuggestion,
 }: SidebarProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<{ type: "chat" | "project"; id: number } | null>(null);
@@ -490,6 +493,16 @@ export default function Sidebar({
                                   label: "Settings",
                                   onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
                                 },
+                                ...(onSaveAsSuggestion
+                                  ? [
+                                      {
+                                        id: "save-as-suggestion",
+                                        icon: <BookmarkSquareIcon className="size-4" />,
+                                        label: "Save as Suggestion",
+                                        onClick: () => onSaveAsSuggestion(chat.id, chat.title, chat.systemPrompt),
+                                      },
+                                    ]
+                                  : []),
                                 {
                                   id: "delete",
                                   icon: <TrashIcon className="size-4 text-red-500" />,
@@ -679,6 +692,17 @@ export default function Sidebar({
                                               label: "Settings",
                                               onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
                                             },
+                                            ...(onSaveAsSuggestion
+                                              ? [
+                                                  {
+                                                    id: "save-as-suggestion",
+                                                    icon: <BookmarkSquareIcon className="size-4" />,
+                                                    label: "Save as Suggestion",
+                                                    onClick: () =>
+                                                      onSaveAsSuggestion(chat.id, chat.title, chat.systemPrompt),
+                                                  },
+                                                ]
+                                              : []),
                                             {
                                               id: "delete",
                                               icon: <TrashIcon className="size-4 text-red-500" />,

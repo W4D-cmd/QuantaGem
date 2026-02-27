@@ -77,3 +77,14 @@ CREATE TABLE IF NOT EXISTS user_settings (
   custom_openai_key TEXT DEFAULT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS prompt_suggestions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  icon TEXT NOT NULL DEFAULT 'SparklesIcon',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_suggestions_user_id ON prompt_suggestions (user_id);

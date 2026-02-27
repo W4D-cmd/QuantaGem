@@ -230,7 +230,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({
             </div>
 
             <Reorder.Group
-              axis="xy"
+              axis="y"
               values={suggestions}
               onReorder={handleReorder}
               as="div"

@@ -11,7 +11,7 @@ QuantaGem is a high-performance, production-grade WebUI for Google's Gemini AI, 
 - **Object Storage:** [MinIO](https://min.io/) (S3-compatible) for handling chat attachments and project files.
 - **Cache/Rate Limiting:** [Redis 8](https://redis.io/) for secure authentication limiting.
 - **AI Integration:** [Google Vertex AI SDK](https://cloud.google.com/vertex-ai) (Gemini 2.0/2.5/3 and more).
-- **Speech-to-Text:** Local Python microservice using [Faster Whisper](https://github.com/SYSTRAN/faster-whisper).
+- **Speech-to-Text:** Local Python microservice using [ONNX ASR](https://github.com/thewh1teagle/onnx-asr) with NVIDIA NeMo Parakeet TDT model.
 - **Deployment:** [Docker Compose](https://www.docker.com/) with Distroless (non-root) production images for maximum security.
 
 ## 🚀 Core Features
@@ -21,7 +21,8 @@ QuantaGem is a high-performance, production-grade WebUI for Google's Gemini AI, 
 - **Vertex AI Integration:** Optimized for enterprise-grade Gemini models, including support for "Thinking" models with adjustable budgets.
 - **Multimodal Support:** Upload PDFs, images, and large source code folders (via Directory Picker API) for context-aware prompting.
 - **Search & Grounding:** Toggle Google Search grounding for real-time information retrieval.
-- **Voice Intelligence:** Built-in Speech-to-Text (local Whisper) and Text-to-Speech (Gemini TTS).
+- **Voice Intelligence:** Built-in Speech-to-Text (local ONNX ASR) and Text-to-Speech (Gemini TTS).
+- **Prompt Suggestions:** Customizable prompt templates with iOS-like drag-and-drop reordering for quick access.
 - **Secure Auth:** JWT-based authentication with bcrypt hashing and Redis-backed rate limiting.
 
 ## 🛠 Installation & Setup
@@ -49,6 +50,7 @@ GOOGLE_CLOUD_LOCATION="global"
 GOOGLE_GENAI_USE_VERTEXAI="True"
 
 OPENAI_API_KEY="your-openai-api-key"
+ANTHROPIC_API_KEY="your-anthropic-api-key"
 
 JWT_SECRET="generate-a-32-char-random-string"
 
@@ -71,9 +73,10 @@ mkdir secrets
 cp /path/to/your/service-account-key.json secrets/gcp-key.json
 ```
 
-### 4. OpenAI Authentication (Optional)
+### 4. OpenAI/Anthropic Authentication (Optional)
 
-To use OpenAI models add your OpenAI API key to the `.env.local` file at `OPENAI_API_KEY`.
+To use OpenAI models, add your OpenAI API key to the `.env.local` file at `OPENAI_API_KEY`.
+To use Anthropic models, add your Anthropic API key at `ANTHROPIC_API_KEY`.
 
 ### 5. Deploy with Docker
 
@@ -118,15 +121,27 @@ Restart the application using `docker compose up --build --force-recreate -d`.
 
 ## 🎤 Speech-to-Text (STT) Customization
 
-The `stt-service` uses `faster-whisper-large-v3` by default on CPU. To adjust the model size for better performance on weaker hardware, modify `stt-service/main.py`:
+The `stt-service` uses NVIDIA's `nemo-parakeet-tdt-0.6b-v3` ONNX model by default for fast, accurate transcription. The model runs on CPU using ONNX Runtime.
 
-```python
-MODEL_SIZE = "Systran/faster-whisper-medium" # Options: tiny, base, small, medium, large-v3
-COMPUTE_TYPE = "int8"
-CPU_THREADS = 4 # Adjust based on your CPU
+### Environment Variables
+
+Configure the STT service via environment variables in `docker-compose.yml`:
+
+```yaml
+stt-service:
+  environment:
+    MODEL_NAME: "nemo-parakeet-tdt-0.6b-v3"  # Built-in model name or HF repo ID
+    STT_THREADS: 4  # Number of CPU threads (default: auto-detect)
 ```
 
-After modifying, rebuild the service:
+### Available Models
+
+`nemo-parakeet-tdt-0.6b-v3` (default) - Best balance of speed and accuracy
+
+Or use any HuggingFace model compatible with `onnx-asr` by specifying the repository ID.
+
+### Rebuild After Changes
+
 ```bash
 docker compose up -d --build stt-service
 ```

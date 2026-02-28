@@ -51,6 +51,7 @@ QuantaGem/
 │   │   │   ├── models/         # Available AI models
 │   │   │   ├── tts/            # Text-to-speech
 │   │   │   ├── stt/            # Speech-to-text proxy
+│   │   │   ├── suggestions/    # Prompt suggestions CRUD
 │   │   │   └── ...
 │   │   ├── layout.tsx          # Root layout with providers
 │   │   ├── page.tsx            # Main chat page
@@ -77,7 +78,7 @@ QuantaGem/
 │   │   └── useWebR.ts          # R code execution
 │   └── types/                  # TypeScript declarations
 ├── stt-service/                # Python STT microservice
-│   ├── main.py                 # Faster Whisper transcription
+│   ├── main.py                 # ONNX ASR transcription (NeMo Parakeet)
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── public/                     # Static assets
@@ -170,10 +171,10 @@ All chat endpoints return JSONL with these event types:
 
 ### STT Service (`stt-service/`)
 
-- FastAPI with Faster Whisper (large-v3 by default)
+- FastAPI with ONNX ASR (NeMo Parakeet TDT 0.6B by default)
 - Endpoint: `POST /transcribe` (multipart audio)
 - Health: `GET /ping`
-- Model configurable via `MODEL_SIZE` constant
+- Configurable via `MODEL_NAME` and `STT_THREADS` environment variables
 
 ## Authentication Flow
 
@@ -214,6 +215,8 @@ Key tables (see `init.sql` for full schema):
 - `chat_sessions` - Chat conversations with optional project linkage
 - `messages` - Individual messages with JSONB parts array
 - `user_settings` - Per-user settings (system prompt, TTS config)
+- `prompt_suggestions` - User-customizable prompt templates
+- `prompt_suggestion_templates` - Default templates copied to new users
 
 System prompt cascade: chat level > project level > user level
 

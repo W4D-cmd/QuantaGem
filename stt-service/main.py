@@ -13,8 +13,8 @@ from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
 
-HF_MODEL_ID = os.getenv("HF_MODEL_ID", "W4D/parakeet-tdt-0.6b-v3-onnx")
-MODEL_CACHE_DIR = os.getenv("MODEL_CACHE_DIR", "/app/models")
+# Use built-in model name or custom HF repo ID
+MODEL_NAME = os.getenv("MODEL_NAME", "nemo-parakeet-tdt-0.6b-v3")
 SAMPLE_RATE = 16000
 
 model: Optional[Any] = None
@@ -22,17 +22,12 @@ model_loaded_event = threading.Event()
 
 
 def load_asr_model():
-    """Load the ONNX ASR model from Hugging Face."""
+    """Load the ONNX ASR model."""
     global model
     start_time = time.time()
-    print(f"STT: Loading model '{HF_MODEL_ID}'...")
+    print(f"STT: Loading model '{MODEL_NAME}'...")
     try:
-        # Download and cache model from Hugging Face
-        model = onnx_asr.load_model(
-            "nemo-conformer-tdt",
-            HF_MODEL_ID,
-            cache_dir=MODEL_CACHE_DIR
-        )
+        model = onnx_asr.load_model(MODEL_NAME)
         load_duration = time.time() - start_time
         print(f"STT: Model loaded in {load_duration:.2f}s.")
         model_loaded_event.set()

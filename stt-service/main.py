@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import onnx_asr
 from fastapi import FastAPI, File, HTTPException, UploadFile, status
@@ -17,7 +17,7 @@ HF_MODEL_ID = os.getenv("HF_MODEL_ID", "W4D/parakeet-tdt-0.6b-v3-onnx")
 MODEL_CACHE_DIR = os.getenv("MODEL_CACHE_DIR", "/app/models")
 SAMPLE_RATE = 16000
 
-model: Optional[onnx_asr.Model] = None
+model: Optional[Any] = None
 model_loaded_event = threading.Event()
 
 

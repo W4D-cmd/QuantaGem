@@ -28,7 +28,6 @@ docker compose -f docker-compose.yml -f docker-compose-dev.yml up --build
 
 # Rebuild specific service
 docker compose up -d --build stt-service
-docker compose up -d --build docling-service
 ```
 
 ### Database
@@ -79,10 +78,6 @@ QuantaGem/
 │   └── types/                  # TypeScript declarations
 ├── stt-service/                # Python STT microservice
 │   ├── main.py                 # Faster Whisper transcription
-│   ├── Dockerfile
-│   └── requirements.txt
-├── docling-service/            # Python PDF conversion
-│   ├── main.py                 # Docling PDF to markdown
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── public/                     # Static assets
@@ -168,7 +163,7 @@ All chat endpoints return JSONL with these event types:
 ### Supported File Types by Provider
 
 - **Gemini**: PDF, PNG, JPEG, WEBP, HEIC, HEIF, text files, source code
-- **OpenAI**: PNG, JPEG, WEBP, GIF, PDF (via Docling), text files
+- **OpenAI**: PNG, JPEG, WEBP, GIF, PDF (via base64), text files
 - **Anthropic**: JPEG, PNG, GIF, WEBP, PDF, text files
 
 ## Microservices
@@ -179,13 +174,6 @@ All chat endpoints return JSONL with these event types:
 - Endpoint: `POST /transcribe` (multipart audio)
 - Health: `GET /ping`
 - Model configurable via `MODEL_SIZE` constant
-
-### Docling Service (`docling-service/`)
-
-- FastAPI with Docling for PDF to markdown conversion
-- Endpoint: `POST /convert` (base64 PDF)
-- Used by OpenAI Responses API for PDF processing
-- Health: `GET /ping`
 
 ## Authentication Flow
 
@@ -262,7 +250,7 @@ System prompt cascade: chat level > project level > user level
 - **Turbopack alias**: `drizzle-orm` is aliased to empty module in `next.config.ts`
 - **Long-running requests**: Chat endpoint has `maxDuration = 600` seconds
 - **Docker security**: Production container runs as non-root (65532:65532) with read-only filesystem
-- **PDF handling**: OpenAI requires Docling service for PDF conversion; Gemini handles natively
+- **PDF handling**: OpenAI processes PDFs via base64 encoding through the Responses API; Gemini handles natively
 - **Redis rate limiting**: Login endpoints limited to 5 attempts per 20 minutes
 - **Model names**: Custom models prefixed with `custom:` in the UI
 - **IPv6**: Docker compose supports IPv6 via override file (see README.md)

@@ -1,3 +1,4 @@
+# Runtime dependencies for ONNX-based STT service
 fastapi[all]
-faster-whisper==1.2.1
-requests
+onnx-asr[cpu,hub]
+soundfile

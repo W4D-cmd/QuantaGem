@@ -1,81 +1,124 @@
 import logging
-from typing import Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException, status
-from fastapi.responses import PlainTextResponse
-from faster_whisper import WhisperModel
-import tempfile
 import os
+import shutil
+import subprocess
+import tempfile
 import threading
 import time
-import shutil
+from typing import Optional
+
+import onnx_asr
+from fastapi import FastAPI, File, HTTPException, UploadFile, status
+from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
 
-MODEL_SIZE = "Systran/faster-whisper-large-v3" 
-COMPUTE_TYPE = "int8"
-CPU_THREADS = 14 
+HF_MODEL_ID = os.getenv("HF_MODEL_ID", "W4D/parakeet-tdt-0.6b-v3-onnx")
+MODEL_CACHE_DIR = os.getenv("MODEL_CACHE_DIR", "/app/models")
+SAMPLE_RATE = 16000
 
-model: Optional[WhisperModel] = None
+model: Optional[onnx_asr.Model] = None
 model_loaded_event = threading.Event()
-model_dir = os.getenv("WHISPER_MODEL_DIR", "./models")
 
-def load_whisper_model():
+
+def load_asr_model():
+    """Load the ONNX ASR model from Hugging Face."""
     global model
     start_time = time.time()
-    print(f"STT: Loading Whisper model '{MODEL_SIZE}'...")
+    print(f"STT: Loading model '{HF_MODEL_ID}'...")
     try:
-        model = WhisperModel(
-            MODEL_SIZE, 
-            device="cpu", 
-            compute_type=COMPUTE_TYPE, 
-            download_root=model_dir,
-            cpu_threads=CPU_THREADS,
-            num_workers=1
+        # Download and cache model from Hugging Face
+        model = onnx_asr.load_model(
+            "nemo-conformer-tdt",
+            HF_MODEL_ID,
+            cache_dir=MODEL_CACHE_DIR
         )
         load_duration = time.time() - start_time
-        print(f"STT: Loaded in {load_duration:.2f}s.")
+        print(f"STT: Model loaded in {load_duration:.2f}s.")
         model_loaded_event.set()
     except Exception as e:
         print(f"STT: Error loading model: {e}")
+        raise
+
 
 class HealthCheckFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         return "HTTP/1.1" not in record.getMessage()
 
+
 @app.on_event("startup")
 async def startup_event():
     logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
-    threading.Thread(target=load_whisper_model, daemon=True).start()
+    threading.Thread(target=load_asr_model, daemon=True).start()
+
+
+def convert_audio_to_wav(input_path: str, output_path: str) -> None:
+    """
+    Convert audio file to 16kHz mono WAV format using ffmpeg.
+    Supports all common audio formats (mp3, webm, m4a, ogg, flac, etc.)
+    """
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", input_path,
+        "-ar", str(SAMPLE_RATE),
+        "-ac", "1",
+        "-f", "wav",
+        "-acodec", "pcm_s16le",
+        output_path
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"FFmpeg conversion failed: {result.stderr}")
+
 
 @app.post("/transcribe", response_class=PlainTextResponse)
 async def transcribe_audio(audio_file: UploadFile = File(...)):
     if not model_loaded_event.is_set() or model is None:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Model loading.")
-
-    suffix = os.path.splitext(audio_file.filename)[1]
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
-        shutil.copyfileobj(audio_file.file, temp_audio)
-        temp_audio_path = temp_audio.name
-
-    try:
-        segments, info = model.transcribe(
-            temp_audio_path, 
-            beam_size=1, 
-            vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=500)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Model loading."
         )
 
-        text_segments = [segment.text for segment in segments]
-        transcription = "".join(text_segments)
+    # Save uploaded file to temp
+    suffix = os.path.splitext(audio_file.filename)[1] or ".bin"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_input:
+        shutil.copyfileobj(audio_file.file, temp_input)
+        temp_input_path = temp_input.name
 
-        return transcription.strip()
-        
+    # Prepare path for conversion
+    temp_wav_path = tempfile.mktemp(suffix=".wav")
+
+    try:
+        # Convert to 16kHz mono WAV
+        convert_audio_to_wav(temp_input_path, temp_wav_path)
+
+        # Transcribe using onnx-asr
+        result = model.recognize(temp_wav_path)
+
+        # Handle both string and list results
+        if isinstance(result, list):
+            if len(result) > 0:
+                if hasattr(result[0], 'text'):
+                    transcription = " ".join(r.text for r in result)
+                else:
+                    transcription = result[0] if isinstance(result[0], str) else str(result[0])
+            else:
+                transcription = ""
+        else:
+            transcription = result
+
+        return transcription.strip() if transcription else ""
+
     except Exception as e:
-        print(f"STT: Failed: {e}")
+        print(f"STT: Transcription failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        if os.path.exists(temp_audio_path):
-            os.remove(temp_audio_path)
+        # Cleanup temp files
+        for path in [temp_input_path, temp_wav_path]:
+            if os.path.exists(path):
+                os.remove(path)
+
 
 @app.get("/ping")
 async def ping():

@@ -2,27 +2,18 @@ FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    build-essential \
-    libffi-dev \
-    git \
+    libsndfile1 \
     ffmpeg \
-    libavformat-dev \
-    libavcodec-dev \
-    libavdevice-dev \
-    libavutil-dev \
-    libavfilter-dev \
-    libswscale-dev \
-    libswresample-dev \
-    pkg-config && \
-    pip install --no-cache-dir --upgrade pip setuptools && \
-    apt-get clean && \
+    curl \
+    && apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-RUN pip install --no-cache-dir "Cython==0.29.37"
+# Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --no-build-isolation -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY main.py .
 

@@ -45,6 +45,7 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 8000
     environment:
       HF_HOME: /app/models
+      # STT_THREADS: 4  # Number of CPU threads for transcription (default: auto)
     volumes:
       - stt_models:/app/models
     networks:

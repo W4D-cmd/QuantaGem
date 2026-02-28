@@ -7,6 +7,8 @@ import threading
 import time
 from typing import Any, Optional
 
+import onnxruntime as ort
+
 import onnx_asr
 from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.responses import PlainTextResponse
@@ -15,6 +17,8 @@ app = FastAPI()
 
 # Use built-in model name or custom HF repo ID
 MODEL_NAME = os.getenv("MODEL_NAME", "nemo-parakeet-tdt-0.6b-v3")
+# Number of CPU threads for ONNX inference (default: auto-detect)
+STT_THREADS = int(os.getenv("STT_THREADS", "0")) or None
 SAMPLE_RATE = 16000
 
 model: Optional[Any] = None
@@ -27,7 +31,14 @@ def load_asr_model():
     start_time = time.time()
     print(f"STT: Loading model '{MODEL_NAME}'...")
     try:
-        model = onnx_asr.load_model(MODEL_NAME)
+        # Configure ONNX Runtime session options
+        sess_options = ort.SessionOptions()
+        if STT_THREADS:
+            sess_options.intra_op_num_threads = STT_THREADS
+            sess_options.inter_op_num_threads = 1
+            print(f"STT: Using {STT_THREADS} CPU thread(s)")
+        
+        model = onnx_asr.load_model(MODEL_NAME, sess_options=sess_options)
         load_duration = time.time() - start_time
         print(f"STT: Model loaded in {load_duration:.2f}s.")
         model_loaded_event.set()

@@ -56,25 +56,6 @@ services:
       retries: 30
       start_period: 10s
 
-  docling-service:
-    build:
-      context: ./docling-service
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    command: uvicorn main:app --host 0.0.0.0 --port 8001 --timeout-keep-alive 0
-    environment:
-      - DOCLING_NUM_THREADS=1
-      - OMP_NUM_THREADS=4
-      - MKL_NUM_THREADS=4
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 60s
-
   redis:
     image: redis:8-alpine
     restart: unless-stopped
@@ -102,8 +83,6 @@ services:
       minio:
         condition: service_healthy
       stt-service:
-        condition: service_healthy
-      docling-service:
         condition: service_healthy
       redis:
         condition: service_healthy

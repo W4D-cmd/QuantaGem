@@ -116,14 +116,6 @@ export const customModels: CustomModelEntry[] = [
     supportsReasoning: true,
   },
   {
-    displayName: "Gemini 3 Pro Preview",
-    modelId: "gemini-3-pro-preview",
-    inputTokenLimit: 1048576,
-    outputTokenLimit: 65536,
-    provider: "gemini",
-    supportsReasoning: true,
-  },
-  {
     displayName: "Gemini 3 Flash Preview",
     modelId: "gemini-3-flash-preview",
     inputTokenLimit: 1048576,
@@ -150,15 +142,6 @@ export const customModels: CustomModelEntry[] = [
   {
     displayName: "GPT-5.2",
     modelId: "gpt-5.2-2025-12-11",
-    inputTokenLimit: 400000,
-    outputTokenLimit: 128000,
-    provider: "openai",
-    supportsReasoning: true,
-    supportsVerbosity: true,
-  },
-  {
-    displayName: "GPT-5.1",
-    modelId: "gpt-5.1-2025-11-13",
     inputTokenLimit: 400000,
     outputTokenLimit: 128000,
     provider: "openai",

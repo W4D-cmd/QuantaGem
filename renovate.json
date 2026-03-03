@@ -4,6 +4,10 @@
   "baseBranchPatterns": ["main", "vertexai", "feat/openai"],
   "platformAutomerge": true,
   "dependencyDashboard": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
   "vulnerabilityAlerts": {
     "enabled": true,
     "labels": ["security"],

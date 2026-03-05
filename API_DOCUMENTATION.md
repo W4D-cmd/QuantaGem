@@ -926,7 +926,7 @@ Get available AI models from Google Gemini.
 
 **Endpoint:** `GET /api/models`
 
-**Authentication Required:** No
+**Authentication Required:** Yes (`x-user-id` header)
 
 **Response (200 OK):**
 
@@ -941,6 +941,36 @@ Get available AI models from Google Gemini.
   }
 ]
 ```
+
+---
+
+### List Custom Models
+
+Get configured custom models (OpenAI-compatible, Anthropic, etc.).
+
+**Endpoint:** `GET /api/models/list`
+
+**Authentication Required:** Yes (`x-user-id` header)
+
+**Response (200 OK):**
+
+```json
+{
+  "models": [
+    {
+      "id": "llama-3.1-70b",
+      "displayName": "Llama 3.1 70B",
+      "provider": "custom-openai"
+    }
+  ],
+  "count": 1
+}
+```
+
+**Fields:**
+- `id` - Model identifier used in chat requests
+- `displayName` - Human-readable model name
+- `provider` - Provider type: `"gemini"`, `"openai"`, `"anthropic"`, or `"custom-openai"`
 
 ---
 

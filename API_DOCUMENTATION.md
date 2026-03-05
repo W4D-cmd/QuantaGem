@@ -620,6 +620,41 @@ Delete messages from a specific position onward.
 
 ---
 
+### Append Model Message
+
+Append a model response message to an existing chat session (for streaming implementations).
+
+**Endpoint:** `POST /api/chats/{chatSessionId}/append-model-message`
+
+**Authentication Required:** Yes (`x-user-id` header)
+
+**Path Parameters:**
+- `chatSessionId` - ID of the chat session
+
+**Request Body:**
+
+```json
+{
+  "modelMessageParts": [{"type": "text", "text": "Hi there!"}],
+  "modelThoughtSummary": "The user greeted me.",
+  "modelSources": []
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true
+}
+```
+
+**Errors:**
+- `400` - Cannot save an empty model message
+- `401` - Chat session not found or not owned by user
+
+---
+
 ## Project Management Endpoints
 
 ### List Projects
@@ -974,6 +1009,74 @@ Get configured custom models (OpenAI-compatible, Anthropic, etc.).
 
 ---
 
+### List User's Custom Models
+
+Fetch models from the user's configured custom OpenAI-compatible endpoint.
+
+**Endpoint:** `GET /api/models/custom`
+
+**Authentication Required:** Yes (`x-user-id` header)
+
+**Response (200 OK):**
+
+```json
+{
+  "models": [
+    {
+      "id": "llama-3.1-70b",
+      "object": "model",
+      "owned_by": "local"
+    }
+  ],
+  "endpoint": "https://your-custom-endpoint.com/v1/"
+}
+```
+
+**Errors:**
+- Returns `{ "models": [], "error": "..." }` with status 200 if endpoint not configured or connection failed (to not break UI)
+
+---
+
+### Test Custom Model Endpoint
+
+Test connection to a custom OpenAI-compatible endpoint without saving.
+
+**Endpoint:** `POST /api/models/custom`
+
+**Authentication Required:** Yes (`x-user-id` header)
+
+**Request Body:**
+
+```json
+{
+  "endpoint": "https://your-custom-endpoint.com/v1/",
+  "apiKey": "your-api-key"
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "models": [
+    {
+      "id": "llama-3.1-70b",
+      "object": "model",
+      "owned_by": "local"
+    }
+  ],
+  "endpoint": "https://your-custom-endpoint.com/v1/",
+  "count": 1
+}
+```
+
+**Errors:**
+- `400` - Invalid URL format or connection failed
+- `408` - Connection timed out
+
+---
+
 ### Health Check
 
 Check if the API is running and the database is accessible.
@@ -1053,7 +1156,7 @@ Get current user information.
 
 ### Get User Settings
 
-Get user settings including system prompt and TTS configuration.
+Get user settings including system prompt, TTS configuration, and custom provider settings.
 
 **Endpoint:** `GET /api/settings`
 
@@ -1065,15 +1168,21 @@ Get user settings including system prompt and TTS configuration.
 {
   "system_prompt": "You are a helpful assistant.",
   "tts_voice": "Sulafat",
-  "tts_model": "gemini-2.5-flash-preview-tts"
+  "tts_model": "gemini-2.5-flash-preview-tts",
+  "custom_openai_endpoint": "https://your-endpoint.com/v1/",
+  "custom_openai_key_set": true
 }
 ```
+
+**Fields:**
+- `custom_openai_endpoint` - Configured custom OpenAI-compatible endpoint URL (null if not set)
+- `custom_openai_key_set` - Whether an API key is configured (actual key never exposed)
 
 ---
 
 ### Update User Settings
 
-Update user settings.
+Update user settings including custom provider configuration.
 
 **Endpoint:** `POST /api/settings`
 
@@ -1085,9 +1194,18 @@ Update user settings.
 {
   "systemPrompt": "You are a coding assistant.",
   "ttsVoice": "Sulafat",
-  "ttsModel": "gemini-2.5-flash-preview-tts"
+  "ttsModel": "gemini-2.5-flash-preview-tts",
+  "customOpenaiEndpoint": "https://your-endpoint.com/v1/",
+  "customOpenaiKey": "your-api-key"
 }
 ```
+
+**Fields:**
+- `systemPrompt` - Default system prompt (optional)
+- `ttsVoice` - TTS voice name (optional)
+- `ttsModel` - TTS model identifier (optional)
+- `customOpenaiEndpoint` - Custom OpenAI-compatible endpoint URL, set to null to clear (optional)
+- `customOpenaiKey` - API key for custom endpoint, set to null to clear (optional, only updated if provided)
 
 **Response (200 OK):**
 
@@ -1097,6 +1215,7 @@ Update user settings.
   "system_prompt": "You are a coding assistant.",
   "tts_voice": "Sulafat",
   "tts_model": "gemini-2.5-flash-preview-tts",
+  "custom_openai_endpoint": "https://your-endpoint.com/v1/",
   "updated_at": "2024-01-15T11:00:00.000Z"
 }
 ```
@@ -1133,6 +1252,171 @@ Count tokens for a chat request (supports Gemini, OpenAI, Anthropic).
   "totalTokens": 1250
 }
 ```
+
+---
+
+### Generate System Prompt
+
+Generate a system prompt from user input using AI (streaming response).
+
+**Endpoint:** `POST /api/generate-system-prompt`
+
+**Authentication Required:** Yes (`x-user-id` header)
+
+**Request Body:**
+
+```json
+{
+  "prompt": "I need help with Python data analysis",
+  "model": "gemini-2.5-pro"
+}
+```
+
+**Response:** Streaming JSONL
+
+```json
+{"type": "text", "value": "<chat_system_prompt>..."}
+```
+
+Supports all providers: Gemini, OpenAI, Anthropic, and custom-openai.
+
+---
+
+### Refine Prompt
+
+Refine a user prompt for clarity and precision (streaming response).
+
+**Endpoint:** `POST /api/refine-prompt`
+
+**Authentication Required:** Yes (`x-user-id` header)
+
+**Request Body:**
+
+```json
+{
+  "prompt": "help me write code",
+  "model": "gemini-2.5-pro"
+}
+```
+
+**Response:** Streaming JSONL
+
+```json
+{"type": "text", "value": "Refined prompt content..."}
+```
+
+Supports Gemini and OpenAI providers.
+
+---
+
+### List Prompt Suggestions
+
+Get user's custom prompt suggestions.
+
+**Endpoint:** `GET /api/suggestions`
+
+**Authentication Required:** Yes (`x-user-id` header)
+
+**Response (200 OK):**
+
+```json
+[
+  {
+    "id": 1,
+    "title": "Explain Code",
+    "prompt": "Explain this code in simple terms",
+    "icon": "SparklesIcon",
+    "sort_order": 0
+  }
+]
+```
+
+---
+
+### Create Prompt Suggestion
+
+Create a new prompt suggestion.
+
+**Endpoint:** `POST /api/suggestions`
+
+**Authentication Required:** Yes (`x-user-id` header)
+
+**Request Body:**
+
+```json
+{
+  "title": "Explain Code",
+  "prompt": "Explain this code in simple terms",
+  "icon": "SparklesIcon"
+}
+```
+
+**Response (201 Created):**
+
+```json
+{
+  "id": 1,
+  "title": "Explain Code",
+  "prompt": "Explain this code in simple terms",
+  "icon": "SparklesIcon",
+  "sort_order": 0
+}
+```
+
+---
+
+### Reorder Prompt Suggestions
+
+Update the display order of prompt suggestions.
+
+**Endpoint:** `PATCH /api/suggestions`
+
+**Authentication Required:** Yes (`x-user-id` header)
+
+**Request Body:**
+
+```json
+{
+  "orderedIds": [3, 1, 2]
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "message": "Order updated successfully"
+}
+```
+
+---
+
+### Delete Prompt Suggestion
+
+Delete a prompt suggestion.
+
+**Endpoint:** `DELETE /api/suggestions`
+
+**Authentication Required:** Yes (`x-user-id` header)
+
+**Request Body:**
+
+```json
+{
+  "id": 1
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "message": "Suggestion deleted successfully"
+}
+```
+
+**Errors:**
+- `404` - Suggestion not found or not owned by user
 
 ---
 

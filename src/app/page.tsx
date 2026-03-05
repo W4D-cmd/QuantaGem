@@ -1020,6 +1020,7 @@ export default function Home() {
                 description: "Custom model from local provider",
                 inputTokenLimit: 128000,
                 outputTokenLimit: 4096,
+                provider: "custom-openai",
               };
             }
           }

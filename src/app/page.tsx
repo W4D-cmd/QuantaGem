@@ -34,13 +34,17 @@ import {
 import { showApiErrorToast } from "@/lib/errors";
 import NewChatScreen from "@/components/NewChatScreen";
 import AddSuggestionModal from "@/components/AddSuggestionModal";
-import { customModels, isCustomModel, getOriginalModelId, createCustomModelId } from "@/lib/custom-models";
+import { isCustomModel, getOriginalModelId, createCustomModelId, ModelProvider } from "@/lib/custom-models";
 
 const FALLBACK_DEFAULT_MODEL_NAME = "gemini-2.5-pro";
 const DEFAULT_MODEL_NAME = process.env.NEXT_PUBLIC_DEFAULT_MODEL_ID || FALLBACK_DEFAULT_MODEL_NAME;
 const TITLE_GENERATION_MAX_LENGTH = 5000;
 const DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 const MAX_RETRIES = 5;
+
+interface ModelWithProvider extends Model {
+  provider: ModelProvider;
+}
 
 export interface MessagePart {
   type: "text" | "file" | "scraped_url";
@@ -199,7 +203,7 @@ export default function Home() {
   const [allChats, setAllChats] = useState<ChatListItem[]>([]);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [controller, setController] = useState<AbortController | null>(null);
-  const [models, setModels] = useState<Model[]>([]);
+  const [models, setModels] = useState<ModelWithProvider[]>([]);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
   const [toast, setToast] = useState<Omit<ToastProps, "onClose"> | null>(null);
   const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
@@ -567,29 +571,52 @@ export default function Home() {
     setVerbosity(newVerbosity);
   }, []);
 
-  useEffect(() => {
-    const manualModelList: Model[] = customModels.map((cm) => ({
-      name: cm.modelId,
-      displayName: cm.displayName,
-      description: `Manually loaded model: ${cm.displayName}`,
-      version: "manual",
-      supportedGenerationMethods: ["generateContent"],
-      inputTokenLimit: cm.inputTokenLimit,
-      outputTokenLimit: cm.outputTokenLimit,
-    }));
+  const fetchModelList = useCallback(async () => {
+    try {
+      const res = await fetch("/api/models/list", { headers: getAuthHeaders() });
+      if (!res.ok) {
+        console.error("Failed to fetch model list");
+        return;
+      }
+      const data = await res.json();
+      const fetchedModels: Array<{
+        modelId: string;
+        displayName: string;
+        inputTokenLimit: number;
+        outputTokenLimit: number;
+        provider: ModelProvider;
+      }> = data.models || [];
 
-    setModels(manualModelList);
+      const manualModelList: ModelWithProvider[] = fetchedModels.map((cm) => ({
+        name: cm.modelId,
+        displayName: cm.displayName,
+        description: `Manually loaded model: ${cm.displayName}`,
+        version: "manual",
+        supportedGenerationMethods: ["generateContent"],
+        inputTokenLimit: cm.inputTokenLimit,
+        outputTokenLimit: cm.outputTokenLimit,
+        provider: cm.provider,
+      }));
 
-    if (manualModelList.length > 0) {
-      setSelectedModel((current) => {
-        if (current && manualModelList.find((m) => m.name === current.name)) {
-          return current;
-        }
-        const defaultModel = manualModelList.find((m) => m.name === DEFAULT_MODEL_NAME);
-        return defaultModel || manualModelList[0];
-      });
+      setModels(manualModelList);
+
+      if (manualModelList.length > 0) {
+        setSelectedModel((current) => {
+          if (current && manualModelList.find((m) => m.name === current.name)) {
+            return current;
+          }
+          const defaultModel = manualModelList.find((m) => m.name === DEFAULT_MODEL_NAME);
+          return defaultModel || manualModelList[0];
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch model list:", extractErrorMessage(err));
     }
-  }, []);
+  }, [getAuthHeaders]);
+
+  useEffect(() => {
+    fetchModelList();
+  }, [fetchModelList]);
 
   const handleRenameChat = async (chatId: number, newTitle: string) => {
     try {

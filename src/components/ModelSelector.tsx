@@ -7,14 +7,13 @@ import { ArrowDownTrayIcon, ArrowUpTrayIcon, ChevronDownIcon } from "@heroicons/
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  customModels,
   ModelProvider,
   getProviderForModel,
   createCustomModelId,
 } from "@/lib/custom-models";
 
 export interface Props {
-  models: Model[];
+  models: ModelWithProvider[];
   selected: Model | null;
   onChangeAction: (model: Model) => void;
   customModelsList?: { id: string; displayName: string }[];
@@ -71,16 +70,8 @@ export default function ModelSelector({
       return result;
     }
 
-    const availableModelMap = new Map(models.map((m) => [m.name, m]));
-
-    // Process built-in models
-    const modelsWithProvider: ModelWithProvider[] = customModels
-      .map((cm) => {
-        const model = availableModelMap.get(cm.modelId);
-        if (!model) return null;
-        return { ...model, provider: cm.provider };
-      })
-      .filter((m): m is ModelWithProvider => !!m);
+    // Models now come with provider info from the API
+    const modelsWithProvider = models as ModelWithProvider[];
 
     result.gemini = modelsWithProvider.filter((m) => m.provider === "gemini");
     result.openai = modelsWithProvider.filter((m) => m.provider === "openai");
@@ -104,7 +95,9 @@ export default function ModelSelector({
     return result;
   }, [models, customModelsList]);
 
-  const selectedProvider = selected?.name ? getProviderForModel(selected.name) : undefined;
+  const selectedProvider = selected?.name 
+    ? ((selected as ModelWithProvider).provider ?? getProviderForModel(selected.name))
+    : undefined;
 
   const renderModelButton = (m: ModelWithProvider) => (
     <Tooltip key={m.name} text={m.description ?? ""}>

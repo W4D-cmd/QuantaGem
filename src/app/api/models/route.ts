@@ -2,6 +2,11 @@ import { NextResponse, NextRequest } from "next/server";
 import { GoogleGenAI, Model } from "@google/genai";
 
 export async function GET(request: NextRequest) {
+  const userIdHeader = request.headers.get("x-user-id");
+  if (!userIdHeader) {
+    return NextResponse.json({ error: "Unauthorized: Missing user identification" }, { status: 401 });
+  }
+
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
   const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
 

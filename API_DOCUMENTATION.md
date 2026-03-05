@@ -30,14 +30,20 @@ Replace `your-domain.com` with your actual deployment domain.
 
 Most endpoints require authentication. The authentication flow is:
 
-1. **Sign Up or Login**: Call `/api/auth/signup` or `/api/auth/login` to get your user ID and token
-2. **Include Headers**: Add the following header to authenticated requests:
+1. **Sign Up or Login**: Call `/api/auth/signup` or `/api/auth/login` to get your user ID and token.
+2. **Include Headers**: Add the following headers to most authenticated requests:
 
 ```
 x-user-id: <your_user_id>
 ```
 
-Or include the `__session` cookie with the token received from login/signup.
+**Note**: For security, some endpoints (like multipart file uploads and STT) require direct token verification via the `Authorization: Bearer <token>` header or the `__session` cookie.
+
+**Headers**:
+- `x-user-id`: The unique numeric ID of the user (Required for most endpoints).
+- `x-user-email`: The email of the user (Optional, used by some endpoints like `/api/user`).
+- `Authorization`: `Bearer <token>` (Required for file uploads and STT).
+- `Cookie`: `__session=<token>` (Alternative to Authorization header).
 
 **Rate Limiting**:
 - Login endpoints use Redis-based rate limiting (5 attempts per 20 minutes per IP/username)
@@ -54,8 +60,8 @@ Represents a part of a message (text, file attachment, or scraped URL).
 ```typescript
 type MessagePart =
   | { type: "text"; text: string }
-  | { type: "file"; fileName: string; objectName: string; mimeType: string; isProjectFile?: boolean }
-  | { type: "scraped_url"; text: string }
+  | { type: "file"; fileName: string; objectName: string; mimeType: string; size?: number; isProjectFile?: boolean; projectFileId?: number }
+  | { type: "scraped_url"; text: string; url?: string }
 ```
 
 ### Chat Request
@@ -66,10 +72,11 @@ Request body for the main chat endpoint.
 {
   history: Array<{ role: string; parts: MessagePart[] }>;
   messageParts: MessagePart[];
-  chatSessionId: string;
+  chatSessionId: string | number | null;
   model: string;
   isSearchActive?: boolean;
   thinkingBudget?: number;
+  isRegeneration?: boolean;
   systemPrompt?: string;
   projectId?: number | null;
   verbosity?: "low" | "medium" | "high";
@@ -80,12 +87,18 @@ Request body for the main chat endpoint.
 - `history` - Array of previous messages with roles ("user" or "model")
 - `messageParts` - Parts of the new message to send
 - `chatSessionId` - ID of the chat session (optional for new chats)
-- `model` - Model identifier (e.g., "gemini-2.5-pro", "gpt-4o", "claude-3-5-sonnet")
+- `model` - Model identifier from `/api/models/list` (e.g., "gemini-2.5-pro", "gpt-5.2-2025-12-11", "claude-opus-4-6")
 - `isSearchActive` - Enable Google Search integration (default: false)
-- `thinkingBudget` - Reasoning budget for supported models (0-1000000)
+- `thinkingBudget` - Reasoning budget for supported models.
+    - **Gemini 2.5 Pro**: 2048 to 32768 tokens (0 is not allowed).
+    - **Gemini 2.5 Flash**: 0 (off) or 2048 to 24576 tokens.
+    - **Gemini 3.1 Pro/Flash**: Currently uses defaults (budget control coming soon).
+    - **OpenAI**: Mapped levels: `0` (none), `1` (low), `2` (medium), `3` (high), `4` (xhigh).
+    - **Anthropic**: Mapped levels: `1` (low), `2` (medium), `3` (high).
+- `isRegeneration` - Flag to indicate if the message is a regeneration (default: false)
 - `systemPrompt` - Override system prompt for this request
 - `projectId` - Associate with a specific project
-- `verbosity` - Output verbosity level (default: "medium")
+- `verbosity` - Output verbosity level: `"low"`, `"medium"`, or `"high"` (default: `"medium"`)
 
 ### Streaming Response Format
 
@@ -102,7 +115,7 @@ The `/api/chat` endpoint returns a streaming response with newline-delimited JSO
 **Event Types:**
 - `text` - Regular text content
 - `thought` - Reasoning thoughts (for models with thinking)
-- `grounding` - Search sources (when isSearchActive is true)
+- `grounding` - Search sources (when `isSearchActive` is `true`). Includes `sources` array of `{ title: string; uri: string }`.
 - `error` - Error messages
 - `warning` - Warning messages
 
@@ -156,7 +169,7 @@ Register a new user account.
 {
   "message": "Account created and logged in successfully",
   "user": {
-    "id": "1",
+    "id": 1,
     "email": "user@example.com"
   },
   "token": "jwt_token_here"
@@ -194,7 +207,7 @@ Authenticate with email and password.
 {
   "message": "Login successful",
   "user": {
-    "id": "1",
+    "id": 1,
     "email": "user@example.com"
   },
   "token": "jwt_token_here"
@@ -258,15 +271,15 @@ curl -X POST https://your-domain.com/api/chat \
 
 **Supported File Types by Model:**
 
-**Gemini:** PDF, PNG, JPEG, WEBP, HEIC, HEIF, text files, source code
-**OpenAI:** PNG, JPEG, WEBP, GIF, PDF, text files, source code
-**Anthropic:** JPEG, PNG, GIF, WEBP, PDF, text files, source code
+**Gemini:** PDF, PNG, JPEG, WEBP, HEIC, HEIF, text files, source code (mapped to `text/plain`), HTML, CSS, JS, Markdown, CSV, XML, RTF
+**OpenAI:** PNG, JPEG, WEBP, GIF, PDF (sent via `input_file` for GPT-5 family), text files, source code, JSON
+**Anthropic:** JPEG, PNG, GIF, WEBP, PDF, text files, source code, JSON
 
 ---
 
 ### List Chat Sessions
 
-Get all chat sessions for the authenticated user.
+Get all chat sessions for the authenticated user, ordered by last update time (newest first).
 
 **Endpoint:** `GET /api/chats`
 
@@ -281,6 +294,7 @@ Get all chat sessions for the authenticated user.
     "title": "Chat about coding",
     "lastModel": "gemini-2.5-pro",
     "systemPrompt": "You are a helpful assistant.",
+    "keySelection": "your-api-key-alias",
     "projectId": null,
     "updatedAt": "2024-01-15T10:30:00.000Z",
     "thinkingBudget": 1000
@@ -453,7 +467,7 @@ Save a user message and model response as a conversation turn.
   "userMessageParts": [{"type": "text", "text": "Hello!"}],
   "modelMessageParts": [{"type": "text", "text": "Hi there!"}],
   "modelThoughtSummary": "The user greeted me.",
-  "modelSources": [],
+  "modelSources": [{"title": "Example Source", "uri": "https://example.com"}],
   "modelName": "gemini-2.5-pro",
   "projectId": null,
   "thinkingBudget": 1000,
@@ -522,42 +536,6 @@ Save only a user message (for streaming implementations).
     "thoughtSummary": null
   }
 }
-```
-
----
-
-### Get Chat Messages
-
-Get all messages for a specific chat session.
-
-**Endpoint:** `GET /api/chats/{chatSessionId}/messages`
-
-**Authentication Required:** Yes (`x-user-id` header)
-
-**Path Parameters:**
-- `chatSessionId` - ID of the chat session
-
-**Response (200 OK):**
-
-```json
-[
-  {
-    "id": 1,
-    "position": 1,
-    "role": "user",
-    "parts": [{"type": "text", "text": "Hello!"}],
-    "sources": [],
-    "thoughtSummary": null
-  },
-  {
-    "id": 2,
-    "position": 2,
-    "role": "model",
-    "parts": [{"type": "text", "text": "Hi there!"}],
-    "sources": [],
-    "thoughtSummary": null
-  }
-]
 ```
 
 ---
@@ -659,7 +637,7 @@ Append a model response message to an existing chat session (for streaming imple
 
 ### List Projects
 
-Get all projects for the authenticated user.
+Get all projects for the authenticated user, ordered by title (alphabetical).
 
 **Endpoint:** `GET /api/projects`
 
@@ -795,7 +773,7 @@ Delete a project and its associated files.
 ```json
 {
   "ok": true,
-  "message": "Project deleted successfully."
+  "message": "Project, its chats, and associated files (if any) deleted."
 }
 ```
 
@@ -834,7 +812,7 @@ Upload a file to a specific project.
 
 **Endpoint:** `POST /api/projects/{projectId}/files`
 
-**Authentication Required:** Yes (`x-user-id` header, token for multipart)
+**Authentication Required:** Yes (`Authorization: Bearer <token>` or `__session` cookie)
 
 **Path Parameters:**
 - `projectId` - ID of the project
@@ -860,23 +838,6 @@ file: <binary file data>
   "isProjectFile": true
 }
 ```
-
----
-
-### Get Project File
-
-Get a specific file from a project.
-
-**Endpoint:** `GET /api/projects/{projectId}/files/{fileId}`
-
-**Authentication Required:** Yes (`x-user-id` header)
-
-**Path Parameters:**
-- `projectId` - ID of the project
-- `fileId` - ID of the file
-
-**Response (200 OK):**
-Binary file content with appropriate Content-Type header.
 
 ---
 
@@ -911,7 +872,7 @@ Upload a file to MinIO storage.
 
 **Endpoint:** `POST /api/files/upload`
 
-**Authentication Required:** Yes (`__session` cookie/token for multipart)
+**Authentication Required:** Yes (`Authorization: Bearer <token>` or `__session` cookie)
 
 **Request Body (multipart/form-data):**
 
@@ -981,7 +942,7 @@ Get available AI models from Google Gemini.
 
 ### List Custom Models
 
-Get configured custom models (OpenAI-compatible, Anthropic, etc.).
+Get configured custom models (hardcoded Gemini, OpenAI, Anthropic entries).
 
 **Endpoint:** `GET /api/models/list`
 
@@ -993,9 +954,13 @@ Get configured custom models (OpenAI-compatible, Anthropic, etc.).
 {
   "models": [
     {
-      "id": "llama-3.1-70b",
-      "displayName": "Llama 3.1 70B",
-      "provider": "custom-openai"
+      "displayName": "Gemini 2.5 Pro",
+      "modelId": "gemini-2.5-pro",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "provider": "gemini",
+      "supportsReasoning": true,
+      "supportsVerbosity": false
     }
   ],
   "count": 1
@@ -1003,9 +968,13 @@ Get configured custom models (OpenAI-compatible, Anthropic, etc.).
 ```
 
 **Fields:**
-- `id` - Model identifier used in chat requests
+- `modelId` - Model identifier used in chat requests (prefixed with `custom:` for custom models)
 - `displayName` - Human-readable model name
 - `provider` - Provider type: `"gemini"`, `"openai"`, `"anthropic"`, or `"custom-openai"`
+- `inputTokenLimit` - Maximum input tokens supported
+- `outputTokenLimit` - Maximum output tokens supported
+- `supportsReasoning` - Whether the model supports a reasoning budget (Optional)
+- `supportsVerbosity` - Whether the model supports verbosity control (Optional)
 
 ---
 
@@ -1099,17 +1068,12 @@ Check if the API is running and the database is accessible.
 
 Search through chat sessions using full-text search with fuzzy matching.
 
-**Endpoint:** `POST /api/search`
+**Endpoint:** `GET /api/search`
 
 **Authentication Required:** Yes (`x-user-id` header)
 
-**Request Body:**
-
-```json
-{
-  "q": "search query"
-}
-```
+**Query Parameters:**
+- `q` - Search query
 
 **Response (200 OK):**
 
@@ -1140,14 +1104,14 @@ Get current user information.
 **Authentication Required:** Yes (`x-user-id` header)
 
 **Request Headers:**
-- `x-user-id` - User ID
-- `x-user-email` - User email (optional)
+- `x-user-id` - User ID (Required)
+- `x-user-email` - User email (Optional, returned in response if provided)
 
 **Response (200 OK):**
 
 ```json
 {
-  "id": "1",
+  "id": 1,
   "email": "user@example.com"
 }
 ```
@@ -1305,7 +1269,7 @@ Refine a user prompt for clarity and precision (streaming response).
 {"type": "text", "value": "Refined prompt content..."}
 ```
 
-Supports Gemini and OpenAI providers.
+Supports Gemini and OpenAI providers. Other providers will fall back to Gemini.
 
 ---
 
@@ -1482,7 +1446,7 @@ Transcribe audio to text using the STT service.
 
 **Endpoint:** `POST /api/stt/transcribe`
 
-**Authentication Required:** Yes (`__session` cookie/token for multipart)
+**Authentication Required:** Yes (`Authorization: Bearer <token>` or `__session` cookie)
 
 **Request Body (multipart/form-data):**
 
@@ -1499,7 +1463,7 @@ Plain text transcription.
 
 Generate an ephemeral token for live streaming features.
 
-**Endpoint:** `GET /api/live/token`
+**Endpoint:** `POST /api/live/token`
 
 **Authentication Required:** Yes (`x-user-id` header)
 
@@ -1616,8 +1580,7 @@ const chatResponse = await fetch('https://your-domain.com/api/chat', {
 
 ## Notes
 
-- All datetimes are in ISO 8601 format
+- IDs returned as numbers from authentication and data endpoints, but accepted as strings or numbers in requests.
 - File uploads require multipart/form-data with token authentication
 - Streaming endpoints return JSONL (JSON Lines) format
-- IDs returned as strings from authentication endpoints, numbers elsewhere
 - System prompts cascade: chat level > project level > user level

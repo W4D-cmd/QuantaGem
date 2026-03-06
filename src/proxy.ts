@@ -12,6 +12,17 @@ const publicPaths = [
   "/highlightjs-themes/:path*",
 ];
 
+function isApiRoute(pathname: string): boolean {
+  return pathname.startsWith("/api/");
+}
+
+function unauthorizedResponse(): NextResponse {
+  return NextResponse.json(
+    { error: "Unauthorized", message: "Authentication required" },
+    { status: 401 }
+  );
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -68,6 +79,9 @@ export async function proxy(request: NextRequest) {
   loginUrl.searchParams.set("redirectedFrom", pathname);
 
   if (!tokenToVerify) {
+    if (isApiRoute(pathname)) {
+      return unauthorizedResponse();
+    }
     return NextResponse.redirect(loginUrl);
   }
 
@@ -75,6 +89,13 @@ export async function proxy(request: NextRequest) {
     const payload = await verifyAuthToken(tokenToVerify);
 
     if (!payload) {
+      if (isApiRoute(pathname)) {
+        const response = unauthorizedResponse();
+        if (sessionCookie?.value === tokenToVerify) {
+          response.cookies.delete("__session");
+        }
+        return response;
+      }
       const response = NextResponse.redirect(loginUrl);
       if (sessionCookie?.value === tokenToVerify) {
         response.cookies.delete("__session");
@@ -101,6 +122,12 @@ export async function proxy(request: NextRequest) {
 
   } catch (error) {
     console.error("Proxy authentication error:", error);
+    if (isApiRoute(pathname)) {
+      return NextResponse.json(
+        { error: "Authentication error", message: "Token verification failed" },
+        { status: 401 }
+      );
+    }
     loginUrl.searchParams.set("error", "internal_error");
     const response = NextResponse.redirect(loginUrl);
     if (sessionCookie?.value === tokenToVerify) {

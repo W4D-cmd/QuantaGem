@@ -116,6 +116,14 @@ export const customModels: CustomModelEntry[] = [
     supportsReasoning: true,
   },
   {
+    displayName: "Gemini 3.1 Flash-Lite Preview",
+    modelId: "gemini-3.1-flash-lite-preview",
+    inputTokenLimit: 1048576,
+    outputTokenLimit: 65536,
+    provider: "gemini",
+    supportsReasoning: true,
+  },
+  {
     displayName: "Gemini 3 Flash Preview",
     modelId: "gemini-3-flash-preview",
     inputTokenLimit: 1048576,

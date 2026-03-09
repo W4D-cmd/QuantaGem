@@ -19,6 +19,7 @@ import {
   PaperClipIcon,
 } from "@heroicons/react/24/outline";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
+import TemporaryChatToggle from "@/components/TemporaryChatToggle";
 import ProjectManagement from "@/components/ProjectManagement";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import ConfirmationModal from "@/components/ConfirmationModal";
@@ -238,6 +239,7 @@ export default function Home() {
     systemPrompt: string;
   } | null>(null);
   const [suggestionsVersion, setSuggestionsVersion] = useState(0);
+  const [isTemporaryChat, setIsTemporaryChat] = useState(false);
 
   const [ttsVoice, setTtsVoice] = useState<string>("Sulafat");
   const [ttsModel, setTtsModel] = useState<string>(DEFAULT_TTS_MODEL);
@@ -1323,84 +1325,87 @@ export default function Home() {
     );
 
     if (modelResponse) {
-      try {
-        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
-        const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
+      if (!isTemporaryChat) {
+        try {
+          const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+          const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
 
-        const persistRes = await fetch("/api/chats/persist-turn", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-          body: JSON.stringify({
-            chatSessionId: activeChatId,
-            userMessageParts: newUserMessageParts,
-            modelMessageParts: modelResponse.parts,
-            modelThoughtSummary: modelResponse.thoughtSummary || null,
-            modelSources: modelResponse.sources,
-            modelName: selectedModel.name,
-            projectId: currentChatProjectId,
-            thinkingBudget: budgetValue,
-            systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
-          }),
-        });
+          const persistRes = await fetch("/api/chats/persist-turn", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+            body: JSON.stringify({
+              chatSessionId: activeChatId,
+              userMessageParts: newUserMessageParts,
+              modelMessageParts: modelResponse.parts,
+              modelThoughtSummary: modelResponse.thoughtSummary || null,
+              modelSources: modelResponse.sources,
+              modelName: selectedModel.name,
+              projectId: currentChatProjectId,
+              thinkingBudget: budgetValue,
+              systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
+            }),
+          });
 
-        if (!persistRes.ok) {
-          await showApiErrorToast(persistRes, showToast);
-          throw new Error("Failed to save conversation to the database.");
+          if (!persistRes.ok) {
+            await showApiErrorToast(persistRes, showToast);
+            throw new Error("Failed to save conversation to the database.");
+          }
+
+          const { newChatId, userMessage: savedUserMessage, modelMessage: savedModelMessage } = await persistRes.json();
+          await fetchAllChats();
+          setActiveChatId(newChatId);
+
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (msg.id === tempUserMessageId) return savedUserMessage;
+              if (msg.id === tempModelMessageId) return savedModelMessage;
+              return msg;
+            }),
+          );
+
+          if (isNewChat && inputText.trim()) {
+            generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
+          }
+        } catch (err) {
+          showToast(extractErrorMessage(err), "error");
+          setMessages(previousMessages);
         }
-
-        const { newChatId, userMessage: savedUserMessage, modelMessage: savedModelMessage } = await persistRes.json();
-        await fetchAllChats();
-        setActiveChatId(newChatId);
-
-        setMessages((prev) =>
-          prev.map((msg) => {
-            if (msg.id === tempUserMessageId) return savedUserMessage;
-            if (msg.id === tempModelMessageId) return savedModelMessage;
-            return msg;
-          }),
-        );
-
-        if (isNewChat && inputText.trim()) {
-          generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
-        }
-      } catch (err) {
-        showToast(extractErrorMessage(err), "error");
-        setMessages(previousMessages);
       }
     } else {
-      try {
-        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
-        const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
+      if (!isTemporaryChat) {
+        try {
+          const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+          const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
 
-        const persistUserMsgRes = await fetch("/api/chats/persist-user-message", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-          body: JSON.stringify({
-            chatSessionId: activeChatId,
-            userMessageParts: newUserMessageParts,
-            modelName: selectedModel.name,
-            projectId: currentChatProjectId,
-            thinkingBudget: budgetValue,
-            systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
-          }),
-        });
+          const persistUserMsgRes = await fetch("/api/chats/persist-user-message", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+            body: JSON.stringify({
+              chatSessionId: activeChatId,
+              userMessageParts: newUserMessageParts,
+              modelName: selectedModel.name,
+              projectId: currentChatProjectId,
+              thinkingBudget: budgetValue,
+              systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
+            }),
+          });
 
-        if (!persistUserMsgRes.ok) {
-          await showApiErrorToast(persistUserMsgRes, showToast);
-          setMessages(previousMessages);
-          return;
-        }
+          if (!persistUserMsgRes.ok) {
+            await showApiErrorToast(persistUserMsgRes, showToast);
+            setMessages(previousMessages);
+            return;
+          }
 
-        const { newChatId, userMessage: savedUserMessage } = await persistUserMsgRes.json();
-        await fetchAllChats();
-        setActiveChatId(newChatId);
-        setMessages((prev) =>
-          prev.map((msg) => {
-            if (msg.id === tempUserMessageId) return savedUserMessage;
-            if (msg.id === tempModelMessageId) return { ...msg, id: 0 };
-            return msg;
-          }),
-        );
+          const { newChatId, userMessage: savedUserMessage } = await persistUserMsgRes.json();
+          await fetchAllChats();
+          setActiveChatId(newChatId);
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (msg.id === tempUserMessageId) return savedUserMessage;
+              if (msg.id === tempModelMessageId) return { ...msg, id: 0 };
+              return msg;
+            }),
+          );
         setMessages((prev) => prev.filter((msg) => msg.id !== 0));
 
         if (isNewChat && inputText.trim()) {
@@ -1409,6 +1414,7 @@ export default function Home() {
       } catch (err) {
         setMessages(previousMessages);
         showToast(extractErrorMessage(err), "error");
+      }
       }
     }
     setIsLoading(false);
@@ -1868,6 +1874,11 @@ export default function Home() {
             <div />
           )}
           <div className="flex items-center ml-auto">
+            {displayingProjectManagementId === null && (
+              <div className="relative ms-2">
+                <TemporaryChatToggle isActive={isTemporaryChat} onToggle={setIsTemporaryChat} />
+              </div>
+            )}
             <div className="relative ms-2">
               <ThemeToggleButton />
             </div>
@@ -2010,6 +2021,7 @@ export default function Home() {
                       onVerbosityChange={handleVerbosityChange}
                       currentSystemPrompt={newChatSystemPrompt}
                       onSystemPromptGenerated={setNewChatSystemPrompt}
+                      isTemporaryChat={isTemporaryChat}
                     />
                   </div>
                 </div>

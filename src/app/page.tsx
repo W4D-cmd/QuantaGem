@@ -66,6 +66,7 @@ export interface Message {
   parts: MessagePart[];
   thoughtSummary?: string;
   sources?: Array<{ title: string; uri: string }>;
+  isTemporary?: boolean;
 }
 
 export interface ChatListItem {
@@ -682,6 +683,10 @@ export default function Home() {
     setAllChats((prev) => prev.filter((c) => c.id !== chatId));
     if (activeChatId === chatId) {
       setActiveChatId(null);
+      setMessages([]);
+      setEditingPromptInitialValue(null);
+      setTotalTokens(0);
+      setThinkingOption("dynamic");
     }
     showToast("Chat deleted.", "success");
   };
@@ -994,12 +999,6 @@ export default function Home() {
   useEffect(() => {
     setEditingMessage(null);
     if (activeChatId === null && displayingProjectManagementId === null) {
-      if (!isLoading) {
-        setMessages([]);
-        setEditingPromptInitialValue(null);
-        setTotalTokens(0);
-        setThinkingOption("dynamic");
-      }
       prevActiveChatIdRef.current = null;
       prevDisplayingProjectManagementIdRef.current = null;
       return;
@@ -1297,6 +1296,7 @@ export default function Home() {
       parts: newUserMessageParts,
       id: tempUserMessageId,
       position: (messages[messages.length - 1]?.position || 0) + 1,
+      isTemporary: isTemporaryChat,
     };
     const tempModelMessageId = tempUserMessageId + 1;
     const placeholderMessage: Message = {
@@ -1306,6 +1306,7 @@ export default function Home() {
       thoughtSummary: "",
       id: tempModelMessageId,
       position: newUserMessage.position + 1,
+      isTemporary: isTemporaryChat,
     };
 
     const previousMessages = [...messages];
@@ -1330,6 +1331,8 @@ export default function Home() {
           const budgetMap = getThinkingBudgetMap(selectedModel?.name);
           const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
 
+          const unsavedMessages = previousMessages.filter((msg) => msg.isTemporary);
+
           const persistRes = await fetch("/api/chats/persist-turn", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -1343,8 +1346,14 @@ export default function Home() {
               projectId: currentChatProjectId,
               thinkingBudget: budgetValue,
               systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
+              unsavedMessages: unsavedMessages.length > 0 ? unsavedMessages : undefined,
             }),
           });
+
+          if (persistRes.status === 401) {
+            router.replace("/login");
+            return;
+          }
 
           if (!persistRes.ok) {
             await showApiErrorToast(persistRes, showToast);
@@ -1359,9 +1368,14 @@ export default function Home() {
             prev.map((msg) => {
               if (msg.id === tempUserMessageId) return savedUserMessage;
               if (msg.id === tempModelMessageId) return savedModelMessage;
+              if (msg.isTemporary) return { ...msg, isTemporary: false };
               return msg;
             }),
           );
+
+          if (unsavedMessages.length > 0 && activeChatId === newChatId) {
+            loadChat(newChatId);
+          }
 
           if (isNewChat && inputText.trim()) {
             generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
@@ -1377,6 +1391,8 @@ export default function Home() {
           const budgetMap = getThinkingBudgetMap(selectedModel?.name);
           const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
 
+          const unsavedMessages = previousMessages.filter((msg) => msg.isTemporary);
+
           const persistUserMsgRes = await fetch("/api/chats/persist-user-message", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -1387,8 +1403,14 @@ export default function Home() {
               projectId: currentChatProjectId,
               thinkingBudget: budgetValue,
               systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
+              unsavedMessages: unsavedMessages.length > 0 ? unsavedMessages : undefined,
             }),
           });
+
+          if (persistUserMsgRes.status === 401) {
+            router.replace("/login");
+            return;
+          }
 
           if (!persistUserMsgRes.ok) {
             await showApiErrorToast(persistUserMsgRes, showToast);
@@ -1403,10 +1425,15 @@ export default function Home() {
             prev.map((msg) => {
               if (msg.id === tempUserMessageId) return savedUserMessage;
               if (msg.id === tempModelMessageId) return { ...msg, id: 0 };
+              if (msg.isTemporary) return { ...msg, isTemporary: false };
               return msg;
             }),
           );
         setMessages((prev) => prev.filter((msg) => msg.id !== 0));
+
+        if (unsavedMessages.length > 0 && activeChatId === newChatId) {
+          loadChat(newChatId);
+        }
 
         if (isNewChat && inputText.trim()) {
           generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
@@ -1415,13 +1442,15 @@ export default function Home() {
         setMessages(previousMessages);
         showToast(extractErrorMessage(err), "error");
       }
+      } else {
+        setMessages((prev) => prev.filter((msg) => msg.id !== tempModelMessageId));
       }
     }
     setIsLoading(false);
   };
 
   const handleEditSave = async (index: number, newParts: MessagePart[]) => {
-    if (!activeChatId || !messages[index] || isLoading) return;
+    if (!messages[index] || isLoading) return;
 
     const messageToEdit = messages[index];
     if (messageToEdit.role !== "user") return;
@@ -1431,30 +1460,43 @@ export default function Home() {
 
     try {
       const newUserMessageParts = newParts;
+      const willBeTemporary = isTemporaryChat || messageToEdit.isTemporary;
 
-      const patchRes = await fetch(`/api/chats/${activeChatId}/messages`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({
-          messageId: messageToEdit.id,
-          newParts: newUserMessageParts,
-        }),
-      });
+      if (!willBeTemporary && activeChatId) {
+        const patchRes = await fetch(`/api/chats/${activeChatId}/messages`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+          body: JSON.stringify({
+            messageId: messageToEdit.id,
+            newParts: newUserMessageParts,
+          }),
+        });
 
-      if (!patchRes.ok) {
-        await showApiErrorToast(patchRes, showToast);
-        throw new Error("Failed to save edited message.");
-      }
+        if (patchRes.status === 401) {
+          router.replace("/login");
+          return;
+        }
 
-      const modelMessagePosition = messageToEdit.position + 1;
-      const deleteRes = await fetch(`/api/chats/${activeChatId}/messages?fromPosition=${modelMessagePosition}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      });
+        if (!patchRes.ok) {
+          await showApiErrorToast(patchRes, showToast);
+          throw new Error("Failed to save edited message.");
+        }
 
-      if (!deleteRes.ok) {
-        await showApiErrorToast(deleteRes, showToast);
-        throw new Error("Failed to delete subsequent messages.");
+        const modelMessagePosition = messageToEdit.position + 1;
+        const deleteRes = await fetch(`/api/chats/${activeChatId}/messages?fromPosition=${modelMessagePosition}`, {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        });
+
+        if (deleteRes.status === 401) {
+          router.replace("/login");
+          return;
+        }
+
+        if (!deleteRes.ok) {
+          await showApiErrorToast(deleteRes, showToast);
+          throw new Error("Failed to delete subsequent messages.");
+        }
       }
 
       const historyForAPI = messages.slice(0, index);
@@ -1462,6 +1504,7 @@ export default function Home() {
       const updatedUserMessage: Message = {
         ...messageToEdit,
         parts: newUserMessageParts,
+        isTemporary: willBeTemporary,
       };
 
       const placeholderMessage: Message = {
@@ -1471,6 +1514,7 @@ export default function Home() {
         thoughtSummary: "",
         id: Date.now() + 1,
         position: updatedUserMessage.position + 1,
+        isTemporary: willBeTemporary,
       };
 
       setMessages([...historyForAPI, updatedUserMessage, placeholderMessage]);
@@ -1485,7 +1529,7 @@ export default function Home() {
         placeholderMessage.id,
       );
 
-      if (modelResponse) {
+      if (modelResponse && !willBeTemporary && activeChatId) {
         const persistRes = await fetch(`/api/chats/${activeChatId}/append-model-message`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -1502,19 +1546,23 @@ export default function Home() {
         }
       }
 
-      await loadChat(activeChatId);
+      if (!willBeTemporary && activeChatId) {
+        await loadChat(activeChatId);
+      }
     } catch (err: unknown) {
       if (err instanceof Error && !err.message.startsWith("Failed to")) {
         showToast(extractErrorMessage(err), "error");
       }
-      await loadChat(activeChatId);
+      if (activeChatId) {
+        await loadChat(activeChatId);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleRegenerateResponse = async (modelMessageIndex: number) => {
-    if (!activeChatId || isLoading) return;
+    if (isLoading) return;
     const userMessageIndex = modelMessageIndex - 1;
     if (userMessageIndex < 0 || messages[userMessageIndex].role !== "user") return;
 
@@ -1523,17 +1571,21 @@ export default function Home() {
 
     setIsLoading(true);
     try {
-      const deleteRes = await fetch(
-        `/api/chats/${activeChatId}/messages?fromPosition=${modelMessageToReplace.position}`,
-        {
-          method: "DELETE",
-          headers: getAuthHeaders(),
-        },
-      );
+      const willBeTemporary = isTemporaryChat || modelMessageToReplace.isTemporary;
 
-      if (!deleteRes.ok) {
-        await showApiErrorToast(deleteRes, showToast);
-        throw new Error("Failed to delete message for regeneration.");
+      if (!willBeTemporary && activeChatId) {
+        const deleteRes = await fetch(
+          `/api/chats/${activeChatId}/messages?fromPosition=${modelMessageToReplace.position}`,
+          {
+            method: "DELETE",
+            headers: getAuthHeaders(),
+          },
+        );
+
+        if (!deleteRes.ok) {
+          await showApiErrorToast(deleteRes, showToast);
+          throw new Error("Failed to delete message for regeneration.");
+        }
       }
 
       const historyForAPI = messages.slice(0, userMessageIndex);
@@ -1546,6 +1598,7 @@ export default function Home() {
         thoughtSummary: "",
         id: Date.now() + 1,
         position: userMessageToResend.position + 1,
+        isTemporary: willBeTemporary,
       };
 
       setMessages([...currentMessages, placeholderMessage]);
@@ -1560,7 +1613,7 @@ export default function Home() {
         placeholderMessage.id,
       );
 
-      if (modelResponse) {
+      if (modelResponse && !willBeTemporary && activeChatId) {
         const persistRes = await fetch(`/api/chats/${activeChatId}/append-model-message`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -1576,12 +1629,16 @@ export default function Home() {
           throw new Error("Failed to save regenerated model response.");
         }
       }
-      await loadChat(activeChatId);
+      if (!willBeTemporary && activeChatId) {
+        await loadChat(activeChatId);
+      }
     } catch (err: unknown) {
       if (err instanceof Error && !err.message.startsWith("Failed to")) {
         showToast(extractErrorMessage(err), "error");
       }
-      await loadChat(activeChatId);
+      if (activeChatId) {
+        await loadChat(activeChatId);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1794,27 +1851,29 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
-      <Sidebar
-        chats={allChats}
-        projects={sortedProjects}
-        activeChatId={activeChatId}
-        activeProjectId={displayingProjectManagementId}
-        onNewChat={handleNewChat}
-        onSelectChat={handleSelectChat}
-        onRenameChat={handleRenameChat}
-        onDeleteChat={confirmDeleteChat}
-        onDeleteAllGlobalChats={confirmDeleteAllGlobalChats}
-        onOpenChatSettings={openChatSettingsModal}
-        onNewProject={handleNewProject}
-        onSelectProject={handleSelectProject}
-        onRenameProject={handleRenameProject}
-        onDeleteProject={confirmDeleteProject}
-        onDuplicateChat={handleDuplicateChat}
-        expandedProjects={expandedProjects}
-        onToggleProjectExpansion={setExpandedProjects}
-        onMoveChat={handleMoveChat}
-        onSaveAsSuggestion={handleOpenSaveSuggestionModal}
-      />
+      <div className={`h-full transition-opacity duration-300 ease-in-out flex-none ${isTemporaryChat ? "opacity-50 pointer-events-none" : "opacity-100"}`}>
+        <Sidebar
+          chats={allChats}
+          projects={sortedProjects}
+          activeChatId={activeChatId}
+          activeProjectId={displayingProjectManagementId}
+          onNewChat={handleNewChat}
+          onSelectChat={handleSelectChat}
+          onRenameChat={handleRenameChat}
+          onDeleteChat={confirmDeleteChat}
+          onDeleteAllGlobalChats={confirmDeleteAllGlobalChats}
+          onOpenChatSettings={openChatSettingsModal}
+          onNewProject={handleNewProject}
+          onSelectProject={handleSelectProject}
+          onRenameProject={handleRenameProject}
+          onDeleteProject={confirmDeleteProject}
+          onDuplicateChat={handleDuplicateChat}
+          expandedProjects={expandedProjects}
+          onToggleProjectExpansion={setExpandedProjects}
+          onMoveChat={handleMoveChat}
+          onSaveAsSuggestion={handleOpenSaveSuggestionModal}
+        />
+      </div>
       <main
         className="flex-1 flex flex-col relative"
         onDragEnter={handleDragEnter}
@@ -1841,10 +1900,10 @@ export default function Home() {
         </AnimatePresence>
         <div
           className="flex-none sticky min-h-16 top-0 z-10 px-4 py-2 border-b border-neutral-100 dark:border-zinc-900
-            transition-colors duration-300 ease-in-out flex items-center justify-between"
+            transition-colors duration-300 ease-in-out flex items-center justify-between relative"
         >
           {displayingProjectManagementId === null ? (
-            <>
+            <div className="flex items-center">
               <ModelSelector
                 models={models}
                 selected={selectedModel}
@@ -1869,16 +1928,18 @@ export default function Home() {
                   </div>
                 </Tooltip>
               </div>
-            </>
+            </div>
           ) : (
             <div />
           )}
-          <div className="flex items-center ml-auto">
+
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             {displayingProjectManagementId === null && (
-              <div className="relative ms-2">
-                <TemporaryChatToggle isActive={isTemporaryChat} onToggle={setIsTemporaryChat} />
-              </div>
+              <TemporaryChatToggle isActive={isTemporaryChat} onToggle={setIsTemporaryChat} />
             )}
+          </div>
+
+          <div className="flex items-center ml-auto">
             <div className="relative ms-2">
               <ThemeToggleButton />
             </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { MessagePart } from "@/app/page";
+import { MessagePart, Message } from "@/app/page";
 
 interface PersistUserMessageRequest {
   chatSessionId: number | null;
@@ -9,6 +9,7 @@ interface PersistUserMessageRequest {
   projectId: number | null;
   thinkingBudget: number;
   systemPrompt?: string;
+  unsavedMessages?: Message[];
 }
 
 export async function POST(request: NextRequest) {
@@ -21,12 +22,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid user ID" }, { status: 401 });
   }
 
-  const { chatSessionId, userMessageParts, modelName, projectId, thinkingBudget, systemPrompt } =
+  const { chatSessionId, userMessageParts, modelName, projectId, thinkingBudget, systemPrompt, unsavedMessages } =
     (await request.json()) as PersistUserMessageRequest;
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+
+    const userCheck = await client.query("SELECT id FROM users WHERE id = $1", [userId]);
+    if (userCheck.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "User not found. Please log in again." }, { status: 401 });
+    }
 
     let currentChatId = chatSessionId;
 
@@ -50,6 +57,28 @@ export async function POST(request: NextRequest) {
       ]);
       if (ownerCheck.rowCount === 0) {
         throw new Error("Chat session not found or not owned by user");
+      }
+    }
+
+    if (unsavedMessages && unsavedMessages.length > 0) {
+      for (const msg of unsavedMessages) {
+        const msgContent = msg.parts
+          .filter((p) => p.type === "text" && p.text)
+          .map((p) => p.text)
+          .join(" ");
+
+        await client.query(
+          `INSERT INTO messages (chat_session_id, role, content, parts, position, sources, thought_summary)
+           VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $5, $6)`,
+          [
+            currentChatId,
+            msg.role,
+            msgContent,
+            JSON.stringify(msg.parts),
+            JSON.stringify(msg.sources || []),
+            msg.thoughtSummary || null,
+          ]
+        );
       }
     }
 

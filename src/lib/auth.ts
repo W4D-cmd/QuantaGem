@@ -11,13 +11,13 @@ interface AuthPayload extends JWTPayload {
   email: string;
 }
 
-const JWT_SECRET_VALUE = process.env.JWT_SECRET;
-
-if (!JWT_SECRET_VALUE) {
-  throw new Error("JWT_SECRET is not defined in environment variables.");
+function getJwtSecretKey() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET is not defined in environment variables.");
+  }
+  return new TextEncoder().encode(secret);
 }
-
-const JWT_SECRET_KEY = new TextEncoder().encode(JWT_SECRET_VALUE);
 
 export async function generateAuthToken(userId: number, email: string): Promise<string> {
   const payload: AuthPayload = { userId, email };
@@ -25,12 +25,12 @@ export async function generateAuthToken(userId: number, email: string): Promise<
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(JWT_SECRET_KEY);
+    .sign(getJwtSecretKey());
 }
 
 export async function verifyAuthToken(token: string): Promise<AuthPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET_KEY, {
+    const { payload } = await jwtVerify(token, getJwtSecretKey(), {
       algorithms: ["HS256"],
     });
 

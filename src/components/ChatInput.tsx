@@ -173,6 +173,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onVerbosityChange,
       currentSystemPrompt,
       onSystemPromptGenerated,
+      isTemporaryChat,
     },
     ref,
   ) => {

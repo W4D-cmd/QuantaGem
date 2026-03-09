@@ -65,6 +65,7 @@ interface ChatInputProps {
   onVerbosityChange: (verbosity: VerbosityOption) => void;
   currentSystemPrompt: string;
   onSystemPromptGenerated: (prompt: string) => void;
+  isTemporaryChat: boolean;
 }
 
 export interface ChatInputHandle {
@@ -220,6 +221,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const xhr = new XMLHttpRequest();
         const formData = new FormData();
         formData.append("file", uploadingFile.file);
+        formData.append("isTemporary", String(isTemporaryChat));
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {

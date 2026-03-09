@@ -98,6 +98,20 @@ CREATE TABLE IF NOT EXISTS prompt_suggestions (
 
 CREATE INDEX IF NOT EXISTS idx_prompt_suggestions_user_id ON prompt_suggestions (user_id);
 
+CREATE TABLE IF NOT EXISTS temporary_files (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  object_name TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '24 hours')
+);
+
+CREATE INDEX IF NOT EXISTS idx_temporary_files_expires_at ON temporary_files (expires_at);
+CREATE INDEX IF NOT EXISTS idx_temporary_files_user_id ON temporary_files (user_id);
+
 -- Function to copy default prompt suggestions for new users
 CREATE OR REPLACE FUNCTION copy_default_prompt_suggestions()
 RETURNS TRIGGER AS $$

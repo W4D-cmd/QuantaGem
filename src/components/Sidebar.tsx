@@ -14,6 +14,7 @@ import {
   TrashIcon,
   BookmarkSquareIcon,
 } from "@heroicons/react/24/outline";
+import { Pin, PinOff } from "lucide-react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import TruncatedTooltip from "./TruncatedTooltip";
 
@@ -38,6 +39,7 @@ interface SidebarProps {
   onToggleProjectExpansion: React.Dispatch<React.SetStateAction<Set<number>>>;
   onMoveChat?: (chatId: number, targetProjectId: number | null) => void;
   onSaveAsSuggestion?: (chatId: number, title: string, systemPrompt: string) => void;
+  onPinChat?: (chatId: number) => void;
 }
 
 const groupChatsByDate = (chats: ChatListItem[]) => {
@@ -203,6 +205,7 @@ export default function Sidebar({
   onToggleProjectExpansion,
   onMoveChat,
   onSaveAsSuggestion,
+  onPinChat,
 }: SidebarProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<{ type: "chat" | "project"; id: number } | null>(null);
@@ -339,12 +342,18 @@ export default function Sidebar({
   };
 
   const globalChats = chats.filter((chat) => chat.projectId === null);
-  const groupedGlobalChats = groupChatsByDate(globalChats);
+  const pinnedGlobalChats = globalChats.filter((chat) => chat.pinnedAt !== null);
+  const unpinnedGlobalChats = globalChats.filter((chat) => chat.pinnedAt === null);
+  const groupedGlobalChats = groupChatsByDate(unpinnedGlobalChats);
 
   const getChatsForProject = (projectId: number) =>
     chats
       .filter((chat) => chat.projectId === projectId)
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      .sort((a, b) => {
+        if (a.pinnedAt && !b.pinnedAt) return -1;
+        if (!a.pinnedAt && b.pinnedAt) return 1;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
 
   const handleStartEdit = (type: "chat" | "project", id: number) => {
     setEditingItem({ type, id });
@@ -424,6 +433,119 @@ export default function Sidebar({
           }`}
         >
           <AnimatePresence>
+            {pinnedGlobalChats.length > 0 && (
+              <motion.div key="pinned" variants={animationVariants.item} className="mb-4">
+                <h3 className="text-xs font-semibold text-neutral-500 dark:text-zinc-500 uppercase mb-2">
+                  Pinned
+                </h3>
+                <ul>
+                  <AnimatePresence>
+                    {pinnedGlobalChats.map((chat) => (
+                      <motion.li
+                        key={chat.id}
+                        variants={animationVariants.item}
+                        exit="exit"
+                        layout="position"
+                        className="mb-0.5"
+                      >
+                        <div
+                          className={`relative group ${draggedChatId === chat.id ? "opacity-50" : ""} ${
+                            !editingItem && onMoveChat ? "cursor-grab active:cursor-grabbing" : ""
+                          }`}
+                          draggable={!editingItem && !!onMoveChat}
+                          onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent<HTMLLIElement>, chat.id)}
+                          onDragEnd={(e) => handleDragEnd(e as unknown as React.DragEvent<HTMLLIElement>)}
+                          onMouseEnter={() => onPrefetchChat?.(chat.id)}
+                        >
+                        <EditableItem
+                          item={chat}
+                          isActive={chat.id === activeChatId}
+                          isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
+                          onSelect={() => onSelectChat(chat.id)}
+                          onStartEdit={() => handleStartEdit("chat", chat.id)}
+                          onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
+                          onCancelEdit={handleCancelEdit}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Pin className="size-4 flex-shrink-0 text-neutral-400 dark:text-zinc-400" />
+                            <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
+                          </div>
+                          <div
+                            className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
+                              group-hover:translate-x-0 transition-all duration-200 ease-in-out"
+                          >
+                            <button
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                e.stopPropagation();
+                                menuAnchorRef.current = e.currentTarget;
+                                setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
+                              }}
+                              className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-zinc-500"
+                            >
+                              <EllipsisHorizontalIcon className="size-5" />
+                            </button>
+                            <DropdownMenu
+                              open={openMenuId === `chat-${chat.id}`}
+                              anchorRef={menuAnchorRef}
+                              onCloseAction={() => setOpenMenuId(null)}
+                              position="left"
+                              items={[
+                                {
+                                  id: "rename",
+                                  icon: <PencilIcon className="size-4" />,
+                                  label: "Rename",
+                                  onClick: () => handleStartEdit("chat", chat.id),
+                                },
+                                {
+                                  id: "duplicate",
+                                  icon: <DocumentDuplicateIcon className="size-4" />,
+                                  label: "Duplicate",
+                                  onClick: () => onDuplicateChat(chat.id),
+                                },
+                                {
+                                  id: "settings",
+                                  icon: <Cog6ToothIcon className="size-4" />,
+                                  label: "Settings",
+                                  onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
+                                },
+                                ...(onSaveAsSuggestion
+                                  ? [
+                                      {
+                                        id: "save-as-suggestion",
+                                        icon: <BookmarkSquareIcon className="size-4" />,
+                                        label: "Save as Suggestion",
+                                        onClick: () => onSaveAsSuggestion(chat.id, chat.title, chat.systemPrompt),
+                                      },
+                                    ]
+                                  : []),
+                                ...(onPinChat
+                                  ? [
+                                      {
+                                        id: "unpin",
+                                        icon: <PinOff className="size-4" />,
+                                        label: "Unpin",
+                                        onClick: () => onPinChat(chat.id),
+                                      },
+                                    ]
+                                  : []),
+                                {
+                                  id: "delete",
+                                  icon: <TrashIcon className="size-4 text-red-500" />,
+                                  label: "Delete",
+                                  onClick: () => onDeleteChat(chat.id),
+                                  className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
+                                },
+                              ]}
+                            />
+                          </div>
+                        </EditableItem>
+                        </div>
+                      </motion.li>
+                  ))}
+                </AnimatePresence>
+              </ul>
+            </motion.div>
+          )}
             {groupedGlobalChats.map((group) => (
               <motion.div key={group.label} variants={animationVariants.item} className="mb-4">
                 <h3 className="text-xs font-semibold text-neutral-500 dark:text-zinc-500 uppercase mb-2">
@@ -503,6 +625,16 @@ export default function Sidebar({
                                         icon: <BookmarkSquareIcon className="size-4" />,
                                         label: "Save as Suggestion",
                                         onClick: () => onSaveAsSuggestion(chat.id, chat.title, chat.systemPrompt),
+                                      },
+                                    ]
+                                  : []),
+                                ...(onPinChat
+                                  ? [
+                                      {
+                                        id: "pin",
+                                        icon: <Pin className="size-4" />,
+                                        label: "Pin",
+                                        onClick: () => onPinChat(chat.id),
                                       },
                                     ]
                                   : []),
@@ -656,7 +788,10 @@ export default function Sidebar({
                                       onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
                                       onCancelEdit={handleCancelEdit}
                                     >
-                                      <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        {chat.pinnedAt && <Pin className="size-4 flex-shrink-0 text-neutral-400 dark:text-zinc-400" />}
+                                        <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
+                                      </div>
                                       <div
                                         className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
                                           group-hover:translate-x-0 transition-all duration-200 ease-in-out"
@@ -704,6 +839,16 @@ export default function Sidebar({
                                                     label: "Save as Suggestion",
                                                     onClick: () =>
                                                       onSaveAsSuggestion(chat.id, chat.title, chat.systemPrompt),
+                                                  },
+                                                ]
+                                              : []),
+                                            ...(onPinChat
+                                              ? [
+                                                  {
+                                                    id: "pin",
+                                                    icon: <Pin className="size-4" />,
+                                                    label: chat.pinnedAt ? "Unpin" : "Pin",
+                                                    onClick: () => onPinChat(chat.id),
                                                   },
                                                 ]
                                               : []),

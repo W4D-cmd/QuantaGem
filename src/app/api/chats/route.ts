@@ -20,9 +20,12 @@ export async function GET(request: NextRequest) {
            , project_id      AS "projectId"
            , updated_at      AS "updatedAt"
            , thinking_budget AS "thinkingBudget"
+           , pinned_at       AS "pinnedAt"
       FROM chat_sessions
       WHERE user_id = $1
-      ORDER BY updated_at DESC
+      ORDER BY 
+        pinned_at DESC NULLS LAST,
+        updated_at DESC
     `,
     [userId],
   );

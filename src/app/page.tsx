@@ -77,6 +77,7 @@ export interface ChatListItem {
   projectId: number | null;
   updatedAt: string;
   thinkingBudget: number;
+  pinnedAt: string | null;
 }
 
 export interface ProjectListItem {
@@ -727,6 +728,33 @@ export default function Home() {
       }
     },
     [getAuthHeaders, router, fetchAllChats, setActiveChatId, setDisplayingProjectManagementId, showToast],
+  );
+
+  const handlePinChat = useCallback(
+    async (chatId: number) => {
+      try {
+        const res = await fetch(`/api/chats/${chatId}/pin`, {
+          method: "PATCH",
+          headers: getAuthHeaders(),
+        });
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          await showApiErrorToast(res, showToast);
+          return;
+        }
+        const { pinnedAt } = await res.json();
+        setAllChats((prev) =>
+          prev.map((c) => (c.id === chatId ? { ...c, pinnedAt } : c)),
+        );
+        showToast(pinnedAt ? "Chat pinned." : "Chat unpinned.", "success");
+      } catch (err: unknown) {
+        showToast(extractErrorMessage(err), "error");
+      }
+    },
+    [getAuthHeaders, router, showToast],
   );
 
   const handleOpenSaveSuggestionModal = useCallback((chatId: number, title: string, systemPrompt: string) => {
@@ -1921,6 +1949,7 @@ export default function Home() {
           onToggleProjectExpansion={setExpandedProjects}
           onMoveChat={handleMoveChat}
           onSaveAsSuggestion={handleOpenSaveSuggestionModal}
+          onPinChat={handlePinChat}
         />
       </div>
       <main

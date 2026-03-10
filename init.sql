@@ -39,8 +39,11 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
   last_model TEXT,
   system_prompt TEXT DEFAULT '',
   key_selection TEXT DEFAULT 'free',
-  thinking_budget INTEGER DEFAULT -1
+  thinking_budget INTEGER DEFAULT -1,
+  pinned_at TIMESTAMPTZ DEFAULT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_pinned_at ON chat_sessions (pinned_at DESC NULLS LAST);
 
 CREATE TABLE IF NOT EXISTS messages (
   id BIGSERIAL PRIMARY KEY,

@@ -24,6 +24,7 @@ interface SidebarProps {
   activeProjectId: number | null;
   onNewChat: (projectId?: number | null) => void;
   onSelectChat: (chatId: number) => void;
+  onPrefetchChat?: (chatId: number) => void;
   onRenameChat: (chatId: number, newTitle: string) => void;
   onDeleteChat: (chatId: number) => void;
   onDeleteAllGlobalChats: () => void;
@@ -188,6 +189,7 @@ export default function Sidebar({
   activeProjectId,
   onNewChat,
   onSelectChat,
+  onPrefetchChat,
   onRenameChat,
   onDeleteChat,
   onDeleteAllGlobalChats,
@@ -444,6 +446,7 @@ export default function Sidebar({
                           draggable={!editingItem && !!onMoveChat}
                           onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent<HTMLLIElement>, chat.id)}
                           onDragEnd={(e) => handleDragEnd(e as unknown as React.DragEvent<HTMLLIElement>)}
+                          onMouseEnter={() => onPrefetchChat?.(chat.id)}
                         >
                         <EditableItem
                           item={chat}
@@ -642,6 +645,7 @@ export default function Sidebar({
                                       draggable={!editingItem && !!onMoveChat}
                                       onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent<HTMLLIElement>, chat.id)}
                                       onDragEnd={(e) => handleDragEnd(e as unknown as React.DragEvent<HTMLLIElement>)}
+                                      onMouseEnter={() => onPrefetchChat?.(chat.id)}
                                     >
                                     <EditableItem
                                       item={chat}

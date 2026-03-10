@@ -258,6 +258,13 @@ export default function Home() {
   const chatInputRef = useRef<ChatInputHandle>(null);
   const prevActiveChatIdRef = useRef<number | null>(null);
   const prevDisplayingProjectManagementIdRef = useRef<number | null>(null);
+  const chatCacheRef = useRef<Map<number, {
+    messages: Message[];
+    systemPrompt: string;
+    projectId: number | null;
+    thinkingBudget: number;
+    lastModel: string;
+  }>>(new Map());
 
   const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
   
@@ -823,8 +830,49 @@ export default function Home() {
     [allProjects],
   );
 
+  const prefetchChat = useCallback(
+    async (chatId: number) => {
+      if (chatCacheRef.current.has(chatId)) return;
+      try {
+        const res = await fetch(`/api/chats/${chatId}`, {
+          headers: getAuthHeaders(),
+        });
+        if (res.ok) {
+          const data: {
+            messages: Message[];
+            systemPrompt: string;
+            projectId: number | null;
+            thinkingBudget: number;
+            lastModel: string;
+          } = await res.json();
+          // LRU eviction: remove oldest entry if cache is full
+          if (chatCacheRef.current.size >= 10) {
+            const oldestKey = chatCacheRef.current.keys().next().value;
+            if (oldestKey !== undefined) {
+              chatCacheRef.current.delete(oldestKey);
+            }
+          }
+          chatCacheRef.current.set(chatId, data);
+        }
+      } catch {
+        // Silently ignore prefetch errors
+      }
+    },
+    [getAuthHeaders],
+  );
+
   const loadChat = useCallback(
     async (chatId: number) => {
+      const cached = chatCacheRef.current.get(chatId);
+      if (cached) {
+        const modelValueMap = getThinkingValueMap(cached.lastModel);
+        setMessages(cached.messages);
+        setEditingPromptInitialValue(cached.systemPrompt);
+        setCurrentChatProjectId(cached.projectId);
+        setThinkingOption(modelValueMap?.[cached.thinkingBudget] || "dynamic");
+        chatCacheRef.current.delete(chatId);
+        return;
+      }
       setIsLoading(true);
       try {
         const res = await fetch(`/api/chats/${chatId}`, {
@@ -1859,6 +1907,7 @@ export default function Home() {
           activeProjectId={displayingProjectManagementId}
           onNewChat={handleNewChat}
           onSelectChat={handleSelectChat}
+          onPrefetchChat={prefetchChat}
           onRenameChat={handleRenameChat}
           onDeleteChat={confirmDeleteChat}
           onDeleteAllGlobalChats={confirmDeleteAllGlobalChats}

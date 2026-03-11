@@ -350,7 +350,7 @@ export default function Home() {
 
   const fetchTokenCount = useCallback(
     async (currentMessages: Message[], currentModel: Model | null, currentChatId: number | null) => {
-      if (!currentModel || !currentChatId || currentMessages.length === 0) {
+      if (!currentModel || currentMessages.length === 0) {
         setTotalTokens(0);
         return;
       }
@@ -375,8 +375,8 @@ export default function Home() {
           return;
         }
 
-        const { totalTokens } = await res.json();
-        setTotalTokens(totalTokens);
+        const { totalTokens: tokens } = await res.json();
+        setTotalTokens(tokens);
       } catch (err) {
         console.error("Token count failed:", extractErrorMessage(err));
         setTotalTokens(null);
@@ -389,7 +389,7 @@ export default function Home() {
 
   useEffect(() => {
     const previousIsLoading = sessionStorage.getItem("isLoading") === "true";
-    if (previousIsLoading && !isLoading && activeChatId && messages.length > 0) {
+    if (previousIsLoading && !isLoading && messages.length > 0 && selectedModel) {
       fetchTokenCount(messages, selectedModel, activeChatId);
     }
     sessionStorage.setItem("isLoading", isLoading.toString());
@@ -890,7 +890,7 @@ export default function Home() {
   );
 
   const loadChat = useCallback(
-    async (chatId: number) => {
+    async (chatId: number): Promise<{ messages: Message[]; lastModel: string } | null> => {
       const cached = chatCacheRef.current.get(chatId);
       if (cached) {
         const modelValueMap = getThinkingValueMap(cached.lastModel);
@@ -899,7 +899,7 @@ export default function Home() {
         setCurrentChatProjectId(cached.projectId);
         setThinkingOption(modelValueMap?.[cached.thinkingBudget] || "dynamic");
         chatCacheRef.current.delete(chatId);
-        return;
+        return { messages: cached.messages, lastModel: cached.lastModel };
       }
       setIsLoading(true);
       try {
@@ -908,7 +908,7 @@ export default function Home() {
         });
         if (res.status === 401) {
           router.replace("/login");
-          return;
+          return null;
         }
         if (!res.ok) {
           if (res.status === 404) {
@@ -920,7 +920,7 @@ export default function Home() {
             setThinkingOption("dynamic");
           }
           await showApiErrorToast(res, showToast);
-          return;
+          return null;
         }
         const data: {
           messages: Message[];
@@ -935,8 +935,10 @@ export default function Home() {
         setEditingPromptInitialValue(data.systemPrompt);
         setCurrentChatProjectId(data.projectId);
         setThinkingOption(modelValueMap?.[data.thinkingBudget] || "dynamic");
+        return { messages: data.messages, lastModel: data.lastModel };
       } catch (err: unknown) {
         showToast(extractErrorMessage(err), "error");
+        return null;
       } finally {
         setIsLoading(false);
       }
@@ -1119,9 +1121,30 @@ export default function Home() {
         }
 
         setIsLoading(true);
-        loadChat(activeChatId).finally(() => {
-          setIsLoading(false);
-        });
+        loadChat(activeChatId)
+          .then((result) => {
+            if (result && result.messages.length > 0) {
+              const modelForTokenCount =
+                models.find((m) => m.name === result.lastModel) ||
+                fetchedCustomModels
+                  .filter((m) => m.id === getOriginalModelId(result.lastModel))
+                  .map((m) => ({
+                    name: result.lastModel,
+                    displayName: m.displayName || getOriginalModelId(result.lastModel),
+                    description: "Custom model from local provider",
+                    inputTokenLimit: 128000,
+                    outputTokenLimit: 4096,
+                    provider: "custom-openai" as const,
+                  }))[0] ||
+                selectedModel;
+              if (modelForTokenCount) {
+                fetchTokenCount(result.messages, modelForTokenCount, activeChatId);
+              }
+            }
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
       }
       prevActiveChatIdRef.current = activeChatId;
       prevDisplayingProjectManagementIdRef.current = null;
@@ -1136,7 +1159,7 @@ export default function Home() {
       prevDisplayingProjectManagementIdRef.current = displayingProjectManagementId;
       prevActiveChatIdRef.current = null;
     }
-  }, [activeChatId, displayingProjectManagementId, allChats, models, selectedModel, loadChat, isLoading]);
+  }, [activeChatId, displayingProjectManagementId, allChats, models, selectedModel, loadChat, isLoading, fetchedCustomModels, fetchTokenCount]);
 
   const handleCancel = () => {
     controller?.abort();

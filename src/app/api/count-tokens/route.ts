@@ -12,6 +12,7 @@ interface CountTokensRequest {
   model: string;
   chatSessionId?: number;
   systemPrompt?: string;
+  projectId?: number;
 }
 
 const SUPPORTED_GEMINI_MIME_TYPES = [
@@ -257,24 +258,38 @@ async function countFileTokensForOpenAI(filePart: MessagePart): Promise<number> 
   return OPENAI_UNKNOWN_FILE_TOKEN_ESTIMATE;
 }
 
-async function fetchSystemPrompt(chatSessionId: number, userId: string): Promise<string | null> {
+async function fetchSystemPrompt(
+  chatSessionId: number | undefined | null,
+  projectId: number | undefined | null,
+  userId: string,
+): Promise<string | null> {
   let systemPromptText: string | null = null;
 
   try {
-    const chatSettingsResult = await pool.query(
-      "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
-      [chatSessionId, userId],
-    );
+    if (chatSessionId) {
+      const chatSettingsResult = await pool.query(
+        "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
+        [chatSessionId, userId],
+      );
 
-    const chatSpecificPrompt = chatSettingsResult.rows[0]?.system_prompt?.trim();
-    const associatedProjectId = chatSettingsResult.rows[0]?.project_id;
+      const chatSpecificPrompt = chatSettingsResult.rows[0]?.system_prompt?.trim();
+      const associatedProjectId = chatSettingsResult.rows[0]?.project_id;
 
-    if (chatSpecificPrompt) {
-      systemPromptText = chatSpecificPrompt;
-    } else if (associatedProjectId) {
+      if (chatSpecificPrompt) {
+        systemPromptText = chatSpecificPrompt;
+      } else if (associatedProjectId) {
+        const projectSettingsResult = await pool.query(
+          "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
+          [associatedProjectId, userId],
+        );
+        if (projectSettingsResult.rows.length > 0 && projectSettingsResult.rows[0].system_prompt?.trim() !== "") {
+          systemPromptText = projectSettingsResult.rows[0].system_prompt;
+        }
+      }
+    } else if (projectId) {
       const projectSettingsResult = await pool.query(
         "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
-        [associatedProjectId, userId],
+        [projectId, userId],
       );
       if (projectSettingsResult.rows.length > 0 && projectSettingsResult.rows[0].system_prompt?.trim() !== "") {
         systemPromptText = projectSettingsResult.rows[0].system_prompt;
@@ -546,7 +561,7 @@ export async function POST(request: NextRequest) {
   }
   const userId = userIdHeader;
 
-  const { history, model, chatSessionId, systemPrompt } = (await request.json()) as CountTokensRequest;
+  const { history, model, chatSessionId, systemPrompt, projectId } = (await request.json()) as CountTokensRequest;
 
   if (!model) {
     return NextResponse.json({ error: "model missing" }, { status: 400 });
@@ -555,9 +570,9 @@ export async function POST(request: NextRequest) {
   const provider = getProviderForModel(model);
 
   try {
-    let systemPromptText: string | null = systemPrompt ?? null;
-    if (!systemPromptText && chatSessionId) {
-      systemPromptText = await fetchSystemPrompt(chatSessionId, userId);
+    let systemPromptText: string | null = systemPrompt && systemPrompt.trim() !== "" ? systemPrompt : null;
+    if (!systemPromptText) {
+      systemPromptText = await fetchSystemPrompt(chatSessionId, projectId, userId);
     }
 
     let totalTokens: number;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart, Message } from "@/app/page";
+import { migrateTemporaryFile } from "@/lib/minio";
 
 interface PersistTurnRequest {
   chatSessionId: number | null;
@@ -13,6 +14,21 @@ interface PersistTurnRequest {
   thinkingBudget: number;
   systemPrompt?: string;
   unsavedMessages?: Message[];
+}
+
+function collectTemporaryObjectNames(parts: MessagePart[]): string[] {
+  return parts
+    .filter((p) => p.type === "file" && p.objectName?.startsWith("temporary/"))
+    .map((p) => p.objectName!);
+}
+
+function replaceObjectNames(parts: MessagePart[], migrations: Map<string, string>): MessagePart[] {
+  return parts.map((part) => {
+    if (part.type === "file" && part.objectName && migrations.has(part.objectName)) {
+      return { ...part, objectName: migrations.get(part.objectName)! };
+    }
+    return part;
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -37,6 +53,13 @@ export async function POST(request: NextRequest) {
     systemPrompt,
     unsavedMessages,
   } = (await request.json()) as PersistTurnRequest;
+
+  const allParts: MessagePart[] = [
+    ...userMessageParts,
+    ...modelMessageParts,
+    ...(unsavedMessages?.flatMap((m) => m.parts) || []),
+  ];
+  const temporaryObjectNames = [...new Set(collectTemporaryObjectNames(allParts))];
 
   const client = await pool.connect();
   try {
@@ -73,6 +96,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const savedUnsavedMessages: { id: number; msg: Message }[] = [];
     if (unsavedMessages && unsavedMessages.length > 0) {
       for (const msg of unsavedMessages) {
         const msgContent = msg.parts
@@ -80,9 +104,10 @@ export async function POST(request: NextRequest) {
           .map((p) => p.text)
           .join(" ");
 
-        await client.query(
+        const unsavedResult = await client.query(
           `INSERT INTO messages (chat_session_id, role, content, parts, position, sources, thought_summary)
-           VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $5, $6)`,
+           VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $5, $6)
+           RETURNING id`,
           [
             currentChatId,
             msg.role,
@@ -92,6 +117,7 @@ export async function POST(request: NextRequest) {
             msg.thoughtSummary || null,
           ]
         );
+        savedUnsavedMessages.push({ id: unsavedResult.rows[0].id, msg });
       }
     }
 
@@ -135,10 +161,65 @@ export async function POST(request: NextRequest) {
 
     await client.query("COMMIT");
 
+    const migrations = new Map<string, string>();
+    const migrationErrors: string[] = [];
+
+    for (const oldObjectName of temporaryObjectNames) {
+      try {
+        const newObjectName = await migrateTemporaryFile(oldObjectName);
+        migrations.set(oldObjectName, newObjectName);
+
+        await pool.query(
+          `DELETE FROM temporary_files WHERE object_name = $1`,
+          [oldObjectName]
+        );
+      } catch (err) {
+        console.error(`Failed to migrate temporary file ${oldObjectName}:`, err);
+        migrationErrors.push(oldObjectName);
+      }
+    }
+
+    if (migrations.size > 0) {
+      const updatedUserParts = replaceObjectNames(savedUserMessage.parts, migrations);
+      const updatedModelParts = replaceObjectNames(savedModelMessage.parts, migrations);
+
+      await pool.query(
+        `UPDATE messages SET parts = $1 WHERE id = $2`,
+        [JSON.stringify(updatedUserParts), savedUserMessage.id]
+      );
+
+      await pool.query(
+        `UPDATE messages SET parts = $1 WHERE id = $2`,
+        [JSON.stringify(updatedModelParts), savedModelMessage.id]
+      );
+
+      if (savedUnsavedMessages.length > 0) {
+        for (const saved of savedUnsavedMessages) {
+          const updatedParts = replaceObjectNames(saved.msg.parts, migrations);
+          await pool.query(
+            `UPDATE messages SET parts = $1 WHERE id = $2`,
+            [JSON.stringify(updatedParts), saved.id]
+          );
+          saved.msg.parts = updatedParts;
+        }
+      }
+
+      savedUserMessage.parts = updatedUserParts;
+      savedModelMessage.parts = updatedModelParts;
+    }
+
+    const finalizedUnsavedMessages = savedUnsavedMessages.map(({ id, msg }) => ({
+      oldId: msg.id,
+      newId: id,
+      parts: msg.parts,
+    }));
+
     return NextResponse.json({
       newChatId: currentChatId,
       userMessage: savedUserMessage,
       modelMessage: savedModelMessage,
+      migrationErrors: migrationErrors.length > 0 ? migrationErrors : undefined,
+      unsavedMessagesMap: finalizedUnsavedMessages,
     });
   } catch (error) {
     await client.query("ROLLBACK");

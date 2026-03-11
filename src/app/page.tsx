@@ -1436,7 +1436,7 @@ export default function Home() {
             throw new Error("Failed to save conversation to the database.");
           }
 
-          const { newChatId, userMessage: savedUserMessage, modelMessage: savedModelMessage } = await persistRes.json();
+          const { newChatId, userMessage: savedUserMessage, modelMessage: savedModelMessage, unsavedMessagesMap } = await persistRes.json();
           await fetchAllChats();
           setActiveChatId(newChatId);
 
@@ -1444,7 +1444,14 @@ export default function Home() {
             prev.map((msg) => {
               if (msg.id === tempUserMessageId) return savedUserMessage;
               if (msg.id === tempModelMessageId) return savedModelMessage;
-              if (msg.isTemporary) return { ...msg, isTemporary: false };
+              if (msg.isTemporary) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const mapEntry = unsavedMessagesMap?.find((m: any) => m.oldId === msg.id);
+                if (mapEntry) {
+                  return { ...msg, id: mapEntry.newId, parts: mapEntry.parts, isTemporary: false };
+                }
+                return { ...msg, isTemporary: false };
+              }
               return msg;
             }),
           );
@@ -1494,14 +1501,21 @@ export default function Home() {
             return;
           }
 
-          const { newChatId, userMessage: savedUserMessage } = await persistUserMsgRes.json();
+          const { newChatId, userMessage: savedUserMessage, unsavedMessagesMap } = await persistUserMsgRes.json();
           await fetchAllChats();
           setActiveChatId(newChatId);
           setMessages((prev) =>
             prev.map((msg) => {
               if (msg.id === tempUserMessageId) return savedUserMessage;
               if (msg.id === tempModelMessageId) return { ...msg, id: 0 };
-              if (msg.isTemporary) return { ...msg, isTemporary: false };
+              if (msg.isTemporary) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const mapEntry = unsavedMessagesMap?.find((m: any) => m.oldId === msg.id);
+                if (mapEntry) {
+                  return { ...msg, id: mapEntry.newId, parts: mapEntry.parts, isTemporary: false };
+                }
+                return { ...msg, isTemporary: false };
+              }
               return msg;
             }),
           );

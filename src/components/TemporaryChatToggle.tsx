@@ -2,7 +2,7 @@
 
 import React from "react";
 import Tooltip from "@/components/Tooltip";
-import { ChatBubbleOvalLeftIcon } from "@heroicons/react/24/outline";
+import { MessageCircleDashed } from "lucide-react";
 import { CheckIcon } from "@heroicons/react/16/solid";
 
 interface TemporaryChatToggleProps {
@@ -24,7 +24,7 @@ export default function TemporaryChatToggle({ isActive, onToggle }: TemporaryCha
         aria-pressed={isActive}
       >
         <div className="relative flex items-center justify-center size-5 mr-2">
-          <ChatBubbleOvalLeftIcon className="size-5" />
+          <MessageCircleDashed className="size-5" />
           {isActive && (
             <div className="absolute inset-0 flex items-center justify-center pb-[2px]">
                <CheckIcon className="size-3.5" />

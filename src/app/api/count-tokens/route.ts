@@ -10,7 +10,8 @@ import { getProviderForModel, isCustomModel } from "@/lib/custom-models";
 interface CountTokensRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
   model: string;
-  chatSessionId: number;
+  chatSessionId?: number;
+  systemPrompt?: string;
 }
 
 const SUPPORTED_GEMINI_MIME_TYPES = [
@@ -545,7 +546,7 @@ export async function POST(request: NextRequest) {
   }
   const userId = userIdHeader;
 
-  const { history, model, chatSessionId } = (await request.json()) as CountTokensRequest;
+  const { history, model, chatSessionId, systemPrompt } = (await request.json()) as CountTokensRequest;
 
   if (!model) {
     return NextResponse.json({ error: "model missing" }, { status: 400 });
@@ -554,8 +555,8 @@ export async function POST(request: NextRequest) {
   const provider = getProviderForModel(model);
 
   try {
-    let systemPromptText: string | null = null;
-    if (chatSessionId) {
+    let systemPromptText: string | null = systemPrompt ?? null;
+    if (!systemPromptText && chatSessionId) {
       systemPromptText = await fetchSystemPrompt(chatSessionId, userId);
     }
 

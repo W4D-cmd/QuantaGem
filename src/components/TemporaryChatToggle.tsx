@@ -2,8 +2,7 @@
 
 import React from "react";
 import Tooltip from "@/components/Tooltip";
-import { MessageCircleDashed } from "lucide-react";
-import { CheckIcon } from "@heroicons/react/16/solid";
+import { MessageCircleDashed, MessageCircleCheck } from "lucide-react";
 
 interface TemporaryChatToggleProps {
   isActive: boolean;
@@ -23,14 +22,11 @@ export default function TemporaryChatToggle({ isActive, onToggle }: TemporaryCha
         aria-label={isActive ? "Disable temporary chat" : "Enable temporary chat"}
         aria-pressed={isActive}
       >
-        <div className="relative flex items-center justify-center size-5 mr-2">
-          <MessageCircleDashed className="size-5" />
-          {isActive && (
-            <div className="absolute inset-0 flex items-center justify-center pb-[2px]">
-               <CheckIcon className="size-3.5" />
-            </div>
-          )}
-        </div>
+        {isActive ? (
+          <MessageCircleCheck className="size-5 mr-2" />
+        ) : (
+          <MessageCircleDashed className="size-5 mr-2" />
+        )}
         <span className="text-sm font-medium">Temporary</span>
       </button>
     </Tooltip>

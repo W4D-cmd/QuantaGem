@@ -349,7 +349,7 @@ export default function Home() {
   };
 
   const fetchTokenCount = useCallback(
-    async (currentMessages: Message[], currentModel: Model | null, currentChatId: number | null) => {
+    async (currentMessages: Message[], currentModel: Model | null, currentChatId: number | null, systemPrompt?: string) => {
       if (!currentModel || currentMessages.length === 0) {
         setTotalTokens(0);
         return;
@@ -365,7 +365,8 @@ export default function Home() {
           body: JSON.stringify({
             history: currentMessages,
             model: currentModel.name,
-            chatSessionId: currentChatId,
+            chatSessionId: currentChatId ?? undefined,
+            systemPrompt: systemPrompt || undefined,
           }),
         });
 
@@ -390,10 +391,11 @@ export default function Home() {
   useEffect(() => {
     const previousIsLoading = sessionStorage.getItem("isLoading") === "true";
     if (previousIsLoading && !isLoading && messages.length > 0 && selectedModel) {
-      fetchTokenCount(messages, selectedModel, activeChatId);
+      const systemPromptForCounting = activeChatId ? undefined : newChatSystemPrompt || undefined;
+      fetchTokenCount(messages, selectedModel, activeChatId, systemPromptForCounting);
     }
     sessionStorage.setItem("isLoading", isLoading.toString());
-  }, [isLoading, activeChatId, messages, selectedModel, fetchTokenCount]);
+  }, [isLoading, activeChatId, messages, selectedModel, fetchTokenCount, newChatSystemPrompt]);
 
   const fetchAllProjects = useCallback(async () => {
     try {

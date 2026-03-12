@@ -52,15 +52,15 @@ import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import { Message, MessagePart } from "@/app/page";
 import {
-  ClipboardDocumentListIcon,
-  CheckIcon,
-  PencilIcon,
-  ArrowPathIcon,
-  XCircleIcon,
-  SpeakerWaveIcon,
-  StopIcon,
-} from "@heroicons/react/24/outline";
-import { ChevronRightIcon } from "@heroicons/react/24/solid";
+  ClipboardList,
+  Check,
+  Pencil,
+  RefreshCw,
+  XCircle,
+  Volume2,
+  Square,
+  ChevronRight,
+} from "lucide-react";
 import Tooltip from "@/components/Tooltip";
 import MessageSkeleton from "./MessageSkeleton";
 import LazyMarkdownRenderer from "./LazyMarkdownRenderer";
@@ -214,7 +214,7 @@ const MessageEditor = memo(function MessageEditor({
                 onClick={() => handleRemoveFilePart(part.objectName!)}
                 className="text-neutral-500 hover:text-red-500 dark:hover:text-red-400"
               >
-                <XCircleIcon className="size-5" />
+                <XCircle className="size-5" />
               </button>
             </div>
           ))}
@@ -260,7 +260,7 @@ const ThinkingSummary: React.FC<{ summary: string; isStreaming: boolean }> = ({ 
           dark:text-zinc-600 hover:text-neutral-900 dark:hover:text-zinc-400 transition-colors"
       >
         <motion.div animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
-          <ChevronRightIcon className="size-4" />
+          <ChevronRight className="size-4" />
         </motion.div>
         {isStreaming ? <ThinkingLabel /> : "Thoughts"}
       </button>
@@ -503,7 +503,7 @@ const CodeBlockWithCopy: React.FC<CodeBlockWithCopyProps> = ({ children, chatAre
             dark:hover:bg-zinc-700 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10
             group-hover:scale-100 scale-95"
         >
-          {copied ? <CheckIcon className="size-4 text-green-600" /> : <ClipboardDocumentListIcon className="size-4" />}
+          {copied ? <Check className="size-4 text-green-600" /> : <ClipboardList className="size-4" />}
         </button>
       </Tooltip>
     </div>
@@ -827,13 +827,13 @@ function ChatAreaComponent(
   const getAudioButtonIcon = (messageId: number) => {
     if (audioPlaybackState.messageId === messageId) {
       if (audioPlaybackState.status === "loading") {
-        return <ArrowPathIcon className="size-4 animate-spin" />;
+        return <RefreshCw className="size-4 animate-spin" />;
       }
       if (audioPlaybackState.status === "playing") {
-        return <StopIcon className="size-4 text-red-400" />;
+        return <Square className="size-4 text-red-400" />;
       }
     }
-    return <SpeakerWaveIcon className="size-4" />;
+    return <Volume2 className="size-4" />;
   };
 
   return (
@@ -995,9 +995,9 @@ function ChatAreaComponent(
                         hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
                     >
                       {copiedMessageId === msg.id ? (
-                        <CheckIcon className="size-4 text-green-500" />
+                        <Check className="size-4 text-green-500" />
                       ) : (
-                        <ClipboardDocumentListIcon className="size-4" />
+                        <ClipboardList className="size-4" />
                       )}
                     </button>
                   </Tooltip>
@@ -1009,7 +1009,7 @@ function ChatAreaComponent(
                         className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
                           hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
                       >
-                        <PencilIcon className="size-4" />
+                        <Pencil className="size-4" />
                       </button>
                     </Tooltip>
                   )}
@@ -1021,7 +1021,7 @@ function ChatAreaComponent(
                         className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
                           hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
                       >
-                        <ArrowPathIcon className="size-4" />
+                        <RefreshCw className="size-4" />
                       </button>
                     </Tooltip>
                   )}

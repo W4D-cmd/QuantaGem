@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    const finalIcon = icon || "SparklesIcon";
+    const finalIcon = icon || "Sparkles";
 
     const maxOrderResult = await pool.query<{ max_order: number | null }>(
       "SELECT COALESCE(MAX(sort_order), -1) as max_order FROM prompt_suggestions WHERE user_id = $1",

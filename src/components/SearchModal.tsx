@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import { MagnifyingGlassIcon, XMarkIcon, FolderIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { Search, X, Folder, Clock } from "lucide-react";
 import { SearchResult } from "@/app/api/search/route";
 
 interface SearchModalProps {
@@ -273,7 +273,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
           >
             {/* Search Input */}
             <div className="flex items-center gap-3 px-4 py-4 border-b border-neutral-200 dark:border-zinc-800">
-              <MagnifyingGlassIcon className="size-5 text-neutral-400 dark:text-zinc-500 flex-shrink-0" />
+              <Search className="size-5 text-neutral-400 dark:text-zinc-500 flex-shrink-0" />
               <input
                 ref={inputRef}
                 type="text"
@@ -295,7 +295,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
                   dark:hover:bg-zinc-800 transition-colors"
                 aria-label="Close search"
               >
-                <XMarkIcon className="size-5" />
+                <X className="size-5" />
               </button>
             </div>
 
@@ -342,7 +342,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
                             className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full
                               bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex-shrink-0"
                           >
-                            <FolderIcon className="size-3" />
+                            <Folder className="size-3" />
                             {result.projectTitle}
                           </span>
                         )}
@@ -353,7 +353,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
 
                       {/* Timestamp */}
                       <div className="flex items-center gap-1 mt-1.5 text-xs text-neutral-400 dark:text-zinc-500">
-                        <ClockIcon className="size-3" />
+                        <Clock className="size-3" />
                         <span>{formatRelativeTime(result.updatedAt)}</span>
                       </div>
                     </motion.div>
@@ -364,7 +364,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
               {/* Empty State */}
               {!isLoading && hasSearched && results.length === 0 && (
                 <div className="py-12 text-center">
-                  <MagnifyingGlassIcon className="size-12 mx-auto text-neutral-300 dark:text-zinc-600 mb-3" />
+                  <Search className="size-12 mx-auto text-neutral-300 dark:text-zinc-600 mb-3" />
                   <p className="text-neutral-500 dark:text-zinc-500">No results found</p>
                   <p className="text-sm text-neutral-400 dark:text-zinc-500 mt-1">
                     Try different keywords or check spelling
@@ -375,7 +375,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelectChat
               {/* Initial State */}
               {!isLoading && !hasSearched && (
                 <div className="py-12 text-center">
-                  <MagnifyingGlassIcon className="size-12 mx-auto text-neutral-300 dark:text-zinc-600 mb-3" />
+                  <Search className="size-12 mx-auto text-neutral-300 dark:text-zinc-600 mb-3" />
                   <p className="text-neutral-500 dark:text-zinc-500">Search your chats</p>
                   <p className="text-sm text-neutral-400 dark:text-zinc-500 mt-1">
                     Search by title or message content

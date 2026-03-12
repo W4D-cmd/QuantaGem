@@ -3,7 +3,7 @@
 import React, { useRef, useState } from "react";
 import { useTheme } from "@/components/ThemeProvider";
 import Tooltip from "@/components/Tooltip";
-import { SunIcon, MoonIcon, ComputerDesktopIcon } from "@heroicons/react/24/outline";
+import { Sun, Moon, Monitor } from "lucide-react";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
 
 export default function ThemeToggleButton() {
@@ -12,9 +12,9 @@ export default function ThemeToggleButton() {
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const getIconForTheme = (t: "light" | "dark" | "system") => {
-    if (t === "light") return <SunIcon className="size-5 transition-colors duration-300 ease-in-out" />;
-    if (t === "dark") return <MoonIcon className="size-5 transition-colors duration-300 ease-in-out" />;
-    return <ComputerDesktopIcon className="size-5 transition-colors duration-300 ease-in-out" />;
+    if (t === "light") return <Sun className="size-5 transition-colors duration-300 ease-in-out" />;
+    if (t === "dark") return <Moon className="size-5 transition-colors duration-300 ease-in-out" />;
+    return <Monitor className="size-5 transition-colors duration-300 ease-in-out" />;
   };
 
   const getLabelForTheme = (t: "light" | "dark" | "system") => {
@@ -27,21 +27,21 @@ export default function ThemeToggleButton() {
     {
       id: "light",
       label: "Light",
-      icon: <SunIcon className="size-4" />,
+      icon: <Sun className="size-4" />,
       onClick: () => setTheme("light"),
       className: resolvedTheme === "light" ? "font-semibold" : "",
     },
     {
       id: "dark",
       label: "Dark",
-      icon: <MoonIcon className="size-4" />,
+      icon: <Moon className="size-4" />,
       onClick: () => setTheme("dark"),
       className: resolvedTheme === "dark" ? "font-semibold" : "",
     },
     {
       id: "system",
       label: "System",
-      icon: <ComputerDesktopIcon className="size-4" />,
+      icon: <Monitor className="size-4" />,
       onClick: () => setTheme("system"),
       className: theme === "system" ? "font-semibold" : "",
     },

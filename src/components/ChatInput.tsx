@@ -14,26 +14,26 @@ import React, {
 } from "react";
 import Tooltip from "@/components/Tooltip";
 import {
-  ArrowPathIcon,
-  BeakerIcon,
-  CheckIcon,
-  CpuChipIcon,
-  FolderOpenIcon,
-  GlobeAltIcon as OutlineGlobeAltIcon,
-  MicrophoneIcon,
-  PaperClipIcon,
-  SparklesIcon,
-  XCircleIcon,
-  XMarkIcon,
-  ChevronDownIcon,
-} from "@heroicons/react/24/outline";
-import { GlobeAltIcon as SolidGlobeAltIcon } from "@heroicons/react/24/solid";
+  RefreshCw,
+  FlaskConical,
+  Check,
+  Cpu,
+  FolderOpen,
+  Globe,
+  GlobeOff,
+  Mic,
+  Paperclip,
+  Sparkles,
+  XCircle,
+  X,
+  ChevronDown,
+  ArrowUp,
+  Square,
+} from "lucide-react";
 import { Message, ProjectFile } from "@/app/page";
 import { ThinkingOption, VerbosityOption, getThinkingConfigForModel, isOpenAIReasoningModel, getOpenAIReasoningConfig } from "@/lib/thinking";
 import { modelSupportsVerbosity } from "@/lib/custom-models";
 import VerbositySelector from "./VerbositySelector";
-import { ArrowUpIcon } from "@heroicons/react/20/solid";
-import { StopIcon } from "@heroicons/react/16/solid";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
 import { ToastProps } from "./Toast";
 import { Model } from "@google/genai";
@@ -388,13 +388,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       {
         id: "attach-files",
         label: "Attach files",
-        icon: <PaperClipIcon className="size-4" />,
+        icon: <Paperclip className="size-4" />,
         onClick: () => fileInputRef.current?.click(),
       },
       {
         id: "open-folder",
         label: "Open source folder",
-        icon: <FolderOpenIcon className="size-4" />,
+        icon: <FolderOpen className="size-4" />,
         onClick: handleOpenSourceFolder,
       },
     ];
@@ -436,7 +436,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         label: labelMap[option],
         onClick: () => onThinkingOptionChange(option),
         className: thinkingOption === option ? "font-semibold" : "",
-        icon: thinkingOption === option ? <CheckIcon className="size-4 text-blue-500" /> : <div className="size-4" />,
+        icon: thinkingOption === option ? <Check className="size-4 text-blue-500" /> : <div className="size-4" />,
       }));
     }, [selectedModel, thinkingOption, onThinkingOptionChange]);
 
@@ -934,7 +934,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   >
                     <span className={file.isProjectFile ? "font-semibold" : ""}>{file.fileName}</span>
                     {!isLoading && (
-                      <XCircleIcon
+                      <XCircle
                         className="size-4 text-neutral-500 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
                         onClick={() => removeSelectedFile(file.objectName)}
                       />
@@ -952,7 +952,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       style={{ width: `${upload.progress}%` }}
                     ></div>
                     <div className="relative z-10 flex items-center gap-2 px-3 py-1 text-blue-700 dark:text-blue-300">
-                      <ArrowPathIcon className="size-4 animate-spin" />
+                      <RefreshCw className="size-4 animate-spin" />
                       <span className="truncate max-w-xs">{upload.file.name}</span>
                     </div>
                   </div>
@@ -962,7 +962,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           </div>
           {scanStatusMessage && (
             <div className="mb-2 p-2 text-sm text-neutral-500 flex items-center gap-2">
-              <ArrowPathIcon className="size-4 animate-spin" />
+              <RefreshCw className="size-4 animate-spin" />
               <span>{scanStatusMessage}</span>
             </div>
           )}
@@ -1023,7 +1023,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-700
                       disabled:opacity-50"
                   >
-                    <PaperClipIcon
+                    <Paperclip
                       className="size-5 text-neutral-500 dark:text-zinc-400 transition-colors duration-300
                         ease-in-out"
                     />
@@ -1059,11 +1059,11 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       } `}
                   >
                     {isSearchActive ? (
-                      <SolidGlobeAltIcon
+                      <Globe
                         className="size-5 text-white dark:text-zinc-800 transition-colors duration-300 ease-in-out"
                       />
                     ) : (
-                      <OutlineGlobeAltIcon
+                      <GlobeOff
                         className="size-5 text-neutral-500 dark:text-zinc-400 transition-colors duration-300
                           ease-in-out"
                       />
@@ -1083,9 +1083,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400
                       dark:hover:bg-zinc-700 disabled:opacity-50`}
                     >
-                      <CpuChipIcon className="size-5" />
+                      <Cpu className="size-5" />
                       <span className="capitalize">{thinkingOption}</span>
-                      <ChevronDownIcon className="size-3" />
+                      <ChevronDown className="size-3" />
                     </button>
                   </Tooltip>
                 )}
@@ -1132,9 +1132,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                             }`}
                         >
                           {isGeneratingSystemPrompt ? (
-                            <ArrowPathIcon className="size-4 animate-spin" />
+                            <RefreshCw className="size-4 animate-spin" />
                           ) : (
-                            <BeakerIcon className="size-5" />
+                            <FlaskConical className="size-5" />
                           )}
                         </button>
                       </Tooltip>
@@ -1162,13 +1162,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         >
                           {isRefining ? (
                             <>
-                              <ArrowPathIcon className="size-4 animate-spin" />
+                              <RefreshCw className="size-4 animate-spin" />
                               <span>Cancel</span>
                             </>
                           ) : (
                             <>
                               <span>Refine</span>
-                              <SparklesIcon className="size-4" />
+                              <Sparkles className="size-4" />
                             </>
                           )}
                         </button>
@@ -1186,9 +1186,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                             disabled:opacity-50"
                         >
                           {isRecording ? (
-                            <XMarkIcon className="size-5 text-red-500" />
+                            <X className="size-5 text-red-500" />
                           ) : (
-                            <MicrophoneIcon className="size-5 text-neutral-500 dark:text-zinc-400" />
+                            <Mic className="size-5 text-neutral-500 dark:text-zinc-400" />
                           )}
                         </button>
                       </Tooltip>
@@ -1229,7 +1229,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.5 }}
                       >
-                        <StopIcon className="size-5" />
+                        <Square className="size-5" />
                       </motion.div>
                     ) : isTranscribing || isScanning ? (
                       <motion.div
@@ -1238,7 +1238,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.5 }}
                       >
-                        <ArrowPathIcon className="size-5 animate-spin" />
+                        <RefreshCw className="size-5 animate-spin" />
                       </motion.div>
                     ) : isRecording ? (
                       <motion.div
@@ -1247,7 +1247,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.5 }}
                       >
-                        <CheckIcon className="size-5 text-green-500" />
+                        <Check className="size-5 text-green-500" />
                       </motion.div>
                     ) : (
                       <motion.div
@@ -1256,7 +1256,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.5 }}
                       >
-                        <ArrowUpIcon className="size-5 stroke-2" />
+                        <ArrowUp className="size-5 stroke-2" />
                       </motion.div>
                     )}
                   </AnimatePresence>

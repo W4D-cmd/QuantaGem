@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { ProjectListItem } from "@/app/page";
-import { SparklesIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { Sparkles, Plus, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   DndContext,
@@ -79,7 +79,7 @@ function SortableSuggestionCard({ suggestion, onDelete, onClick }: SortableSugge
         transition-all z-10"
         title="Delete suggestion"
       >
-        <TrashIcon className="size-4" />
+        <Trash2 className="size-4" />
       </button>
       <div className="flex items-center gap-3 mb-1">
         {getIconComponent(suggestion.icon)}
@@ -249,7 +249,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({
               className="mx-auto flex items-center justify-center size-16 rounded-full bg-blue-100 dark:bg-blue-900/50
               mb-6"
             >
-              <SparklesIcon className="size-8 text-blue-600/80 dark:text-blue-400/90" />
+              <Sparkles className="size-8 text-blue-600/80 dark:text-blue-400/90" />
             </div>
 
             <h1 className="text-3xl font-bold text-neutral-800 dark:text-zinc-300 mb-2">
@@ -322,7 +322,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({
                         dark:hover:bg-blue-900/20 transition-all duration-200 ease-in-out flex flex-col items-center
                         justify-center min-h-[120px]"
                         >
-                          <PlusIcon className="size-8 text-neutral-400 dark:text-zinc-500 mb-2" />
+                          <Plus className="size-8 text-neutral-400 dark:text-zinc-500 mb-2" />
                           <span className="text-sm text-neutral-500 dark:text-zinc-500">Add Suggestion</span>
                         </button>
                       </>

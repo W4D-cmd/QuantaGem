@@ -2,11 +2,11 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import {
-  ArrowPathIcon,
-  ArrowDownTrayIcon,
-  ClipboardDocumentListIcon,
-  CheckIcon,
-} from "@heroicons/react/24/outline";
+  RefreshCw,
+  Download,
+  ClipboardList,
+  Check,
+} from "lucide-react";
 import Tooltip from "@/components/Tooltip";
 
 export type ViewMode = "code" | "output";
@@ -85,7 +85,7 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
             ${!hasOutput ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           Output
-          {hasOutput && view === "output" && <CheckIcon className="size-3" />}
+          {hasOutput && view === "output" && <Check className="size-3" />}
         </button>
       </div>
 
@@ -100,7 +100,7 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
               hover:bg-neutral-300/50 dark:hover:bg-zinc-700/50 transition-colors
               ${isExecuting ? "animate-spin" : ""}`}
           >
-            <ArrowPathIcon className="size-4" />
+            <RefreshCw className="size-4" />
           </button>
         </Tooltip>
 
@@ -113,7 +113,7 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
                 className="cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-zinc-500
                   hover:bg-neutral-300/50 dark:hover:bg-zinc-700/50 transition-colors flex items-center gap-0.5"
               >
-                <ArrowDownTrayIcon className="size-4" />
+                <Download className="size-4" />
                 <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -167,7 +167,7 @@ export const RCodeBlockControls: React.FC<RCodeBlockControlsProps> = ({
             className="cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-zinc-400
               hover:bg-neutral-300/50 dark:hover:bg-zinc-700/50 transition-colors"
           >
-            {copied ? <CheckIcon className="size-4 text-green-600" /> : <ClipboardDocumentListIcon className="size-4" />}
+            {copied ? <Check className="size-4 text-green-600" /> : <ClipboardList className="size-4" />}
           </button>
         </Tooltip>
       </div>

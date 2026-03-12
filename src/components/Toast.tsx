@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useCallback, useEffect, useRef } from "react";
-import { XMarkIcon, CheckCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { X, CheckCircle, AlertTriangle } from "lucide-react";
 import { motion, useAnimation } from "framer-motion";
 
 export interface ToastProps {
@@ -70,7 +70,7 @@ const Toast: FC<ToastProps> = ({ message, type = "error", onClose }) => {
   const borderColor = isSuccess ? "border-green-600/80" : "border-red-600/70";
   const hoverBgColor = isSuccess ? "hover:bg-green-600/30" : "hover:bg-red-600/30";
   const progressBgColor = isSuccess ? "bg-green-600/70" : "bg-red-600/70";
-  const Icon = isSuccess ? CheckCircleIcon : ExclamationTriangleIcon;
+  const Icon = isSuccess ? CheckCircle : AlertTriangle;
 
   return (
     <motion.div
@@ -101,7 +101,7 @@ const Toast: FC<ToastProps> = ({ message, type = "error", onClose }) => {
           onClick={handleClose}
           className={`cursor-pointer p-1.5 rounded-full ${hoverBgColor} transition-colors flex-none -mr-1 -mt-1`}
         >
-          <XMarkIcon className="size-5" />
+          <X className="size-5" />
         </button>
       </div>
       <div className={"h-1 w-full bg-black/20 overflow-hidden"}>

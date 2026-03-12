@@ -1896,23 +1896,41 @@ export default function Home() {
   };
 
   const handleSettingsSaved = useCallback(
-    async (newSettings?: { ttsVoice: string; ttsModel: string }) => {
-      if (newSettings?.ttsVoice) {
-        setTtsVoice(newSettings.ttsVoice);
-      }
-      if (newSettings?.ttsModel) {
-        setTtsModel(newSettings.ttsModel);
-      }
-      await fetchAllChats();
-      await fetchAllProjects();
-      await fetchCustomModels();
-      if (activeChatId !== null) {
-        await loadChat(activeChatId);
-      }
+    async (newSettings: { systemPrompt: string; ttsVoice?: string; ttsModel?: string }) => {
+      // Capture context before closing the modal
+      const isGlobalSettings = editingChatId === null;
+
+      // 1. Immediately close modal and show success to the user
       closeSettingsModal();
       showToast("Settings saved successfully.", "success");
+
+      // 2. Update local state immediately (Optimistic UI)
+      if (newSettings.systemPrompt !== undefined) {
+        setEditingPromptInitialValue(newSettings.systemPrompt);
+      }
+      if (newSettings.ttsVoice) setTtsVoice(newSettings.ttsVoice);
+      if (newSettings.ttsModel) setTtsModel(newSettings.ttsModel);
+
+      // 3. Background synchronization
+      try {
+        const syncTasks: Promise<void>[] = [fetchAllChats()];
+        if (isGlobalSettings) {
+          syncTasks.push(fetchAllProjects(), fetchCustomModels());
+        }
+
+        // Run non-dependent refreshes in parallel
+        await Promise.all(syncTasks);
+
+        // If a chat is active, refresh its details (like thinkingBudget) in the background.
+        // We don't necessarily NEED to await this for the UI to be "done".
+        if (activeChatId !== null) {
+          loadChat(activeChatId);
+        }
+      } catch (err) {
+        console.error("Background sync failed:", err);
+      }
     },
-    [activeChatId, fetchAllChats, fetchAllProjects, fetchCustomModels, loadChat, showToast],
+    [activeChatId, editingChatId, fetchAllChats, fetchAllProjects, fetchCustomModels, loadChat, showToast],
   );
 
   const toggleThreeDotMenu = () => {

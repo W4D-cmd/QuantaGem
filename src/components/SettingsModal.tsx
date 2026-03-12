@@ -28,7 +28,7 @@ interface SettingsModalProps {
   onClose: () => void;
   chatId: number | null;
   initialSystemPromptValue: string | null;
-  onSettingsSaved: (newSettings?: { ttsVoice: string; ttsModel: string }) => void;
+  onSettingsSaved: (newSettings: { systemPrompt: string; ttsVoice?: string; ttsModel?: string }) => void;
   getAuthHeaders: () => HeadersInit;
   showToast: (message: string, type?: ToastProps["type"]) => void;
 }
@@ -180,7 +180,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       setCustomApiKey("");
       setHasExistingKey(true);
 
-      onSettingsSaved(chatId === null ? { ttsVoice, ttsModel } : undefined);
+      onSettingsSaved({
+        systemPrompt,
+        ttsVoice: chatId === null ? ttsVoice : undefined,
+        ttsModel: chatId === null ? ttsModel : undefined,
+      });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
       showToast(errorMessage, "error");

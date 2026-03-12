@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Model } from "@google/genai";
 import Tooltip from "@/components/Tooltip";
-import { Download, Upload, ChevronDown, CheckCircle } from "lucide-react";
+import { Download, Upload, ChevronDown, CircleCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ModelProvider,
@@ -98,40 +98,53 @@ export default function ModelSelector({
     ? ((selected as ModelWithProvider).provider ?? getProviderForModel(selected.name))
     : undefined;
 
-  const renderModelButton = (m: ModelWithProvider) => (
-    <Tooltip key={m.name} text={m.description ?? ""}>
-      <button
-        data-selected={m.name === selected?.name}
-        onClick={() => {
-          onChangeAction(m as Model);
-          setOpen(false);
-        }}
-        className="w-full flex items-start justify-between gap-4 px-4 py-2 hover:bg-neutral-100
-          dark:hover:bg-zinc-800 rounded-lg transition-colors duration-300 ease-in-out cursor-pointer"
-      >
-        <div className="flex flex-col text-left">
-          <span
-            className="font-medium text-neutral-600 dark:text-zinc-400 transition-colors duration-300
-              ease-in-out"
-          >
-            {m.displayName}
-          </span>
-          <div
-            className="text-xs text-neutral-500 dark:text-zinc-500 flex items-center gap-2 mt-1
-              transition-colors duration-300 ease-in-out"
-          >
-            <Download className="size-3 transition-colors duration-300 ease-in-out" />
-            {m.inputTokenLimit?.toLocaleString()}
-            <Upload className="size-3 transition-colors duration-300 ease-in-out" />
-            {m.outputTokenLimit?.toLocaleString()}
+  const renderModelButton = (m: ModelWithProvider) => {
+    const isSelected = m.name === selected?.name;
+    return (
+      <Tooltip key={m.name} text={m.description ?? ""}>
+        <button
+          data-selected={isSelected}
+          onClick={() => {
+            onChangeAction(m as Model);
+            setOpen(false);
+          }}
+          className={`w-full flex items-start justify-between gap-4 px-4 py-2 hover:bg-neutral-100
+            dark:hover:bg-zinc-800 rounded-lg transition-colors duration-300 ease-in-out cursor-pointer ${
+              isSelected
+                ? "bg-neutral-200 hover:bg-neutral-200 dark:bg-zinc-800 dark:hover:bg-zinc-800"
+                : ""
+            }`}
+        >
+          <div className="flex flex-col text-left">
+            <span
+              className={`font-medium transition-colors duration-300 ease-in-out ${
+                isSelected
+                  ? "text-neutral-900 dark:text-zinc-50 font-semibold"
+                  : "text-neutral-600 dark:text-zinc-400"
+              }`}
+            >
+              {m.displayName}
+            </span>
+            <div
+              className={`text-xs flex items-center gap-2 mt-1 transition-colors duration-300 ease-in-out ${
+                isSelected
+                  ? "text-neutral-600 dark:text-zinc-400"
+                  : "text-neutral-500 dark:text-zinc-500"
+              }`}
+            >
+              <Download className="size-3 transition-colors duration-300 ease-in-out" />
+              {m.inputTokenLimit?.toLocaleString()}
+              <Upload className="size-3 transition-colors duration-300 ease-in-out" />
+              {m.outputTokenLimit?.toLocaleString()}
+            </div>
           </div>
-        </div>
-        <div className="w-4 h-4 flex-shrink-0 self-center">
-          {m.name === selected?.name && <CheckCircle className="size-4" />}
-        </div>
-      </button>
-    </Tooltip>
-  );
+          <div className="w-4 h-4 flex-shrink-0 self-center">
+            {isSelected && <CircleCheck className="size-4" />}
+          </div>
+        </button>
+      </Tooltip>
+    );
+  };
 
   const getProviderLabel = (): string => {
     if (selectedProvider === "custom-openai") return "Custom";

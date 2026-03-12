@@ -128,7 +128,7 @@ export default function DropdownMenu({
               <div className="h-px bg-neutral-200 dark:bg-zinc-800 my-1 mx-2" />
             </>
           )}
-          <div className="max-h-60 overflow-y-auto p-2 space-y-1">
+          <div className="p-2 space-y-1">
             {items.map((item) => (
               <button
                 key={item.id ?? item.label}

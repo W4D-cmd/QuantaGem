@@ -1920,17 +1920,11 @@ export default function Home() {
 
         // Run non-dependent refreshes in parallel
         await Promise.all(syncTasks);
-
-        // If a chat is active, refresh its details (like thinkingBudget) in the background.
-        // We don't necessarily NEED to await this for the UI to be "done".
-        if (activeChatId !== null) {
-          loadChat(activeChatId);
-        }
       } catch (err) {
         console.error("Background sync failed:", err);
       }
     },
-    [activeChatId, editingChatId, fetchAllChats, fetchAllProjects, fetchCustomModels, loadChat, showToast],
+    [activeChatId, editingChatId, fetchAllChats, fetchAllProjects, fetchCustomModels, showToast],
   );
 
   const toggleThreeDotMenu = () => {

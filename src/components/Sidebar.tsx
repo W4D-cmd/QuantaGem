@@ -3,18 +3,19 @@ import { ChatListItem, ProjectListItem } from "@/app/page";
 import DropdownMenu from "@/components/DropdownMenu";
 import Tooltip from "@/components/Tooltip";
 import {
-  ChevronRightIcon,
-  Cog6ToothIcon,
-  DocumentDuplicateIcon,
-  EllipsisHorizontalIcon,
-  FolderOpenIcon,
-  FolderPlusIcon,
-  PencilIcon,
-  PencilSquareIcon,
-  TrashIcon,
-  BookmarkSquareIcon,
-} from "@heroicons/react/24/outline";
-import { Pin, PinOff } from "lucide-react";
+  ChevronRight,
+  Settings,
+  Copy,
+  MoreHorizontal,
+  FolderOpen,
+  FolderPlus,
+  Pencil,
+  SquarePen,
+  Trash2,
+  Bookmark,
+  Pin,
+  PinOff,
+} from "lucide-react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import TruncatedTooltip from "./TruncatedTooltip";
 
@@ -387,7 +388,7 @@ export default function Sidebar({
               className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-zinc-800 transition-colors
                 duration-300 ease-in-out"
             >
-              <TrashIcon className="size-6 text-neutral-500 dark:text-zinc-500" />
+              <Trash2 className="size-6 text-neutral-500 dark:text-zinc-500" />
             </button>
           </Tooltip>
 
@@ -398,7 +399,7 @@ export default function Sidebar({
                 className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-zinc-800
                   transition-colors duration-300 ease-in-out"
               >
-                <FolderPlusIcon className="size-6 text-neutral-500 dark:text-zinc-500" />
+                <FolderPlus className="size-6 text-neutral-500 dark:text-zinc-500" />
               </button>
             </Tooltip>
 
@@ -408,7 +409,7 @@ export default function Sidebar({
                 className="cursor-pointer p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-zinc-800
                   transition-colors duration-300 ease-in-out"
               >
-                <PencilSquareIcon className="size-6 text-neutral-500 dark:text-zinc-500" />
+                <SquarePen className="size-6 text-neutral-500 dark:text-zinc-500" />
               </button>
             </Tooltip>
           </div>
@@ -482,7 +483,7 @@ export default function Sidebar({
                               }}
                               className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-zinc-500"
                             >
-                              <EllipsisHorizontalIcon className="size-5" />
+                              <MoreHorizontal className="size-5" />
                             </button>
                             <DropdownMenu
                               open={openMenuId === `chat-${chat.id}`}
@@ -492,19 +493,19 @@ export default function Sidebar({
                               items={[
                                 {
                                   id: "rename",
-                                  icon: <PencilIcon className="size-4" />,
+                                  icon: <Pencil className="size-4" />,
                                   label: "Rename",
                                   onClick: () => handleStartEdit("chat", chat.id),
                                 },
                                 {
                                   id: "duplicate",
-                                  icon: <DocumentDuplicateIcon className="size-4" />,
+                                  icon: <Copy className="size-4" />,
                                   label: "Duplicate",
                                   onClick: () => onDuplicateChat(chat.id),
                                 },
                                 {
                                   id: "settings",
-                                  icon: <Cog6ToothIcon className="size-4" />,
+                                  icon: <Settings className="size-4" />,
                                   label: "Settings",
                                   onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
                                 },
@@ -512,7 +513,7 @@ export default function Sidebar({
                                   ? [
                                       {
                                         id: "save-as-suggestion",
-                                        icon: <BookmarkSquareIcon className="size-4" />,
+                                        icon: <Bookmark className="size-4" />,
                                         label: "Save as Suggestion",
                                         onClick: () => onSaveAsSuggestion(chat.id, chat.title, chat.systemPrompt),
                                       },
@@ -530,7 +531,7 @@ export default function Sidebar({
                                   : []),
                                 {
                                   id: "delete",
-                                  icon: <TrashIcon className="size-4 text-red-500" />,
+                                  icon: <Trash2 className="size-4 text-red-500" />,
                                   label: "Delete",
                                   onClick: () => onDeleteChat(chat.id),
                                   className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
@@ -592,7 +593,7 @@ export default function Sidebar({
                               }}
                               className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-zinc-500"
                             >
-                              <EllipsisHorizontalIcon className="size-5" />
+                              <MoreHorizontal className="size-5" />
                             </button>
                             <DropdownMenu
                               open={openMenuId === `chat-${chat.id}`}
@@ -602,19 +603,19 @@ export default function Sidebar({
                               items={[
                                 {
                                   id: "rename",
-                                  icon: <PencilIcon className="size-4" />,
+                                  icon: <Pencil className="size-4" />,
                                   label: "Rename",
                                   onClick: () => handleStartEdit("chat", chat.id),
                                 },
                                 {
                                   id: "duplicate",
-                                  icon: <DocumentDuplicateIcon className="size-4" />,
+                                  icon: <Copy className="size-4" />,
                                   label: "Duplicate",
                                   onClick: () => onDuplicateChat(chat.id),
                                 },
                                 {
                                   id: "settings",
-                                  icon: <Cog6ToothIcon className="size-4" />,
+                                  icon: <Settings className="size-4" />,
                                   label: "Settings",
                                   onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
                                 },
@@ -622,7 +623,7 @@ export default function Sidebar({
                                   ? [
                                       {
                                         id: "save-as-suggestion",
-                                        icon: <BookmarkSquareIcon className="size-4" />,
+                                        icon: <Bookmark className="size-4" />,
                                         label: "Save as Suggestion",
                                         onClick: () => onSaveAsSuggestion(chat.id, chat.title, chat.systemPrompt),
                                       },
@@ -640,7 +641,7 @@ export default function Sidebar({
                                   : []),
                                 {
                                   id: "delete",
-                                  icon: <TrashIcon className="size-4 text-red-500" />,
+                                  icon: <Trash2 className="size-4 text-red-500" />,
                                   label: "Delete",
                                   onClick: () => onDeleteChat(chat.id),
                                   className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
@@ -688,7 +689,7 @@ export default function Sidebar({
                         animate={{ rotate: expandedProjects.has(project.id) ? 90 : 0 }}
                         transition={{ duration: 0.2 }}
                       >
-                        <ChevronRightIcon className="size-4 stroke-2" />
+                        <ChevronRight className="size-4 stroke-2" />
                       </motion.button>
                       <div className="flex-1 min-w-0">
                         <EditableItem
@@ -701,7 +702,7 @@ export default function Sidebar({
                           onCancelEdit={handleCancelEdit}
                         >
                           <div className="flex min-w-0 items-center gap-2">
-                            <FolderOpenIcon className="size-5 flex-shrink-0" />
+                            <FolderOpen className="size-5 flex-shrink-0" />
                             <TruncatedTooltip title={project.title}>{project.title}</TruncatedTooltip>
                           </div>
                           <div
@@ -716,7 +717,7 @@ export default function Sidebar({
                               }}
                               className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-zinc-500"
                             >
-                              <EllipsisHorizontalIcon className="size-5" />
+                              <MoreHorizontal className="size-5" />
                             </button>
                             <DropdownMenu
                               open={openMenuId === `project-${project.id}`}
@@ -726,19 +727,19 @@ export default function Sidebar({
                               items={[
                                 {
                                   id: "rename",
-                                  icon: <PencilIcon className="size-4" />,
+                                  icon: <Pencil className="size-4" />,
                                   label: "Rename Project",
                                   onClick: () => handleStartEdit("project", project.id),
                                 },
                                 {
                                   id: "new-chat",
-                                  icon: <PencilSquareIcon className="size-4" />,
+                                  icon: <SquarePen className="size-4" />,
                                   label: "New Chat in Project",
                                   onClick: () => onNewChat(project.id),
                                 },
                                 {
                                   id: "delete",
-                                  icon: <TrashIcon className="size-4 text-red-500" />,
+                                  icon: <Trash2 className="size-4 text-red-500" />,
                                   label: "Delete Project",
                                   onClick: () => onDeleteProject(project.id),
                                   className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
@@ -805,7 +806,7 @@ export default function Sidebar({
                                           className="cursor-pointer p-1 rounded-full text-neutral-500
                                             dark:text-zinc-500"
                                         >
-                                          <EllipsisHorizontalIcon className="size-5" />
+                                          <MoreHorizontal className="size-5" />
                                         </button>
                                         <DropdownMenu
                                           open={openMenuId === `chat-${chat.id}`}
@@ -815,19 +816,19 @@ export default function Sidebar({
                                           items={[
                                             {
                                               id: "rename",
-                                              icon: <PencilIcon className="size-4" />,
+                                              icon: <Pencil className="size-4" />,
                                               label: "Rename",
                                               onClick: () => handleStartEdit("chat", chat.id),
                                             },
                                             {
                                               id: "duplicate",
-                                              icon: <DocumentDuplicateIcon className="size-4" />,
+                                              icon: <Copy className="size-4" />,
                                               label: "Duplicate",
                                               onClick: () => onDuplicateChat(chat.id),
                                             },
                                             {
                                               id: "settings",
-                                              icon: <Cog6ToothIcon className="size-4" />,
+                                              icon: <Settings className="size-4" />,
                                               label: "Settings",
                                               onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
                                             },
@@ -835,7 +836,7 @@ export default function Sidebar({
                                               ? [
                                                   {
                                                     id: "save-as-suggestion",
-                                                    icon: <BookmarkSquareIcon className="size-4" />,
+                                                    icon: <Bookmark className="size-4" />,
                                                     label: "Save as Suggestion",
                                                     onClick: () =>
                                                       onSaveAsSuggestion(chat.id, chat.title, chat.systemPrompt),
@@ -854,7 +855,7 @@ export default function Sidebar({
                                               : []),
                                             {
                                               id: "delete",
-                                              icon: <TrashIcon className="size-4 text-red-500" />,
+                                              icon: <Trash2 className="size-4 text-red-500" />,
                                               label: "Delete",
                                               onClick: () => onDeleteChat(chat.id),
                                               className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",

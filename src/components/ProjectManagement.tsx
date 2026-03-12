@@ -3,7 +3,7 @@
 import React, { useState, useEffect, ChangeEvent, useCallback, useRef } from "react";
 import { ToastProps } from "./Toast";
 import { ProjectFile } from "@/app/page";
-import { ArrowUpTrayIcon, DocumentArrowDownIcon, XCircleIcon } from "@heroicons/react/24/outline";
+import { Upload, FileDown, XCircle } from "lucide-react";
 import { showApiErrorToast } from "@/lib/errors";
 
 interface ProjectManagementProps {
@@ -265,7 +265,7 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
             border-dashed border-green-500 bg-green-100/50 dark:bg-green-900/50 backdrop-blur-sm"
         >
           <div className="flex flex-col items-center gap-2 text-green-600 dark:text-green-300">
-            <DocumentArrowDownIcon className="size-8" />
+            <FileDown className="size-8" />
             <p className="font-semibold">Drop files to upload to project</p>
           </div>
         </div>
@@ -336,7 +336,7 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
                     disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Delete file"
                 >
-                  <XCircleIcon className="size-5" />
+                  <XCircle className="size-5" />
                 </button>
               </li>
             ))}
@@ -381,7 +381,7 @@ const ProjectManagement: React.FC<ProjectManagementProps> = ({
               hover:bg-blue-700 dark:hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors
               flex items-center gap-2"
           >
-            <ArrowUpTrayIcon className="size-5" /> Upload New File
+            <Upload className="size-5" /> Upload New File
           </button>
         </div>
       </div>

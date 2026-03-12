@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import { RefreshCw } from "lucide-react";
 
 interface RCodeBlockLoadingProps {
   progress: number;
@@ -15,7 +15,7 @@ export const RCodeBlockLoading: React.FC<RCodeBlockLoadingProps> = ({ progress, 
         dark:border-zinc-600/30"
     >
       <div className="flex items-center gap-2 mb-3 text-neutral-600 dark:text-zinc-500">
-        <ArrowPathIcon className="size-5 animate-spin" />
+        <RefreshCw className="size-5 animate-spin" />
         <span className="font-medium">{message || "Loading R Environment..."}</span>
       </div>
 

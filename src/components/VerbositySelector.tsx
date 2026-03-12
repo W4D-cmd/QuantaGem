@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useMemo } from "react";
-import { CheckIcon, ChevronDownIcon, ChatBubbleBottomCenterTextIcon } from "@heroicons/react/24/outline";
+import { Check, ChevronDown, MessageCircle } from "lucide-react";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
 import Tooltip from "./Tooltip";
 import { VerbosityOption } from "@/lib/thinking";
@@ -42,7 +42,7 @@ export default function VerbositySelector({
       className: verbosity === option ? "font-semibold" : "",
       icon:
         verbosity === option ? (
-          <CheckIcon className="size-4 text-blue-500" />
+          <Check className="size-4 text-blue-500" />
         ) : (
           <div className="size-4" />
         ),
@@ -63,9 +63,9 @@ export default function VerbositySelector({
             text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400
             dark:hover:bg-zinc-700 disabled:opacity-50`}
         >
-          <ChatBubbleBottomCenterTextIcon className="size-5" />
+          <MessageCircle className="size-5" />
           <span>{VERBOSITY_LABELS[verbosity]}</span>
-          <ChevronDownIcon className="size-3" />
+          <ChevronDown className="size-3" />
         </button>
       </Tooltip>
       <DropdownMenu

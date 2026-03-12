@@ -5,7 +5,7 @@ import Modal from "./Modal";
 import { ToastProps } from "./Toast";
 import { dialogVoices } from "@/lib/voices";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
-import { CheckIcon, ChevronDownIcon, Cog6ToothIcon, ServerIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import { Check, ChevronDown, Settings, Server, RefreshCw } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 const ttsModels = [
@@ -221,14 +221,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     label: `${voice.name} - ${voice.description}`,
     onClick: () => setTtsVoice(voice.name),
     className: ttsVoice === voice.name ? "font-semibold" : "",
-    icon: ttsVoice === voice.name ? <CheckIcon className="size-4 text-blue-500" /> : <div className="size-4" />,
+    icon: ttsVoice === voice.name ? <Check className="size-4 text-blue-500" /> : <div className="size-4" />,
   }));
 
   const selectedVoiceDesc = dialogVoices.find((v) => v.name === ttsVoice)?.description || "";
 
   const tabs = [
-    { id: "general" as const, label: "General", icon: Cog6ToothIcon },
-    ...(chatId === null ? [{ id: "providers" as const, label: "Providers", icon: ServerIcon }] : []),
+    { id: "general" as const, label: "General", icon: Settings },
+    ...(chatId === null ? [{ id: "providers" as const, label: "Providers", icon: Server }] : []),
   ];
 
   return (
@@ -337,7 +337,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             <span>
                               <span className="font-medium">{ttsVoice}</span> - {selectedVoiceDesc}
                             </span>
-                            <ChevronDownIcon className="size-4 text-neutral-500" />
+                            <ChevronDown className="size-4 text-neutral-500" />
                           </button>
                           <DropdownMenu
                             open={isVoiceMenuOpen}
@@ -431,13 +431,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                           >
-                            <ArrowPathIcon className="size-4" />
+                            <RefreshCw className="size-4" />
                           </motion.div>
                           Testing...
                         </>
                       ) : (
                         <>
-                          <ServerIcon className="size-4" />
+                          <Server className="size-4" />
                           Test Connection & Fetch Models
                         </>
                       )}

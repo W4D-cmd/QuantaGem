@@ -2,7 +2,7 @@
 
 import React, { useEffect, ReactNode, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { X } from "lucide-react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 
 interface ModalProps {
@@ -120,7 +120,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
                       hover:bg-neutral-100 dark:hover:bg-zinc-800 focus:outline-none"
                     aria-label="Close modal"
                   >
-                    <XMarkIcon className="size-5" />
+                    <X className="size-5" />
                   </button>
                 )}
               </div>
@@ -133,7 +133,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
                   dark:hover:bg-zinc-800 focus:outline-none"
                 aria-label="Close modal"
               >
-                <XMarkIcon className="size-5" />
+                <X className="size-5" />
               </button>
             )}
             <div className="p-6 flex-grow overflow-y-auto">{children}</div>

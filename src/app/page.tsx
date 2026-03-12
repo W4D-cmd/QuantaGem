@@ -12,12 +12,12 @@ import DropdownMenu, { DropdownItem } from "@/components/DropdownMenu";
 import SettingsModal from "@/components/SettingsModal";
 import { useRouter } from "next/navigation";
 import {
-  ArrowDownIcon,
-  ArrowRightStartOnRectangleIcon,
-  Cog6ToothIcon,
-  EllipsisVerticalIcon,
-  PaperClipIcon,
-} from "@heroicons/react/24/outline";
+  ArrowDown,
+  LogOut,
+  Settings,
+  EllipsisVertical,
+  Paperclip,
+} from "lucide-react";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import TemporaryChatToggle from "@/components/TemporaryChatToggle";
 import ProjectManagement from "@/components/ProjectManagement";
@@ -1937,13 +1937,13 @@ export default function Home() {
     {
       id: "settings",
       label: "Settings",
-      icon: <Cog6ToothIcon className="size-4" />,
+      icon: <Settings className="size-4" />,
       onClick: openGlobalSettingsModal,
     },
     {
       id: "logout",
       label: "Logout",
-      icon: <ArrowRightStartOnRectangleIcon className="size-4 text-red-500 dark:text-red-400" />,
+      icon: <LogOut className="size-4 text-red-500 dark:text-red-400" />,
       onClick: handleLogout,
       className: "text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10",
     },
@@ -2010,7 +2010,7 @@ export default function Home() {
                 border-dashed border-blue-500 bg-blue-100/50 dark:bg-blue-900/50 backdrop-blur-sm"
             >
               <div className="flex flex-col items-center gap-2 text-blue-600 dark:text-blue-300">
-                <PaperClipIcon className="size-8" />
+                <Paperclip className="size-8" />
                 <p className="font-semibold">Drop files to attach</p>
               </div>
             </motion.div>
@@ -2070,7 +2070,7 @@ export default function Home() {
                     hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors duration-300 ease-in-out"
                   aria-label="More options"
                 >
-                  <EllipsisVerticalIcon className="size-5" />
+                  <EllipsisVertical className="size-5" />
                 </button>
               </Tooltip>
               <DropdownMenu
@@ -2175,7 +2175,7 @@ export default function Home() {
                                 border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-neutral-900
                                 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-neutral-700 shadow-lg"
                             >
-                              <ArrowDownIcon className="size-5" />
+                              <ArrowDown className="size-5" />
                             </button>
                           </motion.div>
                         )}

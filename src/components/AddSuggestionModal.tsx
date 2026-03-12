@@ -3,50 +3,60 @@
 import React, { useState } from "react";
 import Modal from "./Modal";
 import {
-  AcademicCapIcon,
-  BeakerIcon,
-  BookOpenIcon,
-  BriefcaseIcon,
-  BugAntIcon,
-  CalculatorIcon,
-  ChatBubbleLeftRightIcon,
-  CodeBracketIcon,
-  Cog6ToothIcon,
-  DocumentTextIcon,
-  GlobeAltIcon,
-  LanguageIcon,
-  LightBulbIcon,
-  PaintBrushIcon,
-  PencilSquareIcon,
-  RocketLaunchIcon,
-  ScaleIcon,
-  SparklesIcon,
-  WrenchScrewdriverIcon,
-} from "@heroicons/react/24/outline";
+  Sparkles,
+  SquarePen,
+  Code,
+  FlaskConical,
+  BookOpen,
+  Briefcase,
+  MessageSquare,
+  Settings,
+  FileText,
+  Globe,
+  Languages,
+  Lightbulb,
+  Paintbrush,
+  Rocket,
+  Scale,
+  Cpu,
+  Terminal,
+  Box,
+  GraduationCap,
+  Wrench,
+  Calculator,
+  Bug,
+} from "lucide-react";
 
 export const AVAILABLE_ICONS = [
-  { name: "SparklesIcon", component: <SparklesIcon className="size-5" /> },
-  { name: "PencilSquareIcon", component: <PencilSquareIcon className="size-5" /> },
-  { name: "CodeBracketIcon", component: <CodeBracketIcon className="size-5" /> },
-  { name: "BeakerIcon", component: <BeakerIcon className="size-5" /> },
-  { name: "BookOpenIcon", component: <BookOpenIcon className="size-5" /> },
-  { name: "BriefcaseIcon", component: <BriefcaseIcon className="size-5" /> },
-  { name: "ChatBubbleLeftRightIcon", component: <ChatBubbleLeftRightIcon className="size-5" /> },
-  { name: "Cog6ToothIcon", component: <Cog6ToothIcon className="size-5" /> },
-  { name: "DocumentTextIcon", component: <DocumentTextIcon className="size-5" /> },
-  { name: "GlobeAltIcon", component: <GlobeAltIcon className="size-5" /> },
-  { name: "LanguageIcon", component: <LanguageIcon className="size-5" /> },
-  { name: "LightBulbIcon", component: <LightBulbIcon className="size-5" /> },
-  { name: "PaintBrushIcon", component: <PaintBrushIcon className="size-5" /> },
-  { name: "RocketLaunchIcon", component: <RocketLaunchIcon className="size-5" /> },
-  { name: "ScaleIcon", component: <ScaleIcon className="size-5" /> },
+  { name: "Sparkles", component: <Sparkles className="size-5" /> },
+  { name: "SquarePen", component: <SquarePen className="size-5" /> },
+  { name: "Code", component: <Code className="size-5" /> },
+  { name: "FlaskConical", component: <FlaskConical className="size-5" /> },
+  { name: "BookOpen", component: <BookOpen className="size-5" /> },
+  { name: "Briefcase", component: <Briefcase className="size-5" /> },
+  { name: "MessageSquare", component: <MessageSquare className="size-5" /> },
+  { name: "Settings", component: <Settings className="size-5" /> },
+  { name: "FileText", component: <FileText className="size-5" /> },
+  { name: "Globe", component: <Globe className="size-5" /> },
+  { name: "Languages", component: <Languages className="size-5" /> },
+  { name: "Lightbulb", component: <Lightbulb className="size-5" /> },
+  { name: "Paintbrush", component: <Paintbrush className="size-5" /> },
+  { name: "Rocket", component: <Rocket className="size-5" /> },
+  { name: "Scale", component: <Scale className="size-5" /> },
+  { name: "Cpu", component: <Cpu className="size-5" /> },
+  { name: "Terminal", component: <Terminal className="size-5" /> },
+  { name: "Box", component: <Box className="size-5" /> },
+  { name: "GraduationCap", component: <GraduationCap className="size-5" /> },
+  { name: "Wrench", component: <Wrench className="size-5" /> },
+  { name: "Calculator", component: <Calculator className="size-5" /> },
+  { name: "Bug", component: <Bug className="size-5" /> },
 ] as const;
 
 export type IconName = (typeof AVAILABLE_ICONS)[number]["name"];
 
 export function getIconComponent(iconName: string): React.ReactNode {
   const icon = AVAILABLE_ICONS.find((i) => i.name === iconName);
-  return icon ? icon.component : <SparklesIcon className="size-5" />;
+  return icon ? icon.component : <Sparkles className="size-5" />;
 }
 
 interface AddSuggestionModalProps {
@@ -65,7 +75,7 @@ const AddSuggestionModal: React.FC<AddSuggestionModalProps> = ({
   onSave,
   initialTitle = "",
   initialPrompt = "",
-  initialIcon = "SparklesIcon",
+  initialIcon = "Sparkles",
   mode = "add",
 }) => {
   const [title, setTitle] = useState(initialTitle);

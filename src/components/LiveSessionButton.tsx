@@ -3,14 +3,14 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  ChatBubbleLeftRightIcon,
-  CheckIcon,
-  ChevronRightIcon,
-  ChevronUpIcon,
-  Cog8ToothIcon,
-  StopIcon,
-  VideoCameraIcon,
-} from "@heroicons/react/24/outline";
+  MessageSquare,
+  Check,
+  ChevronRight,
+  ChevronUp,
+  Settings2,
+  Square,
+  Video,
+} from "lucide-react";
 import Tooltip from "./Tooltip";
 import ChatInputSettingsMenu from "./ChatInputSettingsMenu";
 import { LiveModel } from "@/lib/live-models";
@@ -150,7 +150,7 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
           {isConnecting ? (
             <div className="w-4 h-4 border-2 border-neutral-300 border-t-red-500 rounded-full animate-spin" />
           ) : (
-            <StopIcon className="size-5 text-red-500" />
+            <Square className="size-5 text-red-500" />
           )}
         </button>
       </Tooltip>
@@ -173,10 +173,10 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
             hover:bg-neutral-100 dark:hover:bg-zinc-800 cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <ChatBubbleLeftRightIcon className="size-5" />
+            <MessageSquare className="size-5" />
             <span>Live Chat (Audio Only)</span>
           </div>
-          {liveMode === "audio" && <CheckIcon className="size-5 text-blue-500" />}
+          {liveMode === "audio" && <Check className="size-5 text-blue-500" />}
         </button>
         <button
           onClick={() => handleModeSelect("video")}
@@ -185,10 +185,10 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
             hover:bg-neutral-100 dark:hover:bg-zinc-800 cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <VideoCameraIcon className="size-5" />
+            <Video className="size-5" />
             <span>Live Chat + Screen</span>
           </div>
-          {liveMode === "video" && <CheckIcon className="size-5 text-blue-500" />}
+          {liveMode === "video" && <Check className="size-5 text-blue-500" />}
         </button>
         <div className="border-t border-neutral-200 dark:border-zinc-700 my-1 !mx-2"></div>
         <div
@@ -201,10 +201,10 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
             hover:bg-neutral-100 dark:hover:bg-zinc-800 cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <Cog8ToothIcon className="size-5" />
+            <Settings2 className="size-5" />
             <span>Settings</span>
           </div>
-          <ChevronRightIcon className="size-4" />
+          <ChevronRight className="size-4" />
         </div>
       </div>
     </div>
@@ -224,9 +224,9 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
 
   const primaryActionIcon =
     liveMode === "video" ? (
-      <VideoCameraIcon className="size-5 text-neutral-500 dark:text-zinc-400" />
+      <Video className="size-5 text-neutral-500 dark:text-zinc-400" />
     ) : (
-      <ChatBubbleLeftRightIcon className="size-5 text-neutral-500 dark:text-zinc-400" />
+      <MessageSquare className="size-5 text-neutral-500 dark:text-zinc-400" />
     );
 
   const primaryActionTooltip = liveMode === "video" ? "Start Live Chat + Screen" : "Start Live Chat (Audio Only)";
@@ -257,7 +257,7 @@ const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({
             className="cursor-pointer h-9 px-2 flex items-center justify-center rounded-r-full hover:bg-neutral-100
               dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
           >
-            <ChevronUpIcon className="size-4 text-neutral-500 dark:text-zinc-400" />
+            <ChevronUp className="size-4 text-neutral-500 dark:text-zinc-400" />
           </button>
         </Tooltip>
       </div>

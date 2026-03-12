@@ -6,7 +6,7 @@ import { RCodeBlockControls, ViewMode } from "./RCodeBlockControls";
 import { RCodeBlockSVGView } from "./RCodeBlockSVGView";
 import { RCodeBlockLoading } from "./RCodeBlockLoading";
 import { downloadSVG, downloadPNG, downloadPDF } from "@/lib/webr/svg-utils";
-import { ExclamationTriangleIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 
 interface RCodeBlockProps {
   code: string;
@@ -104,7 +104,7 @@ export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className, isStrea
             className="p-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 dark:border-red-400"
           >
             <div className="flex items-start gap-2">
-              <ExclamationTriangleIcon className="size-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="size-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="font-medium text-red-800 dark:text-red-200">
                   {result?.error ? "Execution Error" : "No Output"}
@@ -119,7 +119,7 @@ export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className, isStrea
                   dark:text-red-300 bg-red-100 dark:bg-red-800/30 rounded-lg hover:bg-red-200
                   dark:hover:bg-red-800/50 transition-colors"
               >
-                <ArrowPathIcon className="size-4" />
+                <RefreshCw className="size-4" />
                 Retry
               </button>
             </div>

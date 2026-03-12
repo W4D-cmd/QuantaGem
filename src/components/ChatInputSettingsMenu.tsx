@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, ReactNode, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { ChevronRightIcon, CpuChipIcon, LanguageIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
+import { ChevronRight, Cpu, Languages, Volume2 } from "lucide-react";
 import { LiveModel } from "@/lib/live-models";
 import { DialogVoice } from "@/lib/voices";
 import Tooltip from "./Tooltip";
@@ -102,7 +102,7 @@ const MainMenuItem: React.FC<MainMenuItemProps> = ({
           <span className="text-xs text-neutral-500 dark:text-zinc-500 truncate max-w-40">{value}</span>
         </div>
       </div>
-      {!disabled && <ChevronRightIcon className="size-4 text-neutral-400" />}
+      {!disabled && <ChevronRight className="size-4 text-neutral-400" />}
       {children &&
         createPortal(
           <div ref={subMenuRef} style={{ position: "absolute", top: `${coords.top}px`, left: `${coords.left}px` }}>
@@ -172,7 +172,7 @@ const ChatInputSettingsMenu: React.FC<ChatInputSettingsMenuProps> = ({
     >
       <div className="space-y-1">
         <MainMenuItem
-          icon={<CpuChipIcon className="size-5 text-blue-500" />}
+          icon={<Cpu className="size-5 text-blue-500" />}
           label="Live Model"
           value={selectedLiveModel.displayName}
           onMouseEnter={() => setOpenSubMenu("liveModel")}
@@ -195,7 +195,7 @@ const ChatInputSettingsMenu: React.FC<ChatInputSettingsMenuProps> = ({
           )}
         </MainMenuItem>
         <MainMenuItem
-          icon={<LanguageIcon className="size-5" />}
+          icon={<Languages className="size-5" />}
           label="Language"
           value={selectedLanguage}
           onMouseEnter={() => setOpenSubMenu("language")}
@@ -212,7 +212,7 @@ const ChatInputSettingsMenu: React.FC<ChatInputSettingsMenuProps> = ({
           )}
         </MainMenuItem>
         <MainMenuItem
-          icon={<SpeakerWaveIcon className="size-5" />}
+          icon={<Volume2 className="size-5" />}
           label="Voice"
           value={selectedVoice}
           onMouseEnter={() => setOpenSubMenu("voice")}

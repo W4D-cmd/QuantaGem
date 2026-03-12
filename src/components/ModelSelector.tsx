@@ -3,8 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Model } from "@google/genai";
 import Tooltip from "@/components/Tooltip";
-import { ArrowDownTrayIcon, ArrowUpTrayIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
-import { CheckCircleIcon } from "@heroicons/react/24/solid";
+import { Download, Upload, ChevronDown, CheckCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ModelProvider,
@@ -121,14 +120,14 @@ export default function ModelSelector({
             className="text-xs text-neutral-500 dark:text-zinc-500 flex items-center gap-2 mt-1
               transition-colors duration-300 ease-in-out"
           >
-            <ArrowDownTrayIcon className="size-3 transition-colors duration-300 ease-in-out" />
+            <Download className="size-3 transition-colors duration-300 ease-in-out" />
             {m.inputTokenLimit?.toLocaleString()}
-            <ArrowUpTrayIcon className="size-3 transition-colors duration-300 ease-in-out" />
+            <Upload className="size-3 transition-colors duration-300 ease-in-out" />
             {m.outputTokenLimit?.toLocaleString()}
           </div>
         </div>
         <div className="w-4 h-4 flex-shrink-0 self-center">
-          {m.name === selected?.name && <CheckCircleIcon className="size-4" />}
+          {m.name === selected?.name && <CheckCircle className="size-4" />}
         </div>
       </button>
     </Tooltip>
@@ -185,8 +184,7 @@ export default function ModelSelector({
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ duration: 0.2 }}
         >
-          <ChevronDownIcon
-            className="size-3 stroke-3 text-neutral-400 dark:text-zinc-500 transition-colors duration-300
+          <ChevronDown className="size-3 stroke-3 text-neutral-400 dark:text-zinc-500 transition-colors duration-300
               ease-in-out"
           />
         </motion.div>

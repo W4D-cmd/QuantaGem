@@ -2,7 +2,7 @@
 
 import React from "react";
 import Modal from "./Modal";
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { AlertTriangle } from "lucide-react";
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -29,7 +29,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} size="sm" hideCloseButton>
       <div className="text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/50">
-          <ExclamationTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-400" aria-hidden="true" />
+          <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" aria-hidden="true" />
         </div>
         <div className="mt-3 text-center sm:mt-5">
           <h3 className="text-lg font-semibold leading-6 text-neutral-900 dark:text-zinc-100" id="modal-title">

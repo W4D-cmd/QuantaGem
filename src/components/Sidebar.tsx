@@ -468,7 +468,7 @@ export default function Sidebar({
                           onCancelEdit={handleCancelEdit}
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <Pin className="size-4 flex-shrink-0 text-neutral-400 dark:text-zinc-400" />
+                            <Pin className="size-4 flex-shrink-0 text-neutral-500 dark:text-zinc-500" />
                             <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
                           </div>
                           <div
@@ -790,7 +790,7 @@ export default function Sidebar({
                                       onCancelEdit={handleCancelEdit}
                                     >
                                       <div className="flex items-center gap-2 min-w-0">
-                                        {chat.pinnedAt && <Pin className="size-4 flex-shrink-0 text-neutral-400 dark:text-zinc-400" />}
+                                        {chat.pinnedAt && <Pin className="size-4 flex-shrink-0 text-neutral-500 dark:text-zinc-500" />}
                                         <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
                                       </div>
                                       <div

@@ -54,3 +54,7 @@ html.dark .max-h-96.overflow-y-auto {
 .chat-scroll-gutter {
   scrollbar-gutter: stable both-edges;
 }
+
+.lucide {
+  stroke-width: 1.75;
+}

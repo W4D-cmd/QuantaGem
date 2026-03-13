@@ -14,7 +14,6 @@ import {
 import Tooltip from "./Tooltip";
 import ChatInputSettingsMenu from "./ChatInputSettingsMenu";
 import { LiveModel } from "@/lib/live-models";
-import { DialogVoice } from "@/lib/voices";
 
 interface LiveSessionButtonProps {
   isSessionActive: boolean;
@@ -30,10 +29,6 @@ interface LiveSessionButtonProps {
   languages: string[];
   selectedLanguage: string;
   onLanguageChange: (lang: string) => void;
-  dialogVoices: DialogVoice[];
-  standardVoices: string[];
-  selectedVoice: string;
-  onVoiceChange: (voice: string) => void;
 }
 
 const LiveSessionButton: React.FC<LiveSessionButtonProps> = ({

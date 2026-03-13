@@ -1,25 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Modal from "./Modal";
 import { ToastProps } from "./Toast";
-import { dialogVoices } from "@/lib/voices";
-import DropdownMenu, { DropdownItem } from "./DropdownMenu";
-import { Check, ChevronDown, Settings, Server, RefreshCw } from "lucide-react";
+import { Server, RefreshCw, Settings } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-
-const ttsModels = [
-  {
-    id: "gemini-2.5-flash-preview-tts",
-    name: "Gemini 2.5 Flash TTS",
-    description: "Faster, suitable for most use cases.",
-  },
-  {
-    id: "gemini-2.5-pro-preview-tts",
-    name: "Gemini 2.5 Pro TTS",
-    description: "Higher quality, slightly slower.",
-  },
-];
 
 type SettingsTab = "general" | "providers";
 
@@ -28,7 +13,7 @@ interface SettingsModalProps {
   onClose: () => void;
   chatId: number | null;
   initialSystemPromptValue: string | null;
-  onSettingsSaved: (newSettings: { systemPrompt: string; ttsVoice?: string; ttsModel?: string }) => void;
+  onSettingsSaved: (newSettings: { systemPrompt: string }) => void;
   getAuthHeaders: () => HeadersInit;
   showToast: (message: string, type?: ToastProps["type"]) => void;
 }
@@ -44,10 +29,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   // General settings
   const [systemPrompt, setSystemPrompt] = useState<string>("");
-  const [ttsVoice, setTtsVoice] = useState<string>("Sulafat");
-  const [ttsModel, setTtsModel] = useState<string>(ttsModels[0].id);
-  const [isVoiceMenuOpen, setIsVoiceMenuOpen] = useState(false);
-  const voiceButtonRef = useRef<HTMLButtonElement>(null);
 
   // Provider settings
   const [customEndpoint, setCustomEndpoint] = useState<string>("");
@@ -61,8 +42,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const [initialSettings, setInitialSettings] = useState({
     systemPrompt: "",
-    ttsVoice: "Sulafat",
-    ttsModel: ttsModels[0].id,
     customEndpoint: "",
   });
 
@@ -90,13 +69,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           .then((data) => {
             const settings = {
               systemPrompt: data.system_prompt || "",
-              ttsVoice: data.tts_voice || "Sulafat",
-              ttsModel: data.tts_model || ttsModels[0].id,
               customEndpoint: data.custom_openai_endpoint || "",
             };
             setSystemPrompt(settings.systemPrompt);
-            setTtsVoice(settings.ttsVoice);
-            setTtsModel(settings.ttsModel);
             setCustomEndpoint(settings.customEndpoint);
             setHasExistingKey(data.custom_openai_key_set || false);
             setInitialSettings(settings);
@@ -161,8 +136,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           headers: { "Content-Type": "application/json", ...getAuthHeaders() },
           body: JSON.stringify({
             systemPrompt,
-            ttsVoice,
-            ttsModel,
             customOpenaiEndpoint: customEndpoint || null,
             customOpenaiKey: customApiKey || null,
           }),
@@ -182,8 +155,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
       onSettingsSaved({
         systemPrompt,
-        ttsVoice: chatId === null ? ttsVoice : undefined,
-        ttsModel: chatId === null ? ttsModel : undefined,
       });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
@@ -196,8 +167,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleCancel = () => {
     setSystemPrompt(initialSettings.systemPrompt);
     if (chatId === null) {
-      setTtsVoice(initialSettings.ttsVoice);
-      setTtsModel(initialSettings.ttsModel);
       setCustomEndpoint(initialSettings.customEndpoint);
       setCustomApiKey("");
     }
@@ -205,8 +174,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const hasGeneralChanges =
-    systemPrompt !== initialSettings.systemPrompt ||
-    (chatId === null && (ttsVoice !== initialSettings.ttsVoice || ttsModel !== initialSettings.ttsModel));
+    systemPrompt !== initialSettings.systemPrompt;
 
   const hasProviderChanges =
     chatId === null &&
@@ -219,16 +187,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     chatId !== null
       ? "Define the behavior and persona for the AI in this specific chat. This overrides project or global settings."
       : "Define the default behavior and persona for the AI in all new chats.";
-
-  const voiceDropdownItems: DropdownItem[] = dialogVoices.map((voice) => ({
-    id: voice.name,
-    label: `${voice.name} - ${voice.description}`,
-    onClick: () => setTtsVoice(voice.name),
-    className: ttsVoice === voice.name ? "font-semibold" : "",
-    icon: ttsVoice === voice.name ? <Check className="size-4 text-blue-500" /> : <div className="size-4" />,
-  }));
-
-  const selectedVoiceDesc = dialogVoices.find((v) => v.name === ttsVoice)?.description || "";
 
   const tabs = [
     { id: "general" as const, label: "General", icon: Settings },
@@ -286,75 +244,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       />
                     )}
                   </div>
-
-                  {chatId === null && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-700 dark:text-zinc-400">
-                          Text-to-Speech Model
-                        </label>
-                        <p className="text-xs text-neutral-500 dark:text-zinc-500 mb-2 mt-1">
-                          Select the model for generating audio.
-                        </p>
-                        <div className="space-y-2">
-                          {ttsModels.map((model) => (
-                            <label
-                              key={model.id}
-                              className="flex items-center p-3 border border-neutral-300 dark:border-zinc-700 rounded-xl
-                                cursor-pointer hover:bg-neutral-50 dark:hover:bg-zinc-800"
-                            >
-                              <input
-                                type="radio"
-                                name="tts-model"
-                                value={model.id}
-                                checked={ttsModel === model.id}
-                                onChange={(e) => setTtsModel(e.target.value)}
-                                className="h-4 w-4 text-blue-600 border-neutral-300 focus:ring-blue-500"
-                              />
-                              <span className="ml-3 flex flex-col">
-                                <span className="text-sm font-medium text-neutral-900 dark:text-zinc-200">
-                                  {model.name}
-                                </span>
-                                <span className="text-xs text-neutral-500 dark:text-zinc-500">{model.description}</span>
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-700 dark:text-zinc-400">
-                          Text-to-Speech Voice
-                        </label>
-                        <p className="text-xs text-neutral-500 dark:text-zinc-500 mb-2 mt-1">
-                          Select the default voice for audio playback.
-                        </p>
-                        <div className="relative">
-                          <button
-                            ref={voiceButtonRef}
-                            onClick={() => setIsVoiceMenuOpen(!isVoiceMenuOpen)}
-                            disabled={isLoading}
-                            className="w-full flex justify-between items-center p-3 border border-neutral-300
-                              dark:border-zinc-700 rounded-xl shadow-sm text-sm bg-white dark:bg-zinc-950 text-black
-                              dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500
-                              focus:ring-opacity-50 transition-all"
-                          >
-                            <span>
-                              <span className="font-medium">{ttsVoice}</span> - {selectedVoiceDesc}
-                            </span>
-                            <ChevronDown className="size-4 text-neutral-500" />
-                          </button>
-                          <DropdownMenu
-                            open={isVoiceMenuOpen}
-                            onCloseAction={() => setIsVoiceMenuOpen(false)}
-                            anchorRef={voiceButtonRef}
-                            items={voiceDropdownItems}
-                            position="left"
-                            extraWidthPx={0}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
                 </div>
               )}
 

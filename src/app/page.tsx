@@ -1,7 +1,7 @@
 "use client";
 
 import Sidebar from "@/components/Sidebar";
-import ChatArea, { ChatAreaHandle, AudioPlaybackState } from "@/components/ChatArea";
+import ChatArea, { ChatAreaHandle } from "@/components/ChatArea";
 import ChatInput, { ChatInputHandle, UploadedFileInfo } from "@/components/ChatInput";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ModelSelector from "@/components/ModelSelector";
@@ -40,7 +40,6 @@ import { isCustomModel, getOriginalModelId, createCustomModelId, ModelProvider }
 const FALLBACK_DEFAULT_MODEL_NAME = "gemini-2.5-pro";
 const DEFAULT_MODEL_NAME = process.env.NEXT_PUBLIC_DEFAULT_MODEL_ID || FALLBACK_DEFAULT_MODEL_NAME;
 const TITLE_GENERATION_MAX_LENGTH = 5000;
-const DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 const MAX_RETRIES = 5;
 
 interface ModelWithProvider extends Model {
@@ -101,38 +100,6 @@ interface ConfirmationModalState {
   title: string;
   message: React.ReactNode;
   onConfirm: () => void;
-}
-
-function createWavHeader(dataLength: number): ArrayBuffer {
-  const sampleRate = 24000;
-  const numChannels = 1;
-  const bitsPerSample = 16;
-  const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;
-  const blockAlign = (numChannels * bitsPerSample) / 8;
-  const buffer = new ArrayBuffer(44);
-  const view = new DataView(buffer);
-
-  const writeString = (offset: number, str: string) => {
-    for (let i = 0; i < str.length; i++) {
-      view.setUint8(offset + i, str.charCodeAt(i));
-    }
-  };
-
-  writeString(0, "RIFF");
-  view.setUint32(4, 36 + dataLength, true);
-  writeString(8, "WAVE");
-  writeString(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitsPerSample, true);
-  writeString(36, "data");
-  view.setUint32(40, dataLength, true);
-
-  return buffer;
 }
 
 async function generateAndSetChatTitle(
@@ -243,16 +210,8 @@ export default function Home() {
   const [suggestionsVersion, setSuggestionsVersion] = useState(0);
   const [isTemporaryChat, setIsTemporaryChat] = useState(false);
 
-  const [ttsVoice, setTtsVoice] = useState<string>("Sulafat");
-  const [ttsModel, setTtsModel] = useState<string>(DEFAULT_TTS_MODEL);
-  const [audioPlaybackState, setAudioPlaybackState] = useState<AudioPlaybackState>({
-    messageId: null,
-    status: "idle",
-  });
   const [fetchedCustomModels, setFetchedCustomModels] = useState<{ id: string; displayName: string }[]>([]);
   const [isLoadingCustomModels, setIsLoadingCustomModels] = useState<boolean>(true);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const dragCounter = useRef(0);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
@@ -415,27 +374,6 @@ export default function Home() {
       showToast(extractErrorMessage(err), "error");
     }
   }, [getAuthHeaders, router, showToast]);
-
-  useEffect(() => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-    }
-
-    const fetchUserSettings = async () => {
-      try {
-        const res = await fetch("/api/settings", { headers: getAuthHeaders() });
-        if (res.ok) {
-          const settings = await res.json();
-          setTtsVoice(settings.tts_voice || "Sulafat");
-          setTtsModel(settings.tts_model || DEFAULT_TTS_MODEL);
-        }
-      } catch (err) {
-        console.error("Could not fetch user settings for TTS.");
-      }
-    };
-
-    fetchUserSettings();
-  }, [getAuthHeaders]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -1798,85 +1736,6 @@ export default function Home() {
     showToast("All global chats deleted.", "success");
   };
 
-  const handlePlayAudio = useCallback(
-    async (message: Message, selectedText?: string) => {
-      if (audioSourceRef.current) {
-        audioSourceRef.current.stop();
-        audioSourceRef.current.disconnect();
-        audioSourceRef.current = null;
-      }
-
-      if (audioPlaybackState.messageId === message.id && audioPlaybackState.status === "playing") {
-        setAudioPlaybackState({ messageId: null, status: "idle" });
-        return;
-      }
-
-      setAudioPlaybackState({ messageId: message.id, status: "loading" });
-
-      try {
-        const textToPlay =
-          selectedText?.trim() ||
-          message.parts
-            .filter((p) => p.type === "text" && p.text)
-            .map((p) => p.text)
-            .join("\n\n");
-
-        if (!textToPlay.trim()) {
-          throw new Error("No text content to play.");
-        }
-
-        const res = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-          body: JSON.stringify({ text: textToPlay, voice: ttsVoice, model: ttsModel }),
-        });
-
-        if (!res.ok) {
-          await showApiErrorToast(res, showToast);
-          return;
-        }
-
-        const { audioContent } = await res.json();
-        const binaryString = atob(audioContent);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        const pcmData = bytes.buffer;
-        const wavHeader = createWavHeader(pcmData.byteLength);
-        const wavBlob = new Blob([wavHeader, pcmData], { type: "audio/wav" });
-        const wavArrayBuffer = await wavBlob.arrayBuffer();
-
-        if (!audioContextRef.current) {
-          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        await audioContextRef.current.resume();
-
-        const audioBuffer = await audioContextRef.current.decodeAudioData(wavArrayBuffer);
-        const source = audioContextRef.current.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContextRef.current.destination);
-        source.start(0);
-
-        audioSourceRef.current = source;
-        setAudioPlaybackState({ messageId: message.id, status: "playing" });
-
-        source.onended = () => {
-          if (audioSourceRef.current === source) {
-            setAudioPlaybackState({ messageId: null, status: "idle" });
-            audioSourceRef.current = null;
-          }
-        };
-      } catch (err: unknown) {
-        showToast(extractErrorMessage(err), "error");
-        setAudioPlaybackState({ messageId: null, status: "idle" });
-      }
-    },
-    [audioPlaybackState, getAuthHeaders, showToast, ttsVoice, ttsModel],
-  );
-
   const openGlobalSettingsModal = () => {
     setEditingChatId(null);
     setIsSettingsModalOpen(true);
@@ -1896,7 +1755,7 @@ export default function Home() {
   };
 
   const handleSettingsSaved = useCallback(
-    async (newSettings: { systemPrompt: string; ttsVoice?: string; ttsModel?: string }) => {
+    async (newSettings: { systemPrompt: string }) => {
       // Capture context before closing the modal
       const isGlobalSettings = editingChatId === null;
 
@@ -1908,8 +1767,6 @@ export default function Home() {
       if (newSettings.systemPrompt !== undefined) {
         setEditingPromptInitialValue(newSettings.systemPrompt);
       }
-      if (newSettings.ttsVoice) setTtsVoice(newSettings.ttsVoice);
-      if (newSettings.ttsModel) setTtsModel(newSettings.ttsModel);
 
       // 3. Background synchronization
       try {
@@ -2145,8 +2002,6 @@ export default function Home() {
                     setEditingMessage={setEditingMessage}
                     onEditSave={handleEditSave}
                     onRegenerate={handleRegenerateResponse}
-                    onPlayAudio={handlePlayAudio}
-                    audioPlaybackState={audioPlaybackState}
                   />
                 ) : (
                   <div

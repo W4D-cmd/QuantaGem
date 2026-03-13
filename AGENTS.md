@@ -4,7 +4,7 @@ Guide for AI agents working in the QuantaGem codebase.
 
 ## Project Overview
 
-QuantaGem is a production-grade WebUI for Google's Gemini AI, built with a full-stack architecture using Next.js 16, PostgreSQL, MinIO (S3-compatible storage), and Redis. It supports multiple AI providers (Google Vertex AI, OpenAI, Anthropic) and includes speech-to-text and text-to-speech capabilities.
+QuantaGem is a production-grade WebUI for Google's Gemini AI, built with a full-stack architecture using Next.js 16, PostgreSQL, MinIO (S3-compatible storage), and Redis. It supports multiple AI providers (Google Vertex AI, OpenAI, Anthropic) and includes speech-to-text capabilities.
 
 ## Essential Commands
 
@@ -49,7 +49,6 @@ QuantaGem/
 │   │   │   ├── files/          # File storage (MinIO)
 │   │   │   ├── auth/           # Login, signup, logout
 │   │   │   ├── models/         # Available AI models
-│   │   │   ├── tts/            # Text-to-speech
 │   │   │   ├── stt/            # Speech-to-text proxy
 │   │   │   ├── suggestions/    # Prompt suggestions CRUD
 │   │   │   └── ...

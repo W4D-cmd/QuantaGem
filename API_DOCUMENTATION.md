@@ -1120,7 +1120,7 @@ Get current user information.
 
 ### Get User Settings
 
-Get user settings including system prompt, TTS configuration, and custom provider settings.
+Get user settings including system prompt and custom provider settings.
 
 **Endpoint:** `GET /api/settings`
 
@@ -1131,8 +1131,6 @@ Get user settings including system prompt, TTS configuration, and custom provide
 ```json
 {
   "system_prompt": "You are a helpful assistant.",
-  "tts_voice": "Sulafat",
-  "tts_model": "gemini-2.5-flash-preview-tts",
   "custom_openai_endpoint": "https://your-endpoint.com/v1/",
   "custom_openai_key_set": true
 }
@@ -1157,8 +1155,6 @@ Update user settings including custom provider configuration.
 ```json
 {
   "systemPrompt": "You are a coding assistant.",
-  "ttsVoice": "Sulafat",
-  "ttsModel": "gemini-2.5-flash-preview-tts",
   "customOpenaiEndpoint": "https://your-endpoint.com/v1/",
   "customOpenaiKey": "your-api-key"
 }
@@ -1166,8 +1162,6 @@ Update user settings including custom provider configuration.
 
 **Fields:**
 - `systemPrompt` - Default system prompt (optional)
-- `ttsVoice` - TTS voice name (optional)
-- `ttsModel` - TTS model identifier (optional)
 - `customOpenaiEndpoint` - Custom OpenAI-compatible endpoint URL, set to null to clear (optional)
 - `customOpenaiKey` - API key for custom endpoint, set to null to clear (optional, only updated if provided)
 
@@ -1177,8 +1171,6 @@ Update user settings including custom provider configuration.
 {
   "message": "Settings updated successfully",
   "system_prompt": "You are a coding assistant.",
-  "tts_voice": "Sulafat",
-  "tts_model": "gemini-2.5-flash-preview-tts",
   "custom_openai_endpoint": "https://your-endpoint.com/v1/",
   "updated_at": "2024-01-15T11:00:00.000Z"
 }

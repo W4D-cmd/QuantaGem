@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const { rows } = await pool.query(
-      "SELECT system_prompt, tts_voice, tts_model, custom_openai_endpoint, custom_openai_key FROM user_settings WHERE user_id = $1",
+      "SELECT system_prompt, custom_openai_endpoint, custom_openai_key FROM user_settings WHERE user_id = $1",
       [userId],
     );
 
@@ -18,8 +18,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           system_prompt: "",
-          tts_voice: "Sulafat",
-          tts_model: "gemini-2.5-flash-preview-tts",
           custom_openai_endpoint: null,
           // Never return the actual API key - just indicate if one is set
           custom_openai_key_set: false,
@@ -34,8 +32,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         system_prompt: rows[0].system_prompt || "",
-        tts_voice: rows[0].tts_voice || "Sulafat",
-        tts_model: rows[0].tts_model || "gemini-2.5-flash-preview-tts",
         custom_openai_endpoint: rows[0].custom_openai_endpoint || null,
         // Indicate whether a custom key is configured without exposing it
         custom_openai_key_set: hasCustomKey,
@@ -57,17 +53,13 @@ export async function POST(request: NextRequest) {
   const userId = userIdHeader;
 
   try {
-    const { systemPrompt, ttsVoice, ttsModel, customOpenaiEndpoint, customOpenaiKey } = (await request.json()) as {
+    const { systemPrompt, customOpenaiEndpoint, customOpenaiKey } = (await request.json()) as {
       systemPrompt?: string;
-      ttsVoice?: string;
-      ttsModel?: string;
       customOpenaiEndpoint?: string | null;
       customOpenaiKey?: string | null;
     };
 
     const finalSystemPrompt = systemPrompt ?? "";
-    const finalTtsVoice = ttsVoice ?? "Sulafat";
-    const finalTtsModel = ttsModel ?? "gemini-2.5-flash-preview-tts";
     // Normalize endpoint: trim and set to null if empty
     const finalCustomEndpoint =
       customOpenaiEndpoint && customOpenaiEndpoint.trim() !== "" ? customOpenaiEndpoint.trim() : null;
@@ -82,28 +74,24 @@ export async function POST(request: NextRequest) {
     let params: (string | null)[];
 
     if (shouldUpdateCustomKey) {
-      query = `INSERT INTO user_settings (user_id, system_prompt, tts_voice, tts_model, custom_openai_endpoint, custom_openai_key, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      query = `INSERT INTO user_settings (user_id, system_prompt, custom_openai_endpoint, custom_openai_key, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
            ON CONFLICT (user_id) DO UPDATE
                                       SET system_prompt = EXCLUDED.system_prompt,
-                                          tts_voice     = EXCLUDED.tts_voice,
-                                          tts_model     = EXCLUDED.tts_model,
                                           custom_openai_endpoint = EXCLUDED.custom_openai_endpoint,
                                           custom_openai_key = EXCLUDED.custom_openai_key,
                                           updated_at    = NOW()
-                                      RETURNING system_prompt, tts_voice, tts_model, custom_openai_endpoint, updated_at`;
-      params = [userId, finalSystemPrompt, finalTtsVoice, finalTtsModel, finalCustomEndpoint, finalCustomKey];
+                                      RETURNING system_prompt, custom_openai_endpoint, updated_at`;
+      params = [userId, finalSystemPrompt, finalCustomEndpoint, finalCustomKey];
     } else {
-      query = `INSERT INTO user_settings (user_id, system_prompt, tts_voice, tts_model, custom_openai_endpoint, updated_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())
+      query = `INSERT INTO user_settings (user_id, system_prompt, custom_openai_endpoint, updated_at)
+         VALUES ($1, $2, $3, NOW())
            ON CONFLICT (user_id) DO UPDATE
                                       SET system_prompt = EXCLUDED.system_prompt,
-                                          tts_voice     = EXCLUDED.tts_voice,
-                                          tts_model     = EXCLUDED.tts_model,
                                           custom_openai_endpoint = EXCLUDED.custom_openai_endpoint,
                                           updated_at    = NOW()
-                                      RETURNING system_prompt, tts_voice, tts_model, custom_openai_endpoint, updated_at`;
-      params = [userId, finalSystemPrompt, finalTtsVoice, finalTtsModel, finalCustomEndpoint];
+                                      RETURNING system_prompt, custom_openai_endpoint, updated_at`;
+      params = [userId, finalSystemPrompt, finalCustomEndpoint];
     }
 
     const { rows } = await pool.query(query, params);
@@ -121,8 +109,6 @@ export async function POST(request: NextRequest) {
       {
         message: "Settings updated successfully",
         system_prompt: rows[0].system_prompt,
-        tts_voice: rows[0].tts_voice,
-        tts_model: rows[0].tts_model,
         custom_openai_endpoint: rows[0].custom_openai_endpoint,
         updated_at: rows[0].updated_at,
       },

@@ -21,7 +21,7 @@ QuantaGem is a high-performance, production-grade WebUI for Google's Gemini AI, 
 - **Vertex AI Integration:** Optimized for enterprise-grade Gemini models, including support for "Thinking" models with adjustable budgets.
 - **Multimodal Support:** Upload PDFs, images, and large source code folders (via Directory Picker API) for context-aware prompting.
 - **Search & Grounding:** Toggle Google Search grounding for real-time information retrieval.
-- **Voice Intelligence:** Built-in Speech-to-Text (local ONNX ASR) and Text-to-Speech (Gemini TTS).
+- **Voice Intelligence:** Built-in Speech-to-Text (local ONNX ASR).
 - **Prompt Suggestions:** Customizable prompt templates with iOS-like drag-and-drop reordering for quick access.
 - **Secure Auth:** JWT-based authentication with bcrypt hashing and Redis-backed rate limiting.
 

@@ -57,8 +57,6 @@ import {
   Pencil,
   RefreshCw,
   XCircle,
-  Volume2,
-  Square,
   ChevronRight,
 } from "lucide-react";
 import Tooltip from "@/components/Tooltip";
@@ -67,11 +65,6 @@ import LazyMarkdownRenderer from "./LazyMarkdownRenderer";
 import { motion, AnimatePresence } from "framer-motion";
 
 type GetAuthHeaders = () => HeadersInit;
-
-export interface AudioPlaybackState {
-  messageId: number | null;
-  status: "loading" | "playing" | "idle";
-}
 
 interface ChatAreaProps {
   messages: Message[];
@@ -85,8 +78,6 @@ interface ChatAreaProps {
   setEditingMessage: React.Dispatch<React.SetStateAction<{ index: number; message: Message } | null>>;
   onEditSave: (index: number, newParts: MessagePart[]) => void;
   onRegenerate: (index: number) => void;
-  onPlayAudio: (message: Message, selectedText?: string) => void;
-  audioPlaybackState: AudioPlaybackState;
 }
 
 // Wrapper to provide stable callback reference for MessageEditor
@@ -519,8 +510,7 @@ export default memo(
     prev.streamStarted === next.streamStarted &&
     prev.onAutoScrollChange === next.onAutoScrollChange &&
     prev.getAuthHeaders === next.getAuthHeaders &&
-    prev.editingMessage === next.editingMessage &&
-    prev.audioPlaybackState === next.audioPlaybackState,
+    prev.editingMessage === next.editingMessage,
 );
 
 function ChatAreaComponent(
@@ -536,8 +526,6 @@ function ChatAreaComponent(
     setEditingMessage,
     onEditSave,
     onRegenerate,
-    onPlayAudio,
-    audioPlaybackState,
   }: ChatAreaProps,
   ref: React.Ref<ChatAreaHandle>,
 ) {
@@ -824,18 +812,6 @@ function ChatAreaComponent(
     [], // Empty deps - stable reference
   );
 
-  const getAudioButtonIcon = (messageId: number) => {
-    if (audioPlaybackState.messageId === messageId) {
-      if (audioPlaybackState.status === "loading") {
-        return <RefreshCw className="size-4 animate-spin" />;
-      }
-      if (audioPlaybackState.status === "playing") {
-        return <Square className="size-4 text-red-400" />;
-      }
-    }
-    return <Volume2 className="size-4" />;
-  };
-
   return (
     <div
       ref={containerRef}
@@ -846,7 +822,6 @@ function ChatAreaComponent(
         {messages.map((msg, i) => {
           const isUserMessage = msg.role === "user";
           const isBeingEdited = editingMessage?.index === i;
-          const hasText = msg.parts.some((p) => p.type === "text" && p.text && p.text.trim().length > 0);
           // Only the last model message during loading is actually streaming
           // All other messages always get isStreaming=false to prevent re-execution
           const isLastMessage = i === messages.length - 1;
@@ -1022,32 +997,6 @@ function ChatAreaComponent(
                           hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
                       >
                         <RefreshCw className="size-4" />
-                      </button>
-                    </Tooltip>
-                  )}
-                  {hasText && (
-                    <Tooltip
-                      text={audioPlaybackState.messageId === msg.id ? audioPlaybackState.status : "Read message"}
-                    >
-                      <button
-                        onClick={(e) => {
-                          const messageContainer = (e.currentTarget as HTMLElement).closest(".group\\/message");
-                          const selection = window.getSelection();
-                          let textToPlay: string | undefined = undefined;
-
-                          if (selection && selection.rangeCount > 0 && selection.toString().trim()) {
-                            const range = selection.getRangeAt(0);
-                            if (messageContainer && messageContainer.contains(range.commonAncestorContainer)) {
-                              textToPlay = selection.toString();
-                            }
-                          }
-                          onPlayAudio(msg, textToPlay);
-                        }}
-                        disabled={isLoading && audioPlaybackState.status !== "playing"}
-                        className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
-                          hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
-                      >
-                        {getAudioButtonIcon(msg.id)}
                       </button>
                     </Tooltip>
                   )}

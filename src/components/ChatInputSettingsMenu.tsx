@@ -2,9 +2,8 @@
 
 import React, { useState, useRef, ReactNode, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { ChevronRight, Cpu, Languages, Volume2 } from "lucide-react";
+import { ChevronRight, Cpu, Languages } from "lucide-react";
 import { LiveModel } from "@/lib/live-models";
-import { DialogVoice } from "@/lib/voices";
 import Tooltip from "./Tooltip";
 
 interface SubMenuProps {
@@ -121,10 +120,6 @@ interface ChatInputSettingsMenuProps {
   languages: string[];
   selectedLanguage: string;
   onLanguageChange: (lang: string) => void;
-  dialogVoices: DialogVoice[];
-  standardVoices: string[];
-  selectedVoice: string;
-  onVoiceChange: (voice: string) => void;
   direction: "left" | "right";
   disabled: boolean;
 }
@@ -136,13 +131,9 @@ const ChatInputSettingsMenu: React.FC<ChatInputSettingsMenuProps> = ({
   languages,
   selectedLanguage,
   onLanguageChange,
-  dialogVoices,
-  standardVoices,
-  selectedVoice,
-  onVoiceChange,
   direction,
 }) => {
-  const [openSubMenu, setOpenSubMenu] = useState<"liveModel" | "language" | "voice" | null>(null);
+  const [openSubMenu, setOpenSubMenu] = useState<"liveModel" | "language" | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuTop, setMenuTop] = useState(0);
 
@@ -154,15 +145,6 @@ const ChatInputSettingsMenu: React.FC<ChatInputSettingsMenuProps> = ({
 
   const isDialogModel = selectedLiveModel.configType === "dialog";
   const showLanguageMenu = selectedLiveModel.configType === "standard";
-
-  const voiceItems = isDialogModel
-    ? dialogVoices.map((v) => ({
-        id: v.name,
-        label: v.name,
-        secondaryLabel: v.description,
-        selected: v.name === selectedVoice,
-      }))
-    : standardVoices.map((v) => ({ id: v, label: v, selected: v === selectedVoice }));
 
   return (
     <div
@@ -210,16 +192,6 @@ const ChatInputSettingsMenu: React.FC<ChatInputSettingsMenuProps> = ({
               onSelect={(id) => onLanguageChange(id)}
             />
           )}
-        </MainMenuItem>
-        <MainMenuItem
-          icon={<Volume2 className="size-5" />}
-          label="Voice"
-          value={selectedVoice}
-          onMouseEnter={() => setOpenSubMenu("voice")}
-          parentTop={menuTop}
-          direction={direction}
-        >
-          {openSubMenu === "voice" && <SubMenu title="Voice" items={voiceItems} onSelect={(id) => onVoiceChange(id)} />}
         </MainMenuItem>
       </div>
     </div>

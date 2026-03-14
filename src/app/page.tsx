@@ -57,8 +57,8 @@ function calculateTurnCost(modelId: string, promptTokens: number, completionToke
 function getCostColor(estimatedCost: number, modelId: string | undefined): string {
   if (!modelId) return "currentColor";
 
-  // Smooth gradient from green ($0) to red ($2) based on estimated cost of next request
-  const maxCost = 2.0;
+  // Smooth gradient from green ($0) to red ($1.50) based on estimated cost of next request
+  const maxCost = 1.5;
   const ratio = Math.min(estimatedCost / maxCost, 1);
 
   // Interpolate between green (rgb(34, 197, 94)) and red (rgb(239, 68, 68))

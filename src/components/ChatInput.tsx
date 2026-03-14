@@ -695,7 +695,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     };
 
     const handleRefinePrompt = async () => {
-      if (!input.trim() || !selectedModel) return;
+      if (!input.trim() || !selectedModel || !selectedModel.name) return;
 
       originalInputBeforeRefineRef.current = input;
       setIsRefining(true);
@@ -789,7 +789,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     };
 
     const handleGenerateSystemPrompt = async () => {
-      if (!input.trim() || !selectedModel) return;
+      if (!input.trim() || !selectedModel || !selectedModel.name) return;
 
       originalSystemPromptRef.current = currentSystemPrompt;
       setIsGeneratingSystemPrompt(true);

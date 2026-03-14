@@ -249,7 +249,7 @@ export default function Home() {
   const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
   
   const estimatedNextCost = useMemo(() => {
-    if (!selectedModel || totalTokens === null || totalTokens === 0) return 0;
+    if (!selectedModel || !selectedModel.name || totalTokens === null || totalTokens === 0) return 0;
     const pricing = getModelPricing(selectedModel.name);
     if (!pricing) return 0;
     
@@ -341,7 +341,7 @@ export default function Home() {
 
   const fetchTokenCount = useCallback(
     async (currentMessages: Message[], currentModel: Model | null, currentChatId: number | null, systemPrompt?: string, currentProjectId?: number | null) => {
-      if (!currentModel || currentMessages.length === 0) {
+      if (!currentModel || !currentModel.name || currentMessages.length === 0) {
         setTotalTokens(0);
         return;
       }
@@ -1383,7 +1383,7 @@ export default function Home() {
 
   const handleSendMessage = async (inputText: string, uploadedFiles: UploadedFileInfo[], sendWithSearch: boolean) => {
     if (!inputText.trim() && uploadedFiles.length === 0) return;
-    if (!selectedModel) {
+    if (!selectedModel || !selectedModel.name) {
       showToast("No model selected or available. Please check model list or API key.", "error");
       return;
     }

@@ -54,13 +54,12 @@ function calculateTurnCost(modelId: string, promptTokens: number, completionToke
   return inputCost + outputCost;
 }
 
-function getCostColor(cost: number, modelId: string | undefined): string {
+function getCostColor(estimatedCost: number, modelId: string | undefined): string {
   if (!modelId) return "currentColor";
-  const pricing = getModelPricing(modelId);
-  if (!pricing) return "currentColor";
 
-  const maxPrice = pricing.secondaryPricePer1MInputTokens || pricing.pricePer1MInputTokens || 1.0;
-  const ratio = Math.min(cost / maxPrice, 1);
+  // Smooth gradient from green ($0) to red ($2) based on estimated cost of next request
+  const maxCost = 2.0;
+  const ratio = Math.min(estimatedCost / maxCost, 1);
 
   // Interpolate between green (rgb(34, 197, 94)) and red (rgb(239, 68, 68))
   const r = Math.round(34 + (239 - 34) * ratio);
@@ -2058,7 +2057,7 @@ export default function Home() {
                         {(accumulatedCost > 0 || estimatedNextCost > 0) && (
                           <span
                             className="text-xs font-bold ml-3"
-                            style={{ color: getCostColor(accumulatedCost + estimatedNextCost, selectedModel?.name) }}
+                            style={{ color: getCostColor(estimatedNextCost, selectedModel?.name) }}
                           >
                             (${(Number(accumulatedCost) || 0).toFixed(4)}{estimatedNextCost > 0 ? ` + ~$${estimatedNextCost.toFixed(4)}` : ""})
                           </span>

@@ -25,6 +25,11 @@ const modelConfigs: Record<string, ThinkingModelConfig> = {
 };
 
 const openAIReasoningModelConfigs: Record<string, OpenAIReasoningModelConfig> = {
+  "gpt-5.4": {
+    supportedEfforts: ["none", "low", "medium", "high", "xhigh"],
+    defaultEffort: "none",
+    supportsVerbosity: true,
+  },
   "gpt-5.2": {
     supportedEfforts: ["none", "low", "medium", "high", "xhigh"],
     defaultEffort: "none",
@@ -85,6 +90,7 @@ export function mapBudgetToAnthropicEffort(
 }
 
 function getOpenAIModelBase(modelName: string): string | null {
+  if (modelName.startsWith("gpt-5.4")) return "gpt-5.4";
   if (modelName.startsWith("gpt-5.2")) return "gpt-5.2";
   if (modelName.startsWith("gpt-5.1")) return "gpt-5.1";
   return null;
@@ -96,7 +102,7 @@ export function isOpenAIReasoningModel(modelName: string | null | undefined): bo
   return baseModel !== null && baseModel in openAIReasoningModelConfigs;
 }
 
-const GPT5_FAMILY_PREFIXES = ["gpt-5-", "gpt-5.1", "gpt-5.2"];
+const GPT5_FAMILY_PREFIXES = ["gpt-5-", "gpt-5.1", "gpt-5.2", "gpt-5.4"];
 
 export function isGPT5FamilyModel(modelName: string | null | undefined): boolean {
   if (!modelName) return false;

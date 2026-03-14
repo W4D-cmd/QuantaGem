@@ -6,6 +6,8 @@ interface AppendModelMessageRequest {
   modelMessageParts: MessagePart[];
   modelThoughtSummary: string | null;
   modelSources: Array<{ title: string; uri: string }>;
+  totalTokens?: number;
+  accumulatedCost?: number;
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ch
     return NextResponse.json({ error: "Chat session ID is required" }, { status: 400 });
   }
 
-  const { modelMessageParts, modelThoughtSummary, modelSources } = (await request.json()) as AppendModelMessageRequest;
+  const { modelMessageParts, modelThoughtSummary, modelSources, totalTokens, accumulatedCost } = (await request.json()) as AppendModelMessageRequest;
 
   if (!modelMessageParts || modelMessageParts.length === 0) {
     return NextResponse.json({ error: "Cannot save an empty model message." }, { status: 400 });
@@ -58,10 +60,19 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ch
       ],
     );
 
-    await client.query(`UPDATE chat_sessions SET updated_at = now() WHERE id = $1 AND user_id = $2`, [
-      chatSessionId,
-      userId,
-    ]);
+    if (totalTokens !== undefined && accumulatedCost !== undefined) {
+      await client.query(`UPDATE chat_sessions SET updated_at = now(), total_tokens = $3, accumulated_cost = $4 WHERE id = $1 AND user_id = $2`, [
+        chatSessionId,
+        userId,
+        totalTokens,
+        accumulatedCost,
+      ]);
+    } else {
+      await client.query(`UPDATE chat_sessions SET updated_at = now() WHERE id = $1 AND user_id = $2`, [
+        chatSessionId,
+        userId,
+      ]);
+    }
 
     await client.query("COMMIT");
 

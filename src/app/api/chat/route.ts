@@ -473,9 +473,13 @@ async function handleGeminiRequest(
       let modelOutput = "";
       let thoughtSummaryOutput = "";
       const sourcesToStore: Array<{ title: string; uri: string }> = [];
+      let usageMetadata: any = null;
 
       try {
         for await (const chunk of streamingResult) {
+          if (chunk.usageMetadata) {
+            usageMetadata = chunk.usageMetadata;
+          }
           if (chunk.candidates && chunk.candidates.length > 0) {
             const candidate = chunk.candidates[0];
 
@@ -521,6 +525,18 @@ async function handleGeminiRequest(
               }
             }
           }
+        }
+
+        if (usageMetadata) {
+          const usageChunk = {
+            type: "usage",
+            usage: {
+              input_tokens: usageMetadata.promptTokenCount,
+              output_tokens: usageMetadata.candidatesTokenCount,
+              total_tokens: usageMetadata.totalTokenCount,
+            },
+          };
+          controller.enqueue(encoder.encode(JSON.stringify(usageChunk) + "\n"));
         }
 
         if (modelOutput.trim() === "") {
@@ -774,6 +790,7 @@ async function handleOpenAIRequest(
     model,
     messages,
     stream: true,
+    stream_options: { include_usage: true },
   };
 
   if (isOpenAIReasoningModel(model)) {
@@ -792,9 +809,14 @@ async function handleOpenAIRequest(
   const readableStream = new ReadableStream({
     async start(controller) {
       let modelOutput = "";
+      let usage: any = null;
 
       try {
         for await (const chunk of stream) {
+          if (chunk.usage) {
+            usage = chunk.usage;
+          }
+
           const delta = chunk.choices[0]?.delta;
 
           if (isOpenAIReasoningModel(model) && (delta as Record<string, unknown>)?.reasoning_content) {
@@ -808,6 +830,18 @@ async function handleOpenAIRequest(
             const jsonChunk = { type: "text", value: delta.content };
             controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
           }
+        }
+
+        if (usage) {
+          const usageChunk = {
+            type: "usage",
+            usage: {
+              input_tokens: usage.prompt_tokens,
+              output_tokens: usage.completion_tokens,
+              total_tokens: usage.total_tokens,
+            },
+          };
+          controller.enqueue(encoder.encode(JSON.stringify(usageChunk) + "\n"));
         }
 
         if (modelOutput.trim() === "") {
@@ -1075,15 +1109,21 @@ async function handleCustomOpenAIRequest(
     model: actualModelId,
     messages,
     stream: true,
+    stream_options: { include_usage: true },
   });
 
   const encoder = new TextEncoder();
   const readableStream = new ReadableStream({
     async start(controller) {
       let modelOutput = "";
+      let usage: any = null;
 
       try {
         for await (const chunk of stream) {
+          if (chunk.usage) {
+            usage = chunk.usage;
+          }
+
           const delta = chunk.choices[0]?.delta;
 
           if (delta?.content) {
@@ -1091,6 +1131,18 @@ async function handleCustomOpenAIRequest(
             const jsonChunk = { type: "text", value: delta.content };
             controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
           }
+        }
+
+        if (usage) {
+          const usageChunk = {
+            type: "usage",
+            usage: {
+              input_tokens: usage.prompt_tokens,
+              output_tokens: usage.completion_tokens,
+              total_tokens: usage.total_tokens,
+            },
+          };
+          controller.enqueue(encoder.encode(JSON.stringify(usageChunk) + "\n"));
         }
 
         if (modelOutput.trim() === "") {
@@ -1775,7 +1827,19 @@ async function handleAnthropicRequest(
           }
         });
 
-        await stream.finalMessage();
+        const finalMessage = await stream.finalMessage();
+        
+        if (finalMessage.usage) {
+          const usageChunk = {
+            type: "usage",
+            usage: {
+              input_tokens: finalMessage.usage.input_tokens,
+              output_tokens: finalMessage.usage.output_tokens,
+              total_tokens: finalMessage.usage.input_tokens + finalMessage.usage.output_tokens,
+            },
+          };
+          controller.enqueue(encoder.encode(JSON.stringify(usageChunk) + "\n"));
+        }
 
         if (modelOutput.trim() === "") {
           console.warn(

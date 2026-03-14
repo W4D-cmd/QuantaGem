@@ -11,6 +11,10 @@ export interface CustomModelEntry {
   provider: ModelProvider;
   supportsReasoning?: boolean;
   supportsVerbosity?: boolean;
+  pricePer1MInputTokens?: number;
+  pricePer1MOutputTokens?: number;
+  inputTokenThreshold?: number;
+  secondaryPricePer1MInputTokens?: number;
 }
 
 /**
@@ -106,6 +110,32 @@ export function getModelTokenLimits(
   return CUSTOM_MODEL_DEFAULTS;
 }
 
+/**
+ * Gets pricing for a model. For custom models, returns null.
+ */
+export function getModelPricing(modelId: string): {
+  pricePer1MInputTokens?: number;
+  pricePer1MOutputTokens?: number;
+  inputTokenThreshold?: number;
+  secondaryPricePer1MInputTokens?: number;
+} | null {
+  if (isCustomModel(modelId)) {
+    return null;
+  }
+
+  const model = customModels.find((m) => m.modelId === modelId);
+  if (model) {
+    return {
+      pricePer1MInputTokens: model.pricePer1MInputTokens,
+      pricePer1MOutputTokens: model.pricePer1MOutputTokens,
+      inputTokenThreshold: model.inputTokenThreshold,
+      secondaryPricePer1MInputTokens: model.secondaryPricePer1MInputTokens,
+    };
+  }
+
+  return null;
+}
+
 export const customModels: CustomModelEntry[] = [
   {
     displayName: "Gemini 3.1 Pro Preview",
@@ -114,6 +144,10 @@ export const customModels: CustomModelEntry[] = [
     outputTokenLimit: 65536,
     provider: "gemini",
     supportsReasoning: true,
+    pricePer1MInputTokens: 2.00,
+    pricePer1MOutputTokens: 12.00,
+    inputTokenThreshold: 200000,
+    secondaryPricePer1MInputTokens: 4.00,
   },
   {
     displayName: "Gemini 3.1 Flash-Lite Preview",
@@ -122,6 +156,8 @@ export const customModels: CustomModelEntry[] = [
     outputTokenLimit: 65536,
     provider: "gemini",
     supportsReasoning: true,
+    pricePer1MInputTokens: 0.25,
+    pricePer1MOutputTokens: 1.50,
   },
   {
     displayName: "Gemini 3 Flash Preview",
@@ -130,6 +166,8 @@ export const customModels: CustomModelEntry[] = [
     outputTokenLimit: 65536,
     provider: "gemini",
     supportsReasoning: true,
+    pricePer1MInputTokens: 0.50,
+    pricePer1MOutputTokens: 3.00,
   },
   {
     displayName: "Gemini 2.5 Pro",
@@ -138,6 +176,10 @@ export const customModels: CustomModelEntry[] = [
     outputTokenLimit: 65536,
     provider: "gemini",
     supportsReasoning: true,
+    pricePer1MInputTokens: 1.25,
+    pricePer1MOutputTokens: 10.00,
+    inputTokenThreshold: 200000,
+    secondaryPricePer1MInputTokens: 2.50,
   },
   {
     displayName: "Gemini 2.5 Flash",
@@ -146,15 +188,19 @@ export const customModels: CustomModelEntry[] = [
     outputTokenLimit: 65536,
     provider: "gemini",
     supportsReasoning: true,
+    pricePer1MInputTokens: 0.30,
+    pricePer1MOutputTokens: 2.50,
   },
   {
-    displayName: "GPT-5.2",
-    modelId: "gpt-5.2-2025-12-11",
+    displayName: "GPT-5.4",
+    modelId: "gpt-5.4-2026-03-05",
     inputTokenLimit: 400000,
     outputTokenLimit: 128000,
     provider: "openai",
     supportsReasoning: true,
     supportsVerbosity: true,
+    pricePer1MInputTokens: 2.50,
+    pricePer1MOutputTokens: 15.00,
   },
   {
     displayName: "Claude Opus 4.6",
@@ -163,5 +209,7 @@ export const customModels: CustomModelEntry[] = [
     outputTokenLimit: 128000,
     provider: "anthropic",
     supportsReasoning: true,
+    pricePer1MInputTokens: 5.00,
+    pricePer1MOutputTokens: 25.00,
   },
 ];

@@ -14,6 +14,8 @@ interface PersistTurnRequest {
   thinkingBudget: number;
   systemPrompt?: string;
   unsavedMessages?: Message[];
+  totalTokens?: number;
+  accumulatedCost?: number;
 }
 
 function collectTemporaryObjectNames(parts: MessagePart[]): string[] {
@@ -41,6 +43,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid user ID" }, { status: 401 });
   }
 
+  const requestData = (await request.json()) as PersistTurnRequest;
   const {
     chatSessionId,
     userMessageParts,
@@ -52,7 +55,9 @@ export async function POST(request: NextRequest) {
     thinkingBudget,
     systemPrompt,
     unsavedMessages,
-  } = (await request.json()) as PersistTurnRequest;
+    totalTokens,
+    accumulatedCost,
+  } = requestData;
 
   const allParts: MessagePart[] = [
     ...userMessageParts,
@@ -81,9 +86,9 @@ export async function POST(request: NextRequest) {
           .split("\n")[0] || "New Chat";
 
       const newChatResult = await client.query(
-        `INSERT INTO chat_sessions (user_id, title, last_model, project_id, thinking_budget, system_prompt)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [userId, title, modelName, projectId, thinkingBudget, systemPrompt || ""],
+        `INSERT INTO chat_sessions (user_id, title, last_model, project_id, thinking_budget, system_prompt, total_tokens, accumulated_cost)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+        [userId, title, modelName, projectId, thinkingBudget, systemPrompt || "", requestData.totalTokens || 0, requestData.accumulatedCost || 0],
       );
       currentChatId = newChatResult.rows[0].id;
     } else {
@@ -153,11 +158,21 @@ export async function POST(request: NextRequest) {
     );
     const savedModelMessage = modelMessageResult.rows[0];
 
-    await client.query(`UPDATE chat_sessions SET updated_at = now(), last_model = $2 WHERE id = $1 AND user_id = $3`, [
-      currentChatId,
-      modelName,
-      userId,
-    ]);
+    if (totalTokens !== undefined && accumulatedCost !== undefined) {
+      await client.query(`UPDATE chat_sessions SET updated_at = now(), last_model = $2, total_tokens = $4, accumulated_cost = $5 WHERE id = $1 AND user_id = $3`, [
+        currentChatId,
+        modelName,
+        userId,
+        totalTokens,
+        accumulatedCost,
+      ]);
+    } else {
+      await client.query(`UPDATE chat_sessions SET updated_at = now(), last_model = $2 WHERE id = $1 AND user_id = $3`, [
+        currentChatId,
+        modelName,
+        userId,
+      ]);
+    }
 
     await client.query("COMMIT");
 

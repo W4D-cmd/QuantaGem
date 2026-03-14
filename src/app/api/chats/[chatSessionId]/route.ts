@@ -24,7 +24,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
               system_prompt   AS "systemPrompt",
               project_id      AS "projectId",
               updated_at      AS "updatedAt",
-              thinking_budget AS "thinkingBudget"
+              thinking_budget AS "thinkingBudget",
+              total_tokens    AS "totalTokens",
+              accumulated_cost AS "accumulatedCost"
        FROM chat_sessions
        WHERE id = $1
          AND user_id = $2`,
@@ -72,12 +74,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     return NextResponse.json({ error: "Invalid Chat Session ID format" }, { status: 400 });
   }
 
-  const { title, lastModel, systemPrompt, projectId, thinkingBudget } = (await request.json()) as {
+  const { title, lastModel, systemPrompt, projectId, thinkingBudget, totalTokens, accumulatedCost } = (await request.json()) as {
     title?: string;
     lastModel?: string;
     systemPrompt?: string;
     projectId?: number | null;
     thinkingBudget?: number;
+    totalTokens?: number;
+    accumulatedCost?: number;
   };
 
   const sets: string[] = [];
@@ -104,6 +108,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     sets.push(`thinking_budget = $${idx++}`);
     vals.push(thinkingBudget);
   }
+  if (totalTokens !== undefined) {
+    sets.push(`total_tokens = $${idx++}`);
+    vals.push(totalTokens);
+  }
+  if (accumulatedCost !== undefined) {
+    sets.push(`accumulated_cost = $${idx++}`);
+    vals.push(accumulatedCost);
+  }
 
   if (!sets.length) {
     return NextResponse.json({ error: "nothing to update" }, { status: 400 });
@@ -129,7 +141,9 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
               last_model      AS "lastModel",
               system_prompt   AS "systemPrompt",
               project_id      AS "projectId",
-              thinking_budget AS "thinkingBudget"
+              thinking_budget AS "thinkingBudget",
+              total_tokens    AS "totalTokens",
+              accumulated_cost AS "accumulatedCost"
        FROM chat_sessions
        WHERE id = $1
          AND user_id = $2`,

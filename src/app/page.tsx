@@ -244,6 +244,8 @@ export default function Home() {
     projectId: number | null;
     thinkingBudget: number;
     lastModel: string;
+    totalTokens: number | null;
+    accumulatedCost: number | null;
   }>>(new Map());
 
   const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);

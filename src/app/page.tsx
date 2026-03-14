@@ -54,6 +54,22 @@ function calculateTurnCost(modelId: string, promptTokens: number, completionToke
   return inputCost + outputCost;
 }
 
+function getCostColor(cost: number, modelId: string | undefined): string {
+  if (!modelId) return "currentColor";
+  const pricing = getModelPricing(modelId);
+  if (!pricing) return "currentColor";
+
+  const maxPrice = pricing.secondaryPricePer1MInputTokens || pricing.pricePer1MInputTokens || 1.0;
+  const ratio = Math.min(cost / maxPrice, 1);
+
+  // Interpolate between green (rgb(34, 197, 94)) and red (rgb(239, 68, 68))
+  const r = Math.round(34 + (239 - 34) * ratio);
+  const g = Math.round(197 + (68 - 197) * ratio);
+  const b = Math.round(94 + (68 - 94) * ratio);
+
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 const FALLBACK_DEFAULT_MODEL_NAME = "gemini-2.5-pro";
 const DEFAULT_MODEL_NAME = process.env.NEXT_PUBLIC_DEFAULT_MODEL_ID || FALLBACK_DEFAULT_MODEL_NAME;
 const TITLE_GENERATION_MAX_LENGTH = 5000;
@@ -343,7 +359,8 @@ export default function Home() {
 
   const fetchTokenCount = useCallback(
     async (currentMessages: Message[], currentModel: Model | null, currentChatId: number | null, systemPrompt?: string, currentProjectId?: number | null) => {
-      if (!currentModel || !currentModel.name || currentMessages.length === 0) {
+      const modelName = currentModel?.name;
+      if (!currentModel || !modelName || currentMessages.length === 0) {
         setTotalTokens(0);
         return;
       }
@@ -357,7 +374,7 @@ export default function Home() {
           },
           body: JSON.stringify({
             history: currentMessages,
-            model: currentModel.name,
+            model: modelName,
             chatSessionId: currentChatId ?? undefined,
             systemPrompt: systemPrompt || undefined,
             projectId: currentProjectId ?? undefined,
@@ -373,12 +390,15 @@ export default function Home() {
         const { totalTokens: tokens } = await res.json();
         setTotalTokens(tokens);
         
-        // Approximate the legacy cost
-        const approximateCost = calculateTurnCost(currentModel.name, tokens, 0);
-        setAccumulatedCost(approximateCost);
+        // Approximate the legacy cost only if we don't have one yet
+        setAccumulatedCost((prev) => {
+          if (prev > 0) return prev;
+          return calculateTurnCost(modelName, tokens, 0);
+        });
 
         if (currentChatId) {
-          // Save the primed totalTokens and accumulatedCost
+          // Only prime the database if it doesn't have these values yet (optimistic check handled by server)
+          const approximateCost = calculateTurnCost(modelName, tokens, 0);
           fetch(`/api/chats/${currentChatId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -398,12 +418,12 @@ export default function Home() {
 
   useEffect(() => {
     const previousIsLoading = sessionStorage.getItem("isLoading") === "true";
-    if (previousIsLoading && !isLoading && messages.length > 0 && selectedModel) {
+    if (previousIsLoading && !isLoading && messages.length > 0 && selectedModel && totalTokens === null) {
       const systemPromptForCounting = activeChatId ? undefined : newChatSystemPrompt || undefined;
       fetchTokenCount(messages, selectedModel, activeChatId, systemPromptForCounting, currentChatProjectId);
     }
     sessionStorage.setItem("isLoading", isLoading.toString());
-  }, [isLoading, activeChatId, messages, selectedModel, fetchTokenCount, newChatSystemPrompt, currentChatProjectId]);
+  }, [isLoading, activeChatId, messages, selectedModel, fetchTokenCount, newChatSystemPrompt, currentChatProjectId, totalTokens]);
 
   const fetchAllProjects = useCallback(async () => {
     try {
@@ -890,10 +910,9 @@ export default function Home() {
         setEditingPromptInitialValue(cached.systemPrompt);
         setCurrentChatProjectId(cached.projectId);
         setThinkingOption(modelValueMap?.[cached.thinkingBudget] || "dynamic");
-        setTotalTokens(cached.totalTokens);
-        setAccumulatedCost(cached.accumulatedCost || 0);
-        chatCacheRef.current.delete(chatId);
-        return { messages: cached.messages, lastModel: cached.lastModel, totalTokens: cached.totalTokens, accumulatedCost: cached.accumulatedCost };
+        setTotalTokens(cached.totalTokens !== null ? Number(cached.totalTokens) : null);
+        setAccumulatedCost(Number(cached.accumulatedCost || 0));
+        return { messages: cached.messages, lastModel: cached.lastModel, totalTokens: cached.totalTokens !== null ? Number(cached.totalTokens) : null, accumulatedCost: Number(cached.accumulatedCost || 0) };
       }
       setIsLoading(true);
       try {
@@ -932,9 +951,9 @@ export default function Home() {
         setEditingPromptInitialValue(data.systemPrompt);
         setCurrentChatProjectId(data.projectId);
         setThinkingOption(modelValueMap?.[data.thinkingBudget] || "dynamic");
-        setTotalTokens(data.totalTokens);
-        setAccumulatedCost(data.accumulatedCost || 0);
-        return { messages: data.messages, lastModel: data.lastModel, totalTokens: data.totalTokens, accumulatedCost: data.accumulatedCost };
+        setTotalTokens(data.totalTokens !== null ? Number(data.totalTokens) : null);
+        setAccumulatedCost(Number(data.accumulatedCost || 0));
+        return { messages: data.messages, lastModel: data.lastModel, totalTokens: data.totalTokens !== null ? Number(data.totalTokens) : null, accumulatedCost: Number(data.accumulatedCost || 0) };
       } catch (err: unknown) {
         showToast(extractErrorMessage(err), "error");
         return null;
@@ -1182,7 +1201,7 @@ export default function Home() {
       parts: MessagePart[];
       thoughtSummary: string;
       sources: Array<{ title: string; uri: string }>;
-      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
       totalTokensToSave?: number;
       accumulatedCostToSave?: number;
     } | null> => {
@@ -1235,7 +1254,7 @@ export default function Home() {
         let streamBuffer = "";
         const currentSources: Array<{ title: string; uri: string }> = [];
         let modelReturnedEmptyMessage = false;
-        let finalUsage: { input_tokens: number; output_tokens: number; total_tokens: number } | null = null;
+        let finalUsage: { input_tokens: number; output_tokens: number; total_tokens: number } | undefined = undefined;
 
         while (true) {
           const { value, done } = await reader.read();
@@ -1433,15 +1452,21 @@ export default function Home() {
     );
 
     if (modelResponse) {
-      if (modelResponse.usage) {
-        const { prompt_tokens = 0, completion_tokens = 0, total_tokens = 0 } = modelResponse.usage;
-        const turnCost = calculateTurnCost(selectedModel.name, prompt_tokens, completion_tokens);
-        
-        setTotalTokens((prev) => (prev || 0) + total_tokens);
-        setAccumulatedCost((prev) => (prev || 0) + turnCost);
+      let currentTotalTokens = totalTokens || 0;
+      let currentAccumulatedCost = accumulatedCost || 0;
 
-        modelResponse.totalTokensToSave = (totalTokens || 0) + total_tokens;
-        modelResponse.accumulatedCostToSave = (accumulatedCost || 0) + turnCost;
+      if (modelResponse.usage) {
+        const { input_tokens = 0, output_tokens = 0, total_tokens = 0 } = modelResponse.usage;
+        const turnCost = calculateTurnCost(selectedModel.name, input_tokens, output_tokens);
+        
+        currentTotalTokens = total_tokens; // Overwrite with latest context size
+        currentAccumulatedCost = currentAccumulatedCost + turnCost; // Cumulative billable cost
+
+        setTotalTokens(currentTotalTokens);
+        setAccumulatedCost(currentAccumulatedCost);
+
+        modelResponse.totalTokensToSave = currentTotalTokens;
+        modelResponse.accumulatedCostToSave = currentAccumulatedCost;
       }
 
       if (!isTemporaryChat) {
@@ -1666,15 +1691,21 @@ export default function Home() {
       );
 
       if (modelResponse && !willBeTemporary && activeChatId) {
+        let currentTotalTokens = totalTokens || 0;
+        let currentAccumulatedCost = accumulatedCost || 0;
+
         if (modelResponse.usage) {
-          const { prompt_tokens = 0, completion_tokens = 0, total_tokens = 0 } = modelResponse.usage;
-          const turnCost = calculateTurnCost(selectedModel?.name || "", prompt_tokens, completion_tokens);
+          const { input_tokens = 0, output_tokens = 0, total_tokens = 0 } = modelResponse.usage;
+          const turnCost = calculateTurnCost(selectedModel?.name || "", input_tokens, output_tokens);
           
-          setTotalTokens((prev) => (prev || 0) + total_tokens);
-          setAccumulatedCost((prev) => (prev || 0) + turnCost);
+          currentTotalTokens = total_tokens;
+          currentAccumulatedCost = currentAccumulatedCost + turnCost;
+
+          setTotalTokens(currentTotalTokens);
+          setAccumulatedCost(currentAccumulatedCost);
   
-          modelResponse.totalTokensToSave = (totalTokens || 0) + total_tokens;
-          modelResponse.accumulatedCostToSave = (accumulatedCost || 0) + turnCost;
+          modelResponse.totalTokensToSave = currentTotalTokens;
+          modelResponse.accumulatedCostToSave = currentAccumulatedCost;
         }
 
         const persistRes = await fetch(`/api/chats/${activeChatId}/append-model-message`, {
@@ -1763,15 +1794,21 @@ export default function Home() {
       );
 
       if (modelResponse && !willBeTemporary && activeChatId) {
+        let currentTotalTokens = totalTokens || 0;
+        let currentAccumulatedCost = accumulatedCost || 0;
+
         if (modelResponse.usage) {
-          const { prompt_tokens = 0, completion_tokens = 0, total_tokens = 0 } = modelResponse.usage;
-          const turnCost = calculateTurnCost(selectedModel?.name || "", prompt_tokens, completion_tokens);
+          const { input_tokens = 0, output_tokens = 0, total_tokens = 0 } = modelResponse.usage;
+          const turnCost = calculateTurnCost(selectedModel?.name || "", input_tokens, output_tokens);
           
-          setTotalTokens((prev) => (prev || 0) + total_tokens);
-          setAccumulatedCost((prev) => (prev || 0) + turnCost);
+          currentTotalTokens = total_tokens;
+          currentAccumulatedCost = currentAccumulatedCost + turnCost;
+
+          setTotalTokens(currentTotalTokens);
+          setAccumulatedCost(currentAccumulatedCost);
   
-          modelResponse.totalTokensToSave = (totalTokens || 0) + total_tokens;
-          modelResponse.accumulatedCostToSave = (accumulatedCost || 0) + turnCost;
+          modelResponse.totalTokensToSave = currentTotalTokens;
+          modelResponse.accumulatedCostToSave = currentAccumulatedCost;
         }
 
         const persistRes = await fetch(`/api/chats/${activeChatId}/append-model-message`, {
@@ -2017,10 +2054,13 @@ export default function Home() {
                       />
                     ) : totalTokens !== null ? (
                       <div className="flex items-center gap-1">
-                        <span>{totalTokens.toLocaleString()}</span>
+                        <span>{(Number(totalTokens) || 0).toLocaleString()}</span>
                         {(accumulatedCost > 0 || estimatedNextCost > 0) && (
-                          <span className="text-xs text-neutral-400">
-                            (${accumulatedCost.toFixed(4)}{estimatedNextCost > 0 ? ` + ~$${estimatedNextCost.toFixed(4)}` : ""})
+                          <span
+                            className="text-xs font-bold ml-3"
+                            style={{ color: getCostColor(accumulatedCost + estimatedNextCost, selectedModel?.name) }}
+                          >
+                            (${(Number(accumulatedCost) || 0).toFixed(4)}{estimatedNextCost > 0 ? ` + ~$${estimatedNextCost.toFixed(4)}` : ""})
                           </span>
                         )}
                       </div>

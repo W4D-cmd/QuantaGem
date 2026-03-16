@@ -19,7 +19,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # --- Stage 3: Runner (Distroless Nonroot) ---
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:38792f83f35f2df89d403f49491782981dd13a853bbcb09ff978d79328263463 AS runner
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:56d532109c00500d7bf42b3c999e596b3ba546de15c704da1507aa02bba2f0ff AS runner
 
 WORKDIR /app
 

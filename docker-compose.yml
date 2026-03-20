@@ -6,7 +6,7 @@ services:
       - .env
       - .env.local
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - app-network

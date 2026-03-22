@@ -263,6 +263,10 @@ export default function Home() {
     accumulatedCost: number | null;
   }>>(new Map());
 
+  const invalidateChatCache = useCallback((chatId: number) => {
+    chatCacheRef.current.delete(chatId);
+  }, []);
+
   const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
   
   const estimatedNextCost = useMemo(() => {
@@ -550,10 +554,12 @@ export default function Home() {
 
     setSelectedModel(model);
 
-    if (activeChatId !== null && messages.length > 0) {
-      const modelName = model.name ?? "";
-      setAllChats((prev) => prev.map((c) => (c.id === activeChatId ? { ...c, lastModel: modelName } : c)));
-      fetch(`/api/chats/${activeChatId}`, {
+      if (activeChatId !== null && messages.length > 0) {
+        const modelName = model.name ?? "";
+        setAllChats((prev) => prev.map((c) => (c.id === activeChatId ? { ...c, lastModel: modelName } : c)));
+        invalidateChatCache(activeChatId);
+        fetch(`/api/chats/${activeChatId}`, {
+
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -570,6 +576,7 @@ export default function Home() {
       if (activeChatId !== null) {
         const budgetMap = getThinkingBudgetMap(selectedModel?.name);
         const budgetValue = budgetMap ? budgetMap[option] : -1;
+        invalidateChatCache(activeChatId);
 
         fetch(`/api/chats/${activeChatId}`, {
           method: "PATCH",
@@ -656,6 +663,7 @@ export default function Home() {
         return;
       }
       await fetchAllChats();
+      invalidateChatCache(chatId);
       showToast("Chat renamed.", "success");
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");
@@ -697,6 +705,7 @@ export default function Home() {
     }
 
     setAllChats((prev) => prev.filter((c) => c.id !== chatId));
+    invalidateChatCache(chatId);
     if (activeChatId === chatId) {
       setActiveChatId(null);
       setMessages([]);
@@ -727,6 +736,7 @@ export default function Home() {
           return;
         }
         const newChat: ChatListItem = await res.json();
+        invalidateChatCache(chatId);
         await fetchAllChats();
         setActiveChatId(newChat.id);
         setDisplayingProjectManagementId(null);
@@ -754,6 +764,7 @@ export default function Home() {
           return;
         }
         const { pinnedAt } = await res.json();
+        invalidateChatCache(chatId);
         setAllChats((prev) =>
           prev.map((c) => (c.id === chatId ? { ...c, pinnedAt } : c)),
         );
@@ -1499,14 +1510,19 @@ export default function Home() {
             return;
           }
 
-          if (!persistRes.ok) {
-            await showApiErrorToast(persistRes, showToast);
-            throw new Error("Failed to save conversation to the database.");
-          }
+        if (!persistRes.ok) {
+          await showApiErrorToast(persistRes, showToast);
+          // If the status is not 500, it's a client error and we should probably revert.
+          // For 500, the data might actually be in the DB but MinIO failed (or vice-versa),
+          // or a genuine server error. We'll revert to be safe but the stale cache was the bigger issue.
+          throw new Error("Failed to save conversation to the database.");
+        }
 
-          const { newChatId, userMessage: savedUserMessage, modelMessage: savedModelMessage, unsavedMessagesMap } = await persistRes.json();
-          await fetchAllChats();
-          setActiveChatId(newChatId);
+        const { newChatId, userMessage: savedUserMessage, modelMessage: savedModelMessage, unsavedMessagesMap } = await persistRes.json();
+        invalidateChatCache(newChatId);
+        await fetchAllChats();
+        setActiveChatId(newChatId);
+
 
           setMessages((prev) =>
             prev.map((msg) => {
@@ -1572,6 +1588,7 @@ export default function Home() {
           }
 
           const { newChatId, userMessage: savedUserMessage, unsavedMessagesMap } = await persistUserMsgRes.json();
+          invalidateChatCache(newChatId);
           await fetchAllChats();
           setActiveChatId(newChatId);
           setMessages((prev) =>
@@ -1639,8 +1656,11 @@ export default function Home() {
 
         if (!patchRes.ok) {
           await showApiErrorToast(patchRes, showToast);
+          // Don't throw yet, we still need to delete if that was part of the flow.
+          // Actually, if patch fails, we should stop.
           throw new Error("Failed to save edited message.");
         }
+        invalidateChatCache(activeChatId);
 
         const modelMessagePosition = messageToEdit.position + 1;
         const deleteRes = await fetch(`/api/chats/${activeChatId}/messages?fromPosition=${modelMessagePosition}`, {
@@ -1765,6 +1785,7 @@ export default function Home() {
           await showApiErrorToast(deleteRes, showToast);
           throw new Error("Failed to delete message for regeneration.");
         }
+        invalidateChatCache(activeChatId);
       }
 
       const historyForAPI = messages.slice(0, userMessageIndex);

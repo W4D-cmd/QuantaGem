@@ -158,6 +158,59 @@ export async function POST(request: NextRequest) {
     );
     const savedModelMessage = modelMessageResult.rows[0];
 
+    const migrations = new Map<string, string>();
+    const migrationErrors: string[] = [];
+
+    for (const oldObjectName of temporaryObjectNames) {
+      try {
+        const newObjectName = await migrateTemporaryFile(oldObjectName);
+        migrations.set(oldObjectName, newObjectName);
+
+        await client.query(
+          `DELETE FROM temporary_files WHERE object_name = $1`,
+          [oldObjectName]
+        );
+      } catch (err) {
+        console.error(`Failed to migrate temporary file ${oldObjectName}:`, err);
+        migrationErrors.push(oldObjectName);
+      }
+    }
+
+    if (migrations.size > 0) {
+      const updatedUserParts = replaceObjectNames(savedUserMessage.parts, migrations);
+      const updatedModelParts = replaceObjectNames(savedModelMessage.parts, migrations);
+
+      await client.query(
+        `UPDATE messages SET parts = $1 WHERE id = $2`,
+        [JSON.stringify(updatedUserParts), savedUserMessage.id]
+      );
+
+      await client.query(
+        `UPDATE messages SET parts = $1 WHERE id = $2`,
+        [JSON.stringify(updatedModelParts), savedModelMessage.id]
+      );
+
+      if (savedUnsavedMessages.length > 0) {
+        for (const saved of savedUnsavedMessages) {
+          const updatedParts = replaceObjectNames(saved.msg.parts, migrations);
+          await client.query(
+            `UPDATE messages SET parts = $1 WHERE id = $2`,
+            [JSON.stringify(updatedParts), saved.id]
+          );
+          saved.msg.parts = updatedParts;
+        }
+      }
+
+      savedUserMessage.parts = updatedUserParts;
+      savedModelMessage.parts = updatedModelParts;
+    }
+
+    const finalizedUnsavedMessages = savedUnsavedMessages.map(({ id, msg }) => ({
+      oldId: msg.id,
+      newId: id,
+      parts: msg.parts,
+    }));
+
     if (totalTokens !== undefined && accumulatedCost !== undefined) {
       await client.query(`UPDATE chat_sessions SET updated_at = now(), last_model = $2, total_tokens = $4, accumulated_cost = $5 WHERE id = $1 AND user_id = $3`, [
         currentChatId,
@@ -176,59 +229,6 @@ export async function POST(request: NextRequest) {
 
     await client.query("COMMIT");
 
-    const migrations = new Map<string, string>();
-    const migrationErrors: string[] = [];
-
-    for (const oldObjectName of temporaryObjectNames) {
-      try {
-        const newObjectName = await migrateTemporaryFile(oldObjectName);
-        migrations.set(oldObjectName, newObjectName);
-
-        await pool.query(
-          `DELETE FROM temporary_files WHERE object_name = $1`,
-          [oldObjectName]
-        );
-      } catch (err) {
-        console.error(`Failed to migrate temporary file ${oldObjectName}:`, err);
-        migrationErrors.push(oldObjectName);
-      }
-    }
-
-    if (migrations.size > 0) {
-      const updatedUserParts = replaceObjectNames(savedUserMessage.parts, migrations);
-      const updatedModelParts = replaceObjectNames(savedModelMessage.parts, migrations);
-
-      await pool.query(
-        `UPDATE messages SET parts = $1 WHERE id = $2`,
-        [JSON.stringify(updatedUserParts), savedUserMessage.id]
-      );
-
-      await pool.query(
-        `UPDATE messages SET parts = $1 WHERE id = $2`,
-        [JSON.stringify(updatedModelParts), savedModelMessage.id]
-      );
-
-      if (savedUnsavedMessages.length > 0) {
-        for (const saved of savedUnsavedMessages) {
-          const updatedParts = replaceObjectNames(saved.msg.parts, migrations);
-          await pool.query(
-            `UPDATE messages SET parts = $1 WHERE id = $2`,
-            [JSON.stringify(updatedParts), saved.id]
-          );
-          saved.msg.parts = updatedParts;
-        }
-      }
-
-      savedUserMessage.parts = updatedUserParts;
-      savedModelMessage.parts = updatedModelParts;
-    }
-
-    const finalizedUnsavedMessages = savedUnsavedMessages.map(({ id, msg }) => ({
-      oldId: msg.id,
-      newId: id,
-      parts: msg.parts,
-    }));
-
     return NextResponse.json({
       newChatId: currentChatId,
       userMessage: savedUserMessage,
@@ -237,7 +237,13 @@ export async function POST(request: NextRequest) {
       unsavedMessagesMap: finalizedUnsavedMessages,
     });
   } catch (error) {
-    await client.query("ROLLBACK");
+    // Check if the client is still in a transaction
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      // Rollback might fail if the transaction was already committed or connection is dead
+      console.error("Rollback failed (might already be committed):", rollbackError);
+    }
     console.error("Error persisting conversation turn:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
     return NextResponse.json({ error: "Failed to save conversation", details: errorMessage }, { status: 500 });

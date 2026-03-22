@@ -120,7 +120,6 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
   if (!sets.length) {
     return NextResponse.json({ error: "nothing to update" }, { status: 400 });
   }
-  sets.push(`updated_at = now()`);
 
   const sql = `
     UPDATE chat_sessions

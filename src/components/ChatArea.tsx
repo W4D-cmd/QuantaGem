@@ -17,7 +17,12 @@ import React, {
   ReactNode,
 } from "react";
 import ReactMarkdown, { Components } from "react-markdown";
-import { RCodeBlock } from "@/components/RCodeBlock";
+import dynamic from "next/dynamic";
+
+// Dynamically import RCodeBlock with SSR disabled to prevent jspdf/fflate build errors
+const RCodeBlock = dynamic(() => import("@/components/RCodeBlock").then(mod => mod.RCodeBlock), {
+  ssr: false,
+});
 
 // Helper function to extract text content from React children recursively
 function extractTextFromChildren(children: ReactNode): string {

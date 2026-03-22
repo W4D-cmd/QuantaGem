@@ -84,61 +84,6 @@ export async function downloadPNG(svgContent: string, filename: string = "r-plot
 }
 
 /**
- * Download SVG content as PDF using jsPDF and svg2pdf.js
- */
-export async function downloadPDF(svgContent: string, filename: string = "r-plot.pdf"): Promise<void> {
-  try {
-    // Dynamically import jsPDF and svg2pdf.js
-    const [{ jsPDF }, { svg2pdf }] = await Promise.all([
-      import("jspdf"),
-      import("svg2pdf.js"),
-    ]);
-
-    // Parse the SVG to get dimensions
-    const parser = new DOMParser();
-    const svgDoc = parser.parseFromString(svgContent, "image/svg+xml");
-    const svgElement = svgDoc.documentElement;
-
-    // Get SVG dimensions
-    let width = parseFloat(svgElement.getAttribute("width") || "800");
-    let height = parseFloat(svgElement.getAttribute("height") || "600");
-
-    // Handle viewBox if width/height not set
-    const viewBox = svgElement.getAttribute("viewBox");
-    if (viewBox && (!width || !height)) {
-      const [, , vbWidth, vbHeight] = viewBox.split(" ").map(parseFloat);
-      width = width || vbWidth;
-      height = height || vbHeight;
-    }
-
-    // Create PDF with appropriate dimensions (in mm, convert from px)
-    const pxToMm = 0.264583;
-    const pdfWidth = width * pxToMm;
-    const pdfHeight = height * pxToMm;
-
-    const pdf = new jsPDF({
-      orientation: pdfWidth > pdfHeight ? "landscape" : "portrait",
-      unit: "mm",
-      format: [pdfWidth, pdfHeight],
-    });
-
-    // Convert SVG to PDF
-    await svg2pdf(svgElement, pdf, {
-      x: 0,
-      y: 0,
-      width: pdfWidth,
-      height: pdfHeight,
-    });
-
-    // Download
-    pdf.save(filename);
-  } catch (error) {
-    console.error("PDF generation failed:", error);
-    throw new Error("Failed to generate PDF. Please try downloading as SVG instead.");
-  }
-}
-
-/**
  * Copy SVG content to clipboard
  */
 export async function copySVGToClipboard(svgContent: string): Promise<void> {

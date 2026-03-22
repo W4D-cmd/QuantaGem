@@ -5,7 +5,7 @@ import { useWebR } from "@/hooks/useWebR";
 import { RCodeBlockControls, ViewMode } from "./RCodeBlockControls";
 import { RCodeBlockSVGView } from "./RCodeBlockSVGView";
 import { RCodeBlockLoading } from "./RCodeBlockLoading";
-import { downloadSVG, downloadPNG, downloadPDF } from "@/lib/webr/svg-utils";
+import { downloadSVG, downloadPNG } from "@/lib/webr/svg-utils";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 interface RCodeBlockProps {
@@ -63,6 +63,7 @@ export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className, isStrea
   const handleDownloadPDF = useCallback(async () => {
     if (result?.svg) {
       try {
+        const { downloadPDF } = await import("@/lib/webr/pdf-export");
         await downloadPDF(result.svg);
       } catch (error) {
         console.error("PDF download failed:", error);

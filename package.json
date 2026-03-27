@@ -26,7 +26,7 @@
     "jose": "^6.2.1",
     "js-tiktoken": "^1.0.21",
     "jspdf": "^4.2.0",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1.0.0",
     "mime": "^4.1.0",
     "minio": "^8.0.7",
     "next": "16.2.1",

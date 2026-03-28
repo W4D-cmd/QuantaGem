@@ -466,7 +466,7 @@ export default function Home() {
 
   const fetchAllProjects = useCallback(async () => {
     try {
-      const res = await fetch("/api/projects", { headers: getAuthHeaders() });
+      const res = await fetch("/api/projects", { headers: getAuthHeaders(), cache: "no-store" });
       if (res.status === 401) {
         router.replace("/login");
         return;
@@ -554,7 +554,7 @@ export default function Home() {
 
   const fetchAllChats = useCallback(async () => {
     try {
-      const res = await fetch("/api/chats", { headers: getAuthHeaders() });
+      const res = await fetch("/api/chats", { headers: getAuthHeaders(), cache: "no-store" });
       if (res.status === 401) {
         router.replace("/login");
         return;
@@ -939,6 +939,7 @@ export default function Home() {
       try {
         const res = await fetch(`/api/chats/${chatId}`, {
           headers: getAuthHeaders(),
+          cache: "no-store",
         });
         if (res.ok) {
           const data: {
@@ -1003,6 +1004,7 @@ export default function Home() {
       try {
         const res = await fetch(`/api/chats/${chatId}`, {
           headers: getAuthHeaders(),
+          cache: "no-store",
         });
         if (res.status === 401) {
           router.replace("/login");
@@ -1010,13 +1012,18 @@ export default function Home() {
         }
         if (!res.ok) {
           if (res.status === 404) {
-            setActiveChatId(null);
-            setMessages([]);
-            setEditingPromptInitialValue(null);
-            setCurrentChatProjectId(null);
-            setTotalTokens(null);
-            setAccumulatedCost(0);
-            setThinkingOption("dynamic");
+            // Only clear if we are still on this chat
+            setActiveChatId((curr) => {
+              if (curr === chatId) {
+                setMessages([]);
+                setEditingPromptInitialValue(null);
+                setCurrentChatProjectId(null);
+                setTotalTokens(null);
+                setAccumulatedCost(0);
+                setThinkingOption("dynamic");
+              }
+              return curr;
+            });
           }
           await showApiErrorToast(res, showToast);
           return null;
@@ -1650,10 +1657,6 @@ export default function Home() {
             }),
           );
 
-          if (unsavedMessages.length > 0 && activeChatId === newChatId) {
-            loadChat(newChatId);
-          }
-
           if (isNewChat && inputText.trim()) {
             generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
           }
@@ -1720,10 +1723,6 @@ export default function Home() {
             }),
           );
           setMessages((prev) => prev.filter((msg) => msg.id !== 0));
-
-          if (unsavedMessages.length > 0 && activeChatId === newChatId) {
-            loadChat(newChatId);
-          }
 
           if (isNewChat && inputText.trim()) {
             generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);

@@ -10,6 +10,7 @@ import {
   getProviderForModel,
   ModelProvider,
   modelSupportsVerbosity,
+  modelSupportsReasoning,
   isCustomModel,
   getOriginalModelId,
   getModelTokenLimits,
@@ -272,20 +273,17 @@ async function handleGeminiRequest(
   topP: number | null,
   topK: number | null,
 ): Promise<Response> {
-  const modelParts = model.split("/");
-  const modelId = modelParts[modelParts.length - 1];
-
+  const useVertexAI = process.env.GOOGLE_GENAI_USE_VERTEXAI?.toLowerCase() === "true";
   const cloudProjectId = process.env.GOOGLE_CLOUD_PROJECT;
   const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
+  const apiKey = process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY;
 
-  const safetySettings = [
-    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-  ];
+  const modelParts = model.split("/");
+  const baseModelId = modelParts[modelParts.length - 1];
 
-  const genAI = new GoogleGenAI({ vertexai: true, project: cloudProjectId, location: location });
+  const genAI = new GoogleGenAI(
+    useVertexAI ? { vertexai: true, project: cloudProjectId, location: location } : { apiKey: apiKey, vertexai: false },
+  );
 
   const newMessageGeminiParts: Part[] = [];
 
@@ -432,7 +430,7 @@ async function handleGeminiRequest(
   } = {};
 
   generationConfig.safetySettings = safetySettings;
-  generationConfig.maxOutputTokens = getModelTokenLimits(model).outputTokenLimit;
+  generationConfig.maxOutputTokens = getModelTokenLimits(baseModelId).outputTokenLimit;
 
   if (temperature !== null) generationConfig.temperature = temperature;
   if (topP !== null) generationConfig.topP = topP;
@@ -446,19 +444,17 @@ async function handleGeminiRequest(
     generationConfig.tools = [{ googleSearch: {} }];
   }
 
-  const isThinkingSupported = model.includes("2.5-pro") || model.includes("2.5-flash");
-  if (isThinkingSupported) {
+  if (modelSupportsReasoning(baseModelId)) {
     const effectiveThinkingConfig: { thinkingBudget?: number; includeThoughts?: boolean } = {};
 
+    // For reasoning-capable models, we default includeThoughts to true unless budget is 0
     if (thinkingBudget !== 0) {
       effectiveThinkingConfig.includeThoughts = true;
     }
 
     if (thinkingBudget !== undefined) {
-      const isProModel = model.includes("2.5-pro");
-      if (!isProModel || (isProModel && thinkingBudget !== 0)) {
-        effectiveThinkingConfig.thinkingBudget = thinkingBudget;
-      }
+      // 0 is DISABLED, -1 is AUTOMATIC in the SDK
+      effectiveThinkingConfig.thinkingBudget = thinkingBudget;
     }
 
     if (Object.keys(effectiveThinkingConfig).length > 0) {
@@ -1047,10 +1043,6 @@ async function handleCustomOpenAIRequest(
     messages,
     stream: true,
   };
-
-  if (!isCustomModel(model)) {
-    requestOptions.max_tokens = getModelTokenLimits(model).outputTokenLimit;
-  }
 
   if (temperature !== null) requestOptions.temperature = temperature;
   if (topP !== null) requestOptions.top_p = topP;

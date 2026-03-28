@@ -65,7 +65,9 @@ export function isAnthropicReasoningModel(modelName: string | null | undefined):
   return baseModel !== null && baseModel in anthropicReasoningModelConfigs;
 }
 
-export function getAnthropicReasoningConfig(modelName: string | null | undefined): AnthropicReasoningModelConfig | null {
+export function getAnthropicReasoningConfig(
+  modelName: string | null | undefined,
+): AnthropicReasoningModelConfig | null {
   if (!modelName) return null;
   const baseModel = getAnthropicModelBase(modelName);
   if (!baseModel) return null;
@@ -106,7 +108,7 @@ const GPT5_FAMILY_PREFIXES = ["gpt-5-", "gpt-5.1", "gpt-5.2", "gpt-5.4"];
 
 export function isGPT5FamilyModel(modelName: string | null | undefined): boolean {
   if (!modelName) return false;
-  return GPT5_FAMILY_PREFIXES.some(prefix => modelName.startsWith(prefix));
+  return GPT5_FAMILY_PREFIXES.some((prefix) => modelName.startsWith(prefix));
 }
 
 export function getOpenAIReasoningConfig(modelName: string | null | undefined): OpenAIReasoningModelConfig | null {
@@ -142,8 +144,9 @@ export function getDefaultReasoningEffort(modelName: string | null | undefined):
 
 export function getThinkingConfigForModel(modelName: string | null | undefined): ThinkingModelConfig | null {
   if (!modelName) return null;
-  if (modelName.includes("2.5-pro")) return modelConfigs["2.5-pro"];
-  if (modelName.includes("2.5-flash")) return modelConfigs["2.5-flash"];
+  if (modelName.includes("2.5-pro") || modelName.includes("3.1-pro")) return modelConfigs["2.5-pro"];
+  if (modelName.includes("2.5-flash") || modelName.includes("3.1-flash") || modelName.includes("gemini-3-flash"))
+    return modelConfigs["2.5-flash"];
   if (isOpenAIReasoningModel(modelName)) {
     const config = getOpenAIReasoningConfig(modelName);
     const canBeOff = config?.supportedEfforts.includes("none") ?? false;
@@ -239,7 +242,7 @@ export function getThinkingValueMap(modelName: string | null | undefined): { [ke
 
 export function mapBudgetToOpenAIReasoningEffort(
   modelName: string | null | undefined,
-  budget: number | undefined
+  budget: number | undefined,
 ): OpenAIReasoningEffort {
   const config = getOpenAIReasoningConfig(modelName);
   if (!config) return "none";

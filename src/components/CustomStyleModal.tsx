@@ -38,12 +38,15 @@ export default function CustomStyleModal({ isOpen, onClose, onSave, initialParam
     <Modal isOpen={isOpen} onClose={onClose} title="Custom Sampling Parameters" size="md">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-neutral-700 dark:text-zinc-400">
-            Allow Really Arbitrary Values
+          <label
+            onClick={() => setIsArbitrary(!isArbitrary)}
+            className="text-sm font-medium text-neutral-700 dark:text-zinc-400 cursor-pointer select-none"
+          >
+            Allow arbitrary values
           </label>
           <button
             onClick={() => setIsArbitrary(!isArbitrary)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
               isArbitrary ? "bg-blue-600" : "bg-neutral-200 dark:bg-zinc-800"
             }`}
           >

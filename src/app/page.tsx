@@ -1734,6 +1734,7 @@ export default function Home() {
         activeChatId,
         isSearchActive,
         thinkingOption,
+        generationStyle,
         true,
         placeholderMessage.id,
       );

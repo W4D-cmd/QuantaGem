@@ -974,6 +974,7 @@ export default function Home() {
           systemPrompt: string;
           projectId: number | null;
           thinkingBudget: number;
+          generationStyle: string;
           lastModel: string;
           totalTokens: number | null;
           accumulatedCost: number | null;

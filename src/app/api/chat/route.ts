@@ -12,6 +12,7 @@ import {
   modelSupportsVerbosity,
   isCustomModel,
   getOriginalModelId,
+  getModelTokenLimits,
 } from "@/lib/custom-models";
 import {
   isOpenAIReasoningModel,
@@ -21,6 +22,7 @@ import {
   VerbosityOption,
   supportsVerbosity,
 } from "@/lib/thinking";
+import { getParametersForStyle } from "@/lib/generation-styles";
 
 // Allow long-running requests for AI processing
 export const maxDuration = 600;
@@ -36,6 +38,7 @@ interface ChatRequest {
   systemPrompt?: string;
   projectId?: number | null;
   verbosity?: VerbosityOption;
+  generationStyle?: string;
 }
 
 const SUPPORTED_GEMINI_MIME_TYPES = [
@@ -265,6 +268,7 @@ async function handleGeminiRequest(
   systemPromptText: string | null,
   isSearchActive: boolean | undefined,
   thinkingBudget: number | undefined,
+  generationStyle: string | undefined,
 ): Promise<Response> {
   const cloudProjectId = process.env.GOOGLE_CLOUD_PROJECT;
   const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
@@ -420,9 +424,21 @@ async function handleGeminiRequest(
     tools?: Array<{ googleSearch: Record<string, never> }>;
     thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
     safetySettings?: typeof safetySettings;
+    temperature?: number;
+    topP?: number;
+    topK?: number;
+    maxOutputTokens?: number;
   } = {};
 
   generationConfig.safetySettings = safetySettings;
+  generationConfig.maxOutputTokens = getModelTokenLimits(model).outputTokenLimit;
+
+  if (generationStyle && generationStyle !== "default") {
+    const params = getParametersForStyle(generationStyle);
+    generationConfig.temperature = params.temperature;
+    generationConfig.topP = params.topP;
+    generationConfig.topK = params.topK;
+  }
 
   if (systemPromptText && systemPromptText.trim() !== "") {
     generationConfig.systemInstruction = systemPromptText;
@@ -581,6 +597,7 @@ async function handleOpenAIRequest(
   systemPromptText: string | null,
   thinkingBudget: number | undefined,
   verbosity: VerbosityOption | undefined,
+  generationStyle: string | undefined,
 ): Promise<Response> {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -791,7 +808,16 @@ async function handleOpenAIRequest(
     messages,
     stream: true,
     stream_options: { include_usage: true },
+    max_completion_tokens: getModelTokenLimits(model).outputTokenLimit,
   };
+
+  if (generationStyle && generationStyle !== "default") {
+    const params = getParametersForStyle(generationStyle);
+    requestOptions.temperature = params.temperature;
+    requestOptions.top_p = params.topP;
+    requestOptions.frequency_penalty = params.frequencyPenalty;
+    requestOptions.presence_penalty = params.presencePenalty;
+  }
 
   if (isOpenAIReasoningModel(model)) {
     const reasoningEffort = mapBudgetToOpenAIReasoningEffort(model, thinkingBudget);
@@ -894,6 +920,7 @@ async function handleCustomOpenAIRequest(
   clientHistoryWithAppParts: Array<{ role: string; parts: MessagePart[] }>,
   systemPromptText: string | null,
   userId: number,
+  generationStyle: string | undefined,
 ): Promise<Response> {
   // Fetch custom endpoint and key from database
   const settingsResult = await pool.query(
@@ -1105,12 +1132,26 @@ async function handleCustomOpenAIRequest(
     content: newMessageContentParts,
   });
 
-  const stream = await openai.chat.completions.create({
+  const requestOptions: any = {
     model: actualModelId,
     messages,
     stream: true,
     stream_options: { include_usage: true },
-  });
+  };
+
+  if (!isCustomModel(model)) {
+    requestOptions.max_tokens = getModelTokenLimits(model).outputTokenLimit;
+  }
+
+  if (generationStyle && generationStyle !== "default") {
+    const params = getParametersForStyle(generationStyle);
+    requestOptions.temperature = params.temperature;
+    requestOptions.top_p = params.topP;
+    requestOptions.frequency_penalty = params.frequencyPenalty;
+    requestOptions.presence_penalty = params.presencePenalty;
+  }
+
+  const stream = await openai.chat.completions.create(requestOptions);
 
   const encoder = new TextEncoder();
   const readableStream = new ReadableStream({
@@ -1185,6 +1226,7 @@ async function handleOpenAIResponsesAPIRequest(
   systemPromptText: string | null,
   thinkingBudget: number | undefined,
   verbosity: VerbosityOption | undefined,
+  generationStyle: string | undefined,
 ): Promise<Response> {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -1437,13 +1479,22 @@ async function handleOpenAIResponsesAPIRequest(
     instructions?: string;
     stream: true;
     reasoning?: { effort: string; summary?: string };
-    text?: { format: { type: string }; verbosity?: string };
+    text?: {
+      format: { type: string };
+      verbosity?: string;
+      temperature?: number;
+      top_p?: number;
+      frequency_penalty?: number;
+      presence_penalty?: number;
+    };
+    max_output_tokens?: number;
   };
 
   const requestOptions: ResponsesCreateParams = {
     model,
     input: inputItems,
     stream: true,
+    max_output_tokens: getModelTokenLimits(model).outputTokenLimit,
   };
 
   if (systemPromptText && systemPromptText.trim() !== "") {
@@ -1454,7 +1505,19 @@ async function handleOpenAIResponsesAPIRequest(
     requestOptions.reasoning = { effort: reasoningEffort, summary: "auto" };
   }
 
-  requestOptions.text = { format: { type: "text" }, verbosity: effectiveVerbosity };
+  if (generationStyle && generationStyle !== "default") {
+    const params = getParametersForStyle(generationStyle);
+    requestOptions.text = {
+      format: { type: "text" },
+      verbosity: effectiveVerbosity,
+      temperature: params.temperature,
+      top_p: params.topP,
+      frequency_penalty: params.frequencyPenalty,
+      presence_penalty: params.presencePenalty,
+    };
+  } else {
+    requestOptions.text = { format: { type: "text" }, verbosity: effectiveVerbosity };
+  }
 
   const stream = await (openai.responses as unknown as {
     create(params: ResponsesCreateParams): Promise<AsyncIterable<{
@@ -1551,7 +1614,9 @@ async function handleAnthropicRequest(
   clientHistoryWithAppParts: Array<{ role: string; parts: MessagePart[] }>,
   systemPromptText: string | null,
   thinkingBudget: number | undefined,
+  generationStyle: string | undefined,
 ): Promise<Response> {
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
@@ -1788,7 +1853,7 @@ async function handleAnthropicRequest(
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const requestParams: any = {
     model,
-    max_tokens: 128000,
+    max_tokens: getModelTokenLimits(model).outputTokenLimit,
     messages,
     thinking: {
       type: "adaptive",
@@ -1797,7 +1862,21 @@ async function handleAnthropicRequest(
       effort,
     },
   };
+
+  if (generationStyle && generationStyle !== "default") {
+    const params = getParametersForStyle(generationStyle);
+    requestParams.temperature = params.temperature;
+    requestParams.top_p = params.topP;
+    requestParams.top_k = params.topK;
+  }
   /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  if (generationStyle) {
+    const params = getParametersForStyle(generationStyle);
+    requestParams.temperature = params.temperature;
+    requestParams.top_p = params.topP;
+    requestParams.top_k = params.topK;
+  }
 
   if (systemPromptText && systemPromptText.trim() !== "") {
     requestParams.system = systemPromptText;
@@ -1897,6 +1976,7 @@ export async function POST(request: NextRequest) {
     projectId,
     systemPrompt: newChatSystemPrompt,
     verbosity,
+    generationStyle,
   } = (await request.json()) as Omit<ChatRequest, "keySelection" | "isRegeneration">;
 
   const newMessageAppParts: MessagePart[] = [...originalNewMessageAppParts];
@@ -1917,6 +1997,7 @@ export async function POST(request: NextRequest) {
         clientHistoryWithAppParts,
         systemPromptText,
         thinkingBudget,
+        generationStyle,
       );
     } else if (provider === "openai") {
       if (isGPT5FamilyModel(model)) {
@@ -1927,6 +2008,7 @@ export async function POST(request: NextRequest) {
           systemPromptText,
           thinkingBudget,
           verbosity,
+          generationStyle,
         );
       } else {
         return await handleOpenAIRequest(
@@ -1936,6 +2018,7 @@ export async function POST(request: NextRequest) {
           systemPromptText,
           thinkingBudget,
           verbosity,
+          generationStyle,
         );
       }
     } else if (provider === "custom-openai") {
@@ -1945,6 +2028,7 @@ export async function POST(request: NextRequest) {
         clientHistoryWithAppParts,
         systemPromptText,
         userId,
+        generationStyle,
       );
     } else {
       return await handleGeminiRequest(
@@ -1954,6 +2038,7 @@ export async function POST(request: NextRequest) {
         systemPromptText,
         isSearchActive,
         thinkingBudget,
+        generationStyle,
       );
     }
   } catch (error: unknown) {

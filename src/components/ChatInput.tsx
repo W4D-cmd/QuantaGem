@@ -29,9 +29,14 @@ import {
   ChevronDown,
   ArrowUp,
   Square,
+  Zap,
+  Code,
+  Type,
+  MessageSquare,
 } from "lucide-react";
 import { Message, ProjectFile } from "@/app/page";
 import { ThinkingOption, VerbosityOption, getThinkingConfigForModel, isOpenAIReasoningModel, getOpenAIReasoningConfig } from "@/lib/thinking";
+import { GenerationStyle, STYLE_LABELS } from "@/lib/generation-styles";
 import { modelSupportsVerbosity } from "@/lib/custom-models";
 import VerbositySelector from "./VerbositySelector";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
@@ -63,6 +68,8 @@ interface ChatInputProps {
   selectedModel: Model | null;
   verbosity: VerbosityOption;
   onVerbosityChange: (verbosity: VerbosityOption) => void;
+  generationStyle: GenerationStyle;
+  onGenerationStyleChange: (style: GenerationStyle) => void;
   currentSystemPrompt: string;
   onSystemPromptGenerated: (prompt: string) => void;
   isTemporaryChat: boolean;
@@ -171,6 +178,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       selectedModel,
       verbosity,
       onVerbosityChange,
+      generationStyle,
+      onGenerationStyleChange,
       currentSystemPrompt,
       onSystemPromptGenerated,
       isTemporaryChat,
@@ -182,8 +191,10 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const fileInputRef = useRef<HTMLInputElement>(null);
     const attachButtonRef = useRef<HTMLButtonElement>(null);
     const thinkingButtonRef = useRef<HTMLButtonElement>(null);
+    const styleButtonRef = useRef<HTMLButtonElement>(null);
     const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
     const [isThinkingMenuOpen, setIsThinkingMenuOpen] = useState(false);
+    const [isStyleMenuOpen, setIsStyleMenuOpen] = useState(false);
     const [selectedFiles, setSelectedFiles] = useState<UploadedFileInfo[]>([]);
     const [uploadingFiles, setUploadingFiles] = useState<
       { file: File; id: string; progress: number; error?: string }[]
@@ -439,6 +450,25 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         icon: thinkingOption === option ? <Check className="size-4 text-blue-500" /> : <div className="size-4" />,
       }));
     }, [selectedModel, thinkingOption, onThinkingOptionChange]);
+
+    const styleDropdownItems = useMemo((): DropdownItem[] => {
+      const styles: { id: GenerationStyle; label: string; icon: React.ReactNode }[] = [
+        { id: "default", label: STYLE_LABELS.default, icon: <Zap className="size-4" /> },
+        { id: "scientific", label: STYLE_LABELS.scientific, icon: <FlaskConical className="size-4" /> },
+        { id: "creative", label: STYLE_LABELS.creative, icon: <Sparkles className="size-4" /> },
+        { id: "coding", label: STYLE_LABELS.coding, icon: <Code className="size-4" /> },
+        { id: "concise", label: STYLE_LABELS.concise, icon: <Type className="size-4" /> },
+        { id: "chatty", label: STYLE_LABELS.chatty, icon: <MessageSquare className="size-4" /> },
+      ];
+
+      return styles.map((style) => ({
+        id: style.id,
+        label: style.label,
+        icon: generationStyle === style.id ? <Check className="size-4 text-blue-500" /> : style.icon,
+        onClick: () => onGenerationStyleChange(style.id),
+        className: generationStyle === style.id ? "font-semibold" : "",
+      }));
+    }, [generationStyle, onGenerationStyleChange]);
 
     useEffect(() => {
       const ta = textareaRef.current;
@@ -1094,6 +1124,41 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   onCloseAction={() => setIsThinkingMenuOpen(false)}
                   anchorRef={thinkingButtonRef}
                   items={thinkingDropdownItems}
+                  position="left"
+                />
+                <Tooltip text="Generation Style">
+                  <button
+                    ref={styleButtonRef}
+                    type="button"
+                    onClick={() => setIsStyleMenuOpen((prev) => !prev)}
+                    disabled={isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
+                    className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
+                    transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
+                    text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400
+                    dark:hover:bg-zinc-700 disabled:opacity-50`}
+                  >
+                    {generationStyle === "scientific" ? (
+                      <FlaskConical className="size-5" />
+                    ) : generationStyle === "creative" ? (
+                      <Sparkles className="size-5" />
+                    ) : generationStyle === "coding" ? (
+                      <Code className="size-5" />
+                    ) : generationStyle === "concise" ? (
+                      <Type className="size-5" />
+                    ) : generationStyle === "chatty" ? (
+                      <MessageSquare className="size-5" />
+                    ) : (
+                      <Zap className="size-5" />
+                    )}
+                    <span className="capitalize">{STYLE_LABELS[generationStyle]}</span>
+                    <ChevronDown className="size-3" />
+                  </button>
+                </Tooltip>
+                <DropdownMenu
+                  open={isStyleMenuOpen}
+                  onCloseAction={() => setIsStyleMenuOpen(false)}
+                  anchorRef={styleButtonRef}
+                  items={styleDropdownItems}
                   position="left"
                 />
                 {isVerbositySupported && (

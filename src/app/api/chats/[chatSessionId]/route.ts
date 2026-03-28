@@ -25,6 +25,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
               project_id      AS "projectId",
               updated_at      AS "updatedAt",
               thinking_budget AS "thinkingBudget",
+              generation_style AS "generationStyle",
               total_tokens    AS "totalTokens",
               accumulated_cost AS "accumulatedCost"
        FROM chat_sessions
@@ -74,12 +75,13 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     return NextResponse.json({ error: "Invalid Chat Session ID format" }, { status: 400 });
   }
 
-  const { title, lastModel, systemPrompt, projectId, thinkingBudget, totalTokens, accumulatedCost } = (await request.json()) as {
+  const { title, lastModel, systemPrompt, projectId, thinkingBudget, generationStyle, totalTokens, accumulatedCost } = (await request.json()) as {
     title?: string;
     lastModel?: string;
     systemPrompt?: string;
     projectId?: number | null;
     thinkingBudget?: number;
+    generationStyle?: string;
     totalTokens?: number;
     accumulatedCost?: number;
   };
@@ -107,6 +109,10 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
   if (thinkingBudget !== undefined) {
     sets.push(`thinking_budget = $${idx++}`);
     vals.push(thinkingBudget);
+  }
+  if (generationStyle !== undefined) {
+    sets.push(`generation_style = $${idx++}`);
+    vals.push(generationStyle);
   }
   if (totalTokens !== undefined) {
     sets.push(`total_tokens = $${idx++}`);
@@ -141,6 +147,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
               system_prompt   AS "systemPrompt",
               project_id      AS "projectId",
               thinking_budget AS "thinkingBudget",
+              generation_style AS "generationStyle",
               total_tokens    AS "totalTokens",
               accumulated_cost AS "accumulatedCost"
        FROM chat_sessions

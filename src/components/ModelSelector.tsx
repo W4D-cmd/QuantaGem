@@ -125,18 +125,20 @@ export default function ModelSelector({
             >
               {m.displayName}
             </span>
-            <div
-              className={`text-xs flex items-center gap-2 mt-1 transition-colors duration-300 ease-in-out ${
-                isSelected
-                  ? "text-neutral-600 dark:text-zinc-400"
-                  : "text-neutral-500 dark:text-zinc-500"
-              }`}
-            >
-              <Download className="size-3 transition-colors duration-300 ease-in-out" />
-              {m.inputTokenLimit?.toLocaleString()}
-              <Upload className="size-3 transition-colors duration-300 ease-in-out" />
-              {m.outputTokenLimit?.toLocaleString()}
-            </div>
+            {m.provider !== "custom-openai" && (
+              <div
+                className={`text-xs flex items-center gap-2 mt-1 transition-colors duration-300 ease-in-out ${
+                  isSelected
+                    ? "text-neutral-600 dark:text-zinc-400"
+                    : "text-neutral-500 dark:text-zinc-500"
+                }`}
+              >
+                <Download className="size-3 transition-colors duration-300 ease-in-out" />
+                {m.inputTokenLimit?.toLocaleString()}
+                <Upload className="size-3 transition-colors duration-300 ease-in-out" />
+                {m.outputTokenLimit?.toLocaleString()}
+              </div>
+            )}
           </div>
           <div className="w-4 h-4 flex-shrink-0 self-center">
             {isSelected && <CircleCheck className="size-4" />}

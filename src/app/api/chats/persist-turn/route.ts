@@ -12,6 +12,7 @@ interface PersistTurnRequest {
   modelName: string;
   projectId: number | null;
   thinkingBudget: number;
+  generationStyle?: string;
   systemPrompt?: string;
   unsavedMessages?: Message[];
   totalTokens?: number;
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
     modelName,
     projectId,
     thinkingBudget,
+    generationStyle,
     systemPrompt,
     unsavedMessages,
     totalTokens,
@@ -86,9 +88,9 @@ export async function POST(request: NextRequest) {
           .split("\n")[0] || "New Chat";
 
       const newChatResult = await client.query(
-        `INSERT INTO chat_sessions (user_id, title, last_model, project_id, thinking_budget, system_prompt, total_tokens, accumulated_cost)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [userId, title, modelName, projectId, thinkingBudget, systemPrompt || "", requestData.totalTokens || 0, requestData.accumulatedCost || 0],
+        `INSERT INTO chat_sessions (user_id, title, last_model, project_id, thinking_budget, generation_style, system_prompt, total_tokens, accumulated_cost)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        [userId, title, modelName, projectId, thinkingBudget, generationStyle || 'default', systemPrompt || "", requestData.totalTokens || 0, requestData.accumulatedCost || 0],
       );
       currentChatId = newChatResult.rows[0].id;
     } else {

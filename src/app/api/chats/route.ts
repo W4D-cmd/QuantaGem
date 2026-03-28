@@ -18,9 +18,11 @@ export async function GET(request: NextRequest) {
            , system_prompt   AS "systemPrompt"
            , key_selection   AS "keySelection"
            , project_id      AS "projectId"
-           , updated_at      AS "updatedAt"
-           , thinking_budget AS "thinkingBudget"
-           , pinned_at       AS "pinnedAt"
+            , updated_at      AS "updatedAt"
+            , thinking_budget AS "thinkingBudget"
+            , generation_style AS "generationStyle"
+            , pinned_at       AS "pinnedAt"
+
       FROM chat_sessions
       WHERE user_id = $1
       ORDER BY 

@@ -1151,7 +1151,7 @@ async function handleCustomOpenAIRequest(
     requestOptions.presence_penalty = params.presencePenalty;
   }
 
-  const stream = await openai.chat.completions.create(requestOptions);
+  const stream = await openai.chat.completions.create(requestOptions) as unknown as AsyncIterable<any>;
 
   const encoder = new TextEncoder();
   const readableStream = new ReadableStream({
@@ -1870,13 +1870,6 @@ async function handleAnthropicRequest(
     requestParams.top_k = params.topK;
   }
   /* eslint-enable @typescript-eslint/no-explicit-any */
-
-  if (generationStyle) {
-    const params = getParametersForStyle(generationStyle);
-    requestParams.temperature = params.temperature;
-    requestParams.top_p = params.topP;
-    requestParams.top_k = params.topK;
-  }
 
   if (systemPromptText && systemPromptText.trim() !== "") {
     requestParams.system = systemPromptText;

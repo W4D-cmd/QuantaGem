@@ -1,10 +1,4 @@
-export type GenerationStyleId =
-  | "default"
-  | "precise"
-  | "balanced"
-  | "creative"
-  | "unconstrained"
-  | "custom";
+export type GenerationStyleId = "default" | "precise" | "balanced" | "creative" | "unconstrained" | "custom";
 
 export interface GenerationParameters {
   temperature: number | null;
@@ -48,7 +42,7 @@ export const GENERATION_STYLES: Record<GenerationStyleId, GenerationStyle> = {
     id: "unconstrained",
     label: "Unconstrained",
     description: "Maximum exploration. High risk of incoherence but maximum variety.",
-    params: { temperature: 1.5, topP: 1.0, topK: 100 },
+    params: { temperature: 1.5, topP: 1.0, topK: 64 },
   },
   custom: {
     id: "custom",
@@ -67,9 +61,11 @@ export function getStyleFromParams(params: GenerationParameters): GenerationStyl
     if (styleId === "default" || styleId === "custom") continue;
     const style = GENERATION_STYLES[styleId as GenerationStyleId];
     if (
-      style.params.temperature === params.temperature &&
-      style.params.topP === params.topP &&
-      style.params.topK === params.topK
+      (style.params.temperature === null
+        ? params.temperature === null
+        : Number(style.params.temperature) === Number(params.temperature)) &&
+      (style.params.topP === null ? params.topP === null : Number(style.params.topP) === Number(params.topP)) &&
+      (style.params.topK === null ? params.topK === null : Number(style.params.topK) === Number(params.topK))
     ) {
       return styleId as GenerationStyleId;
     }

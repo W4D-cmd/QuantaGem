@@ -13,12 +13,13 @@ interface PersistUserMessageRequest {
   unsavedMessages?: Message[];
   totalTokens?: number;
   accumulatedCost?: number;
+  temperature?: number | null;
+  topP?: number | null;
+  topK?: number | null;
 }
 
 function collectTemporaryObjectNames(parts: MessagePart[]): string[] {
-  return parts
-    .filter((p) => p.type === "file" && p.objectName?.startsWith("temporary/"))
-    .map((p) => p.objectName!);
+  return parts.filter((p) => p.type === "file" && p.objectName?.startsWith("temporary/")).map((p) => p.objectName!);
 }
 
 function replaceObjectNames(parts: MessagePart[], migrations: Map<string, string>): MessagePart[] {
@@ -41,13 +42,22 @@ export async function POST(request: NextRequest) {
   }
 
   const requestData = (await request.json()) as PersistUserMessageRequest;
-  const { chatSessionId, userMessageParts, modelName, projectId, thinkingBudget, systemPrompt, unsavedMessages, totalTokens, accumulatedCost } =
-    requestData;
+  const {
+    chatSessionId,
+    userMessageParts,
+    modelName,
+    projectId,
+    thinkingBudget,
+    systemPrompt,
+    unsavedMessages,
+    totalTokens,
+    accumulatedCost,
+    temperature,
+    topP,
+    topK,
+  } = requestData;
 
-  const allParts: MessagePart[] = [
-    ...userMessageParts,
-    ...(unsavedMessages?.flatMap((m) => m.parts) || []),
-  ];
+  const allParts: MessagePart[] = [...userMessageParts, ...(unsavedMessages?.flatMap((m) => m.parts) || [])];
   const temporaryObjectNames = [...new Set(collectTemporaryObjectNames(allParts))];
 
   const client = await pool.connect();
@@ -70,9 +80,21 @@ export async function POST(request: NextRequest) {
           .split("\n")[0] || "New Chat";
 
       const newChatResult = await client.query(
-        `INSERT INTO chat_sessions (user_id, title, last_model, project_id, thinking_budget, system_prompt, total_tokens, accumulated_cost)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [userId, title, modelName, projectId, thinkingBudget, systemPrompt || "", requestData.totalTokens || 0, requestData.accumulatedCost || 0],
+        `INSERT INTO chat_sessions (user_id, title, last_model, project_id, thinking_budget, system_prompt, total_tokens, accumulated_cost, temperature, top_p, top_k)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        [
+          userId,
+          title,
+          modelName,
+          projectId,
+          thinkingBudget,
+          systemPrompt || "",
+          requestData.totalTokens || 0,
+          requestData.accumulatedCost || 0,
+          temperature ?? null,
+          topP ?? null,
+          topK ?? null,
+        ],
       );
       currentChatId = newChatResult.rows[0].id;
     } else {
@@ -104,7 +126,7 @@ export async function POST(request: NextRequest) {
             JSON.stringify(msg.parts),
             JSON.stringify(msg.sources || []),
             msg.thoughtSummary || null,
-          ]
+          ],
         );
         savedUnsavedMessages.push({ id: unsavedResult.rows[0].id, msg });
       }
@@ -125,19 +147,38 @@ export async function POST(request: NextRequest) {
     const savedUserMessage = userMessageResult.rows[0];
 
     if (totalTokens !== undefined && accumulatedCost !== undefined) {
-      await client.query(`UPDATE chat_sessions SET updated_at = now(), last_model = $2, total_tokens = $4, accumulated_cost = $5 WHERE id = $1 AND user_id = $3`, [
-        currentChatId,
-        modelName,
-        userId,
-        totalTokens,
-        accumulatedCost,
-      ]);
+      await client.query(
+        `UPDATE chat_sessions 
+         SET updated_at = now(), 
+             last_model = $2, 
+             total_tokens = $4, 
+             accumulated_cost = $5,
+             temperature = COALESCE($6, temperature),
+             top_p = COALESCE($7, top_p),
+             top_k = COALESCE($8, top_k)
+         WHERE id = $1 AND user_id = $3`,
+        [
+          currentChatId,
+          modelName,
+          userId,
+          totalTokens,
+          accumulatedCost,
+          temperature ?? null,
+          topP ?? null,
+          topK ?? null,
+        ],
+      );
     } else {
-      await client.query(`UPDATE chat_sessions SET updated_at = now(), last_model = $2 WHERE id = $1 AND user_id = $3`, [
-        currentChatId,
-        modelName,
-        userId,
-      ]);
+      await client.query(
+        `UPDATE chat_sessions 
+         SET updated_at = now(), 
+             last_model = $2,
+             temperature = COALESCE($4, temperature),
+             top_p = COALESCE($5, top_p),
+             top_k = COALESCE($6, top_k)
+         WHERE id = $1 AND user_id = $3`,
+        [currentChatId, modelName, userId, temperature ?? null, topP ?? null, topK ?? null],
+      );
     }
 
     await client.query("COMMIT");
@@ -150,10 +191,7 @@ export async function POST(request: NextRequest) {
         const newObjectName = await migrateTemporaryFile(oldObjectName);
         migrations.set(oldObjectName, newObjectName);
 
-        await pool.query(
-          `DELETE FROM temporary_files WHERE object_name = $1`,
-          [oldObjectName]
-        );
+        await pool.query(`DELETE FROM temporary_files WHERE object_name = $1`, [oldObjectName]);
       } catch (err) {
         console.error(`Failed to migrate temporary file ${oldObjectName}:`, err);
         migrationErrors.push(oldObjectName);
@@ -163,18 +201,15 @@ export async function POST(request: NextRequest) {
     if (migrations.size > 0) {
       const updatedUserParts = replaceObjectNames(savedUserMessage.parts, migrations);
 
-      await pool.query(
-        `UPDATE messages SET parts = $1 WHERE id = $2`,
-        [JSON.stringify(updatedUserParts), savedUserMessage.id]
-      );
+      await pool.query(`UPDATE messages SET parts = $1 WHERE id = $2`, [
+        JSON.stringify(updatedUserParts),
+        savedUserMessage.id,
+      ]);
 
       if (savedUnsavedMessages.length > 0) {
         for (const saved of savedUnsavedMessages) {
           const updatedParts = replaceObjectNames(saved.msg.parts, migrations);
-          await pool.query(
-            `UPDATE messages SET parts = $1 WHERE id = $2`,
-            [JSON.stringify(updatedParts), saved.id]
-          );
+          await pool.query(`UPDATE messages SET parts = $1 WHERE id = $2`, [JSON.stringify(updatedParts), saved.id]);
           saved.msg.parts = updatedParts;
         }
       }

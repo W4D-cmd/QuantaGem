@@ -11,13 +11,7 @@ import Toast, { ToastProps } from "@/components/Toast";
 import DropdownMenu, { DropdownItem } from "@/components/DropdownMenu";
 import SettingsModal from "@/components/SettingsModal";
 import { useRouter } from "next/navigation";
-import {
-  ArrowDown,
-  LogOut,
-  Settings,
-  EllipsisVertical,
-  Paperclip,
-} from "lucide-react";
+import { ArrowDown, LogOut, Settings, EllipsisVertical, Paperclip } from "lucide-react";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import TemporaryChatToggle from "@/components/TemporaryChatToggle";
 import ProjectManagement from "@/components/ProjectManagement";
@@ -32,17 +26,28 @@ import {
   getThinkingBudgetMap,
   getThinkingValueMap,
 } from "@/lib/thinking";
-import { GenerationStyle, STYLE_LABELS } from "@/lib/generation-styles";
+import { GenerationStyle, GenerationParameters } from "@/lib/generation-styles";
 import { showApiErrorToast } from "@/lib/errors";
 import NewChatScreen from "@/components/NewChatScreen";
 import AddSuggestionModal from "@/components/AddSuggestionModal";
-import { isCustomModel, getOriginalModelId, createCustomModelId, ModelProvider, getModelPricing } from "@/lib/custom-models";
+import {
+  isCustomModel,
+  getOriginalModelId,
+  createCustomModelId,
+  ModelProvider,
+  getModelPricing,
+} from "@/lib/custom-models";
 
 function calculateTurnCost(modelId: string, promptTokens: number, completionTokens: number): number {
   const pricing = getModelPricing(modelId);
   if (!pricing) return 0;
 
-  const { pricePer1MInputTokens = 0, pricePer1MOutputTokens = 0, inputTokenThreshold, secondaryPricePer1MInputTokens } = pricing;
+  const {
+    pricePer1MInputTokens = 0,
+    pricePer1MOutputTokens = 0,
+    inputTokenThreshold,
+    secondaryPricePer1MInputTokens,
+  } = pricing;
 
   let inputCost = 0;
   if (inputTokenThreshold && secondaryPricePer1MInputTokens && promptTokens > inputTokenThreshold) {
@@ -262,30 +267,35 @@ export default function Home() {
   const chatInputRef = useRef<ChatInputHandle>(null);
   const prevActiveChatIdRef = useRef<number | null>(null);
   const prevDisplayingProjectManagementIdRef = useRef<number | null>(null);
-  const chatCacheRef = useRef<Map<number, {
-    messages: Message[];
-    systemPrompt: string;
-    projectId: number | null;
-    thinkingBudget: number;
-    temperature: number | null;
-    topP: number | null;
-    topK: number | null;
-    lastModel: string;
-    totalTokens: number | null;
-    accumulatedCost: number | null;
-  }>>(new Map());
+  const chatCacheRef = useRef<
+    Map<
+      number,
+      {
+        messages: Message[];
+        systemPrompt: string;
+        projectId: number | null;
+        thinkingBudget: number;
+        temperature: number | null;
+        topP: number | null;
+        topK: number | null;
+        lastModel: string;
+        totalTokens: number | null;
+        accumulatedCost: number | null;
+      }
+    >
+  >(new Map());
 
   const invalidateChatCache = useCallback((chatId: number) => {
     chatCacheRef.current.delete(chatId);
   }, []);
 
   const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
-  
+
   const estimatedNextCost = useMemo(() => {
     if (!selectedModel || !selectedModel.name || totalTokens === null || totalTokens === 0) return 0;
     const pricing = getModelPricing(selectedModel.name);
     if (!pricing) return 0;
-    
+
     const { pricePer1MInputTokens = 0, inputTokenThreshold, secondaryPricePer1MInputTokens } = pricing;
     if (inputTokenThreshold && secondaryPricePer1MInputTokens && totalTokens > inputTokenThreshold) {
       return (totalTokens / 1_000_000) * secondaryPricePer1MInputTokens;
@@ -373,7 +383,13 @@ export default function Home() {
   };
 
   const fetchTokenCount = useCallback(
-    async (currentMessages: Message[], currentModel: Model | null, currentChatId: number | null, systemPrompt?: string, currentProjectId?: number | null) => {
+    async (
+      currentMessages: Message[],
+      currentModel: Model | null,
+      currentChatId: number | null,
+      systemPrompt?: string,
+      currentProjectId?: number | null,
+    ) => {
       const modelName = currentModel?.name;
       if (!currentModel || !modelName || currentMessages.length === 0) {
         setTotalTokens(0);
@@ -404,7 +420,7 @@ export default function Home() {
 
         const { totalTokens: tokens } = await res.json();
         setTotalTokens(tokens);
-        
+
         // Approximate the legacy cost only if we don't have one yet
         setAccumulatedCost((prev) => {
           if (prev > 0) return prev;
@@ -420,7 +436,6 @@ export default function Home() {
             body: JSON.stringify({ totalTokens: tokens, accumulatedCost: approximateCost }),
           }).catch(console.error);
         }
-
       } catch (err) {
         console.error("Token count failed:", extractErrorMessage(err));
         setTotalTokens(null);
@@ -438,7 +453,16 @@ export default function Home() {
       fetchTokenCount(messages, selectedModel, activeChatId, systemPromptForCounting, currentChatProjectId);
     }
     sessionStorage.setItem("isLoading", isLoading.toString());
-  }, [isLoading, activeChatId, messages, selectedModel, fetchTokenCount, newChatSystemPrompt, currentChatProjectId, totalTokens]);
+  }, [
+    isLoading,
+    activeChatId,
+    messages,
+    selectedModel,
+    fetchTokenCount,
+    newChatSystemPrompt,
+    currentChatProjectId,
+    totalTokens,
+  ]);
 
   const fetchAllProjects = useCallback(async () => {
     try {
@@ -566,12 +590,11 @@ export default function Home() {
 
     setSelectedModel(model);
 
-      if (activeChatId !== null && messages.length > 0) {
-        const modelName = model.name ?? "";
-        setAllChats((prev) => prev.map((c) => (c.id === activeChatId ? { ...c, lastModel: modelName } : c)));
-        invalidateChatCache(activeChatId);
-        fetch(`/api/chats/${activeChatId}`, {
-
+    if (activeChatId !== null && messages.length > 0) {
+      const modelName = model.name ?? "";
+      setAllChats((prev) => prev.map((c) => (c.id === activeChatId ? { ...c, lastModel: modelName } : c)));
+      invalidateChatCache(activeChatId);
+      fetch(`/api/chats/${activeChatId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -801,9 +824,7 @@ export default function Home() {
         }
         const { pinnedAt } = await res.json();
         invalidateChatCache(chatId);
-        setAllChats((prev) =>
-          prev.map((c) => (c.id === chatId ? { ...c, pinnedAt } : c)),
-        );
+        setAllChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, pinnedAt } : c)));
         showToast(pinnedAt ? "Chat pinned." : "Chat unpinned.", "success");
       } catch (err: unknown) {
         showToast(extractErrorMessage(err), "error");
@@ -865,9 +886,7 @@ export default function Home() {
           return;
         }
 
-        setAllChats((prev) =>
-          prev.map((c) => (c.id === chatId ? { ...c, projectId: targetProjectId } : c)),
-        );
+        setAllChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, projectId: targetProjectId } : c)));
 
         if (targetProjectId !== null) {
           setExpandedProjects((prev: Set<number>) => {
@@ -951,7 +970,14 @@ export default function Home() {
   );
 
   const loadChat = useCallback(
-    async (chatId: number): Promise<{ messages: Message[]; lastModel: string; totalTokens: number | null; accumulatedCost: number | null } | null> => {
+    async (
+      chatId: number,
+    ): Promise<{
+      messages: Message[];
+      lastModel: string;
+      totalTokens: number | null;
+      accumulatedCost: number | null;
+    } | null> => {
       const cached = chatCacheRef.current.get(chatId);
       if (cached) {
         const modelValueMap = getThinkingValueMap(cached.lastModel);
@@ -960,13 +986,18 @@ export default function Home() {
         setCurrentChatProjectId(cached.projectId);
         setThinkingOption(modelValueMap?.[cached.thinkingBudget] || "dynamic");
         setGenerationParams({
-          temperature: cached.temperature,
-          topP: cached.topP,
-          topK: cached.topK,
+          temperature: cached.temperature !== null ? Number(cached.temperature) : null,
+          topP: cached.topP !== null ? Number(cached.topP) : null,
+          topK: cached.topK !== null ? Number(cached.topK) : null,
         });
         setTotalTokens(cached.totalTokens !== null ? Number(cached.totalTokens) : null);
         setAccumulatedCost(Number(cached.accumulatedCost || 0));
-        return { messages: cached.messages, lastModel: cached.lastModel, totalTokens: cached.totalTokens !== null ? Number(cached.totalTokens) : null, accumulatedCost: Number(cached.accumulatedCost || 0) };
+        return {
+          messages: cached.messages,
+          lastModel: cached.lastModel,
+          totalTokens: cached.totalTokens !== null ? Number(cached.totalTokens) : null,
+          accumulatedCost: Number(cached.accumulatedCost || 0),
+        };
       }
       setIsLoading(true);
       try {
@@ -1009,13 +1040,18 @@ export default function Home() {
         setCurrentChatProjectId(data.projectId);
         setThinkingOption(modelValueMap?.[data.thinkingBudget] || "dynamic");
         setGenerationParams({
-          temperature: data.temperature,
-          topP: data.topP,
-          topK: data.topK,
+          temperature: data.temperature !== null ? Number(data.temperature) : null,
+          topP: data.topP !== null ? Number(data.topP) : null,
+          topK: data.topK !== null ? Number(data.topK) : null,
         });
         setTotalTokens(data.totalTokens !== null ? Number(data.totalTokens) : null);
         setAccumulatedCost(Number(data.accumulatedCost || 0));
-        return { messages: data.messages, lastModel: data.lastModel, totalTokens: data.totalTokens !== null ? Number(data.totalTokens) : null, accumulatedCost: Number(data.accumulatedCost || 0) };
+        return {
+          messages: data.messages,
+          lastModel: data.lastModel,
+          totalTokens: data.totalTokens !== null ? Number(data.totalTokens) : null,
+          accumulatedCost: Number(data.accumulatedCost || 0),
+        };
       } catch (err: unknown) {
         showToast(extractErrorMessage(err), "error");
         return null;
@@ -1241,7 +1277,17 @@ export default function Home() {
       prevDisplayingProjectManagementIdRef.current = displayingProjectManagementId;
       prevActiveChatIdRef.current = null;
     }
-  }, [activeChatId, displayingProjectManagementId, allChats, models, selectedModel, loadChat, isLoading, fetchedCustomModels, fetchTokenCount]);
+  }, [
+    activeChatId,
+    displayingProjectManagementId,
+    allChats,
+    models,
+    selectedModel,
+    loadChat,
+    isLoading,
+    fetchedCustomModels,
+    fetchTokenCount,
+  ]);
 
   const handleCancel = () => {
     controller?.abort();
@@ -1525,7 +1571,7 @@ export default function Home() {
       if (modelResponse.usage) {
         const { input_tokens = 0, output_tokens = 0, total_tokens = 0 } = modelResponse.usage;
         const turnCost = calculateTurnCost(selectedModel.name, input_tokens, output_tokens);
-        
+
         currentTotalTokens = total_tokens; // Overwrite with latest context size
         currentAccumulatedCost = currentAccumulatedCost + turnCost; // Cumulative billable cost
 
@@ -1570,19 +1616,23 @@ export default function Home() {
             return;
           }
 
-        if (!persistRes.ok) {
-          await showApiErrorToast(persistRes, showToast);
-          // If the status is not 500, it's a client error and we should probably revert.
-          // For 500, the data might actually be in the DB but MinIO failed (or vice-versa),
-          // or a genuine server error. We'll revert to be safe but the stale cache was the bigger issue.
-          throw new Error("Failed to save conversation to the database.");
-        }
+          if (!persistRes.ok) {
+            await showApiErrorToast(persistRes, showToast);
+            // If the status is not 500, it's a client error and we should probably revert.
+            // For 500, the data might actually be in the DB but MinIO failed (or vice-versa),
+            // or a genuine server error. We'll revert to be safe but the stale cache was the bigger issue.
+            throw new Error("Failed to save conversation to the database.");
+          }
 
-        const { newChatId, userMessage: savedUserMessage, modelMessage: savedModelMessage, unsavedMessagesMap } = await persistRes.json();
-        invalidateChatCache(newChatId);
-        await fetchAllChats();
-        setActiveChatId(newChatId);
-
+          const {
+            newChatId,
+            userMessage: savedUserMessage,
+            modelMessage: savedModelMessage,
+            unsavedMessagesMap,
+          } = await persistRes.json();
+          invalidateChatCache(newChatId);
+          await fetchAllChats();
+          setActiveChatId(newChatId);
 
           setMessages((prev) =>
             prev.map((msg) => {
@@ -1629,6 +1679,9 @@ export default function Home() {
               modelName: selectedModel.name,
               projectId: currentChatProjectId,
               thinkingBudget: budgetValue,
+              temperature: generationParams.temperature,
+              topP: generationParams.topP,
+              topK: generationParams.topK,
               systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
               unsavedMessages: unsavedMessages.length > 0 ? unsavedMessages : undefined,
               totalTokens: totalTokens,
@@ -1666,19 +1719,19 @@ export default function Home() {
               return msg;
             }),
           );
-        setMessages((prev) => prev.filter((msg) => msg.id !== 0));
+          setMessages((prev) => prev.filter((msg) => msg.id !== 0));
 
-        if (unsavedMessages.length > 0 && activeChatId === newChatId) {
-          loadChat(newChatId);
-        }
+          if (unsavedMessages.length > 0 && activeChatId === newChatId) {
+            loadChat(newChatId);
+          }
 
-        if (isNewChat && inputText.trim()) {
-          generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
+          if (isNewChat && inputText.trim()) {
+            generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
+          }
+        } catch (err) {
+          setMessages(previousMessages);
+          showToast(extractErrorMessage(err), "error");
         }
-      } catch (err) {
-        setMessages(previousMessages);
-        showToast(extractErrorMessage(err), "error");
-      }
       } else {
         setMessages((prev) => prev.filter((msg) => msg.id !== tempModelMessageId));
       }
@@ -1777,13 +1830,13 @@ export default function Home() {
         if (modelResponse.usage) {
           const { input_tokens = 0, output_tokens = 0, total_tokens = 0 } = modelResponse.usage;
           const turnCost = calculateTurnCost(selectedModel?.name || "", input_tokens, output_tokens);
-          
+
           currentTotalTokens = total_tokens;
           currentAccumulatedCost = currentAccumulatedCost + turnCost;
 
           setTotalTokens(currentTotalTokens);
           setAccumulatedCost(currentAccumulatedCost);
-  
+
           modelResponse.totalTokensToSave = currentTotalTokens;
           modelResponse.accumulatedCostToSave = currentAccumulatedCost;
         }
@@ -1882,13 +1935,13 @@ export default function Home() {
         if (modelResponse.usage) {
           const { input_tokens = 0, output_tokens = 0, total_tokens = 0 } = modelResponse.usage;
           const turnCost = calculateTurnCost(selectedModel?.name || "", input_tokens, output_tokens);
-          
+
           currentTotalTokens = total_tokens;
           currentAccumulatedCost = currentAccumulatedCost + turnCost;
 
           setTotalTokens(currentTotalTokens);
           setAccumulatedCost(currentAccumulatedCost);
-  
+
           modelResponse.totalTokensToSave = currentTotalTokens;
           modelResponse.accumulatedCostToSave = currentAccumulatedCost;
         }
@@ -2063,7 +2116,10 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
-      <div className={`h-full transition-opacity duration-300 ease-in-out flex-none ${isTemporaryChat ? "opacity-50 pointer-events-none" : "opacity-100"}`}>
+      <div
+        className={`h-full transition-opacity duration-300 ease-in-out flex-none
+          ${isTemporaryChat ? "opacity-50 pointer-events-none" : "opacity-100"}`}
+      >
         <Sidebar
           chats={allChats}
           projects={sortedProjects}
@@ -2142,7 +2198,8 @@ export default function Home() {
                             className="text-xs font-bold ml-3"
                             style={{ color: getCostColor(estimatedNextCost, selectedModel?.name) }}
                           >
-                            (${(Number(accumulatedCost) || 0).toFixed(4)}{estimatedNextCost > 0 ? ` + ~$${estimatedNextCost.toFixed(4)}` : ""})
+                            (${(Number(accumulatedCost) || 0).toFixed(4)}
+                            {estimatedNextCost > 0 ? ` + ~$${estimatedNextCost.toFixed(4)}` : ""})
                           </span>
                         )}
                       </div>
@@ -2300,12 +2357,11 @@ export default function Home() {
                       thinkingOption={thinkingOption}
                       onThinkingOptionChange={handleThinkingOptionChange}
                       selectedModel={selectedModel}
-            verbosity={verbosity}
+                      verbosity={verbosity}
                       onVerbosityChange={handleVerbosityChange}
                       generationParams={generationParams}
                       onGenerationParamsChange={handleGenerationParamsChange}
                       currentSystemPrompt={newChatSystemPrompt}
-
                       onSystemPromptGenerated={setNewChatSystemPrompt}
                       isTemporaryChat={isTemporaryChat}
                     />

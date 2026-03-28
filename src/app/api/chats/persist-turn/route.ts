@@ -22,9 +22,7 @@ interface PersistTurnRequest {
 }
 
 function collectTemporaryObjectNames(parts: MessagePart[]): string[] {
-  return parts
-    .filter((p) => p.type === "file" && p.objectName?.startsWith("temporary/"))
-    .map((p) => p.objectName!);
+  return parts.filter((p) => p.type === "file" && p.objectName?.startsWith("temporary/")).map((p) => p.objectName!);
 }
 
 function replaceObjectNames(parts: MessagePart[], migrations: Map<string, string>): MessagePart[] {
@@ -136,7 +134,7 @@ export async function POST(request: NextRequest) {
             JSON.stringify(msg.parts),
             JSON.stringify(msg.sources || []),
             msg.thoughtSummary || null,
-          ]
+          ],
         );
         savedUnsavedMessages.push({ id: unsavedResult.rows[0].id, msg });
       }
@@ -182,10 +180,7 @@ export async function POST(request: NextRequest) {
         const newObjectName = await migrateTemporaryFile(oldObjectName);
         migrations.set(oldObjectName, newObjectName);
 
-        await client.query(
-          `DELETE FROM temporary_files WHERE object_name = $1`,
-          [oldObjectName]
-        );
+        await client.query(`DELETE FROM temporary_files WHERE object_name = $1`, [oldObjectName]);
       } catch (err) {
         console.error(`Failed to migrate temporary file ${oldObjectName}:`, err);
         migrationErrors.push(oldObjectName);
@@ -196,23 +191,20 @@ export async function POST(request: NextRequest) {
       const updatedUserParts = replaceObjectNames(savedUserMessage.parts, migrations);
       const updatedModelParts = replaceObjectNames(savedModelMessage.parts, migrations);
 
-      await client.query(
-        `UPDATE messages SET parts = $1 WHERE id = $2`,
-        [JSON.stringify(updatedUserParts), savedUserMessage.id]
-      );
+      await client.query(`UPDATE messages SET parts = $1 WHERE id = $2`, [
+        JSON.stringify(updatedUserParts),
+        savedUserMessage.id,
+      ]);
 
-      await client.query(
-        `UPDATE messages SET parts = $1 WHERE id = $2`,
-        [JSON.stringify(updatedModelParts), savedModelMessage.id]
-      );
+      await client.query(`UPDATE messages SET parts = $1 WHERE id = $2`, [
+        JSON.stringify(updatedModelParts),
+        savedModelMessage.id,
+      ]);
 
       if (savedUnsavedMessages.length > 0) {
         for (const saved of savedUnsavedMessages) {
           const updatedParts = replaceObjectNames(saved.msg.parts, migrations);
-          await client.query(
-            `UPDATE messages SET parts = $1 WHERE id = $2`,
-            [JSON.stringify(updatedParts), saved.id]
-          );
+          await client.query(`UPDATE messages SET parts = $1 WHERE id = $2`, [JSON.stringify(updatedParts), saved.id]);
           saved.msg.parts = updatedParts;
         }
       }
@@ -228,19 +220,38 @@ export async function POST(request: NextRequest) {
     }));
 
     if (totalTokens !== undefined && accumulatedCost !== undefined) {
-      await client.query(`UPDATE chat_sessions SET updated_at = now(), last_model = $2, total_tokens = $4, accumulated_cost = $5 WHERE id = $1 AND user_id = $3`, [
-        currentChatId,
-        modelName,
-        userId,
-        totalTokens,
-        accumulatedCost,
-      ]);
+      await client.query(
+        `UPDATE chat_sessions 
+         SET updated_at = now(), 
+             last_model = $2, 
+             total_tokens = $4, 
+             accumulated_cost = $5,
+             temperature = COALESCE($6, temperature),
+             top_p = COALESCE($7, top_p),
+             top_k = COALESCE($8, top_k)
+         WHERE id = $1 AND user_id = $3`,
+        [
+          currentChatId,
+          modelName,
+          userId,
+          totalTokens,
+          accumulatedCost,
+          temperature ?? null,
+          topP ?? null,
+          topK ?? null,
+        ],
+      );
     } else {
-      await client.query(`UPDATE chat_sessions SET updated_at = now(), last_model = $2 WHERE id = $1 AND user_id = $3`, [
-        currentChatId,
-        modelName,
-        userId,
-      ]);
+      await client.query(
+        `UPDATE chat_sessions 
+         SET updated_at = now(), 
+             last_model = $2,
+             temperature = COALESCE($4, temperature),
+             top_p = COALESCE($5, top_p),
+             top_k = COALESCE($6, top_k)
+         WHERE id = $1 AND user_id = $3`,
+        [currentChatId, modelName, userId, temperature ?? null, topP ?? null, topK ?? null],
+      );
     }
 
     await client.query("COMMIT");

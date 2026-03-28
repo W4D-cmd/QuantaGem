@@ -3,6 +3,7 @@
 import React, { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import Tooltip from "./Tooltip";
 
 export interface DropdownItem {
   id?: string;
@@ -121,8 +122,8 @@ export default function DropdownMenu({
             ...(menuWidth != null ? { width: `${menuWidth}px` } : {}),
             transformOrigin: "top",
           }}
-          className="border bg-white dark:bg-zinc-900 border-neutral-200 dark:border-zinc-800 rounded-2xl
-            shadow-lg overflow-hidden transition-colors duration-300 ease-in-out"
+          className="border bg-white dark:bg-zinc-900 border-neutral-200 dark:border-zinc-800 rounded-2xl shadow-lg
+            overflow-hidden transition-colors duration-300 ease-in-out"
         >
           {header && (
             <>
@@ -133,22 +134,22 @@ export default function DropdownMenu({
           <div className="p-2 space-y-1">
             {items.map((item, index) => (
               <React.Fragment key={item.id ?? `${item.label}-${index}`}>
-                {item.isSeparator && (
-                  <div className="h-px bg-neutral-200 dark:bg-zinc-800 my-1 mx-2" />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCloseAction();
-                    item.onClick(e);
-                  }}
-                  title={item.title}
-                  className={`cursor-pointer w-full flex items-center px-4 py-2 text-sm text-left hover:bg-neutral-100
-                  dark:hover:bg-zinc-800 rounded-lg transition-colors duration-300 ease-in-out ${item.className || ""}`}
-                >
-                  {item.icon && <span className="mr-2">{item.icon}</span>}
-                  {item.label}
-                </button>
+                {item.isSeparator && <div className="h-px bg-neutral-200 dark:bg-zinc-800 my-1 mx-2" />}
+                <Tooltip text={item.title || ""}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCloseAction();
+                      item.onClick(e);
+                    }}
+                    className={`cursor-pointer w-full flex items-center px-4 py-2 text-sm text-left hover:bg-neutral-100
+                    dark:hover:bg-zinc-800 rounded-lg transition-colors duration-300 ease-in-out
+                    ${item.className || ""}`}
+                  >
+                    {item.icon && <span className="mr-2">{item.icon}</span>}
+                    {item.label}
+                  </button>
+                </Tooltip>
               </React.Fragment>
             ))}
           </div>

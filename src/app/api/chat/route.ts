@@ -275,11 +275,14 @@ async function handleGeminiRequest(
   const modelParts = model.split("/");
   const modelId = modelParts[modelParts.length - 1];
 
+  const cloudProjectId = process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
+
   const safetySettings = [
-    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
   ];
 
   const genAI = new GoogleGenAI({ vertexai: true, project: cloudProjectId, location: location });
@@ -433,167 +436,7 @@ async function handleGeminiRequest(
 
   if (temperature !== null) generationConfig.temperature = temperature;
   if (topP !== null) generationConfig.topP = topP;
-  if (topK !== null) generationConfig.topK = topK;
-
-  const genAI = new GoogleGenAI({ vertexai: true, project: cloudProjectId, location: location });
-
-  const newMessageGeminiParts: Part[] = [];
-
-  for (const appPart of newMessageAppParts) {
-    if (appPart.type === "text" && appPart.text) {
-      newMessageGeminiParts.push({ text: appPart.text });
-    } else if (appPart.type === "scraped_url" && appPart.text) {
-      newMessageGeminiParts.push({ text: appPart.text });
-    } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-      let effectiveMimeType = appPart.mimeType.toLowerCase();
-      const extension = getFileExtension(appPart.fileName);
-
-      if (
-        !SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType) &&
-        SOURCE_CODE_EXTENSIONS.includes(`.${extension}`)
-      ) {
-        console.warn(
-          `Overriding MIME type for source code file ${appPart.fileName || appPart.objectName} from ${effectiveMimeType} to text/plain for Gemini.`,
-        );
-        effectiveMimeType = "text/plain";
-      }
-
-      if (!SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType)) {
-        console.warn(
-          `Skipping new file ${appPart.fileName || appPart.objectName} for Gemini due to unsupported MIME type: ${appPart.mimeType} (effective: ${effectiveMimeType})`,
-        );
-        continue;
-      }
-
-      try {
-        const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-        const chunks: Buffer[] = [];
-        for await (const chunk of fileStream) {
-          chunks.push(chunk as Buffer);
-        }
-        const fileBuffer = Buffer.concat(chunks);
-        newMessageGeminiParts.push({
-          inlineData: {
-            mimeType: effectiveMimeType,
-            data: fileBuffer.toString("base64"),
-          },
-        });
-      } catch (fileError) {
-        console.error(
-          `Failed to retrieve or process file ${appPart.objectName} from MinIO for new message:`,
-          fileError,
-        );
-        return NextResponse.json(
-          {
-            error: `Failed to process file: ${appPart.fileName || appPart.objectName}`,
-          },
-          { status: 500 },
-        );
-      }
-    }
-  }
-
-  if (newMessageGeminiParts.length === 0) {
-    const hasActualTextContent = newMessageAppParts.some((p) => p.type === "text" && p.text && p.text.trim() !== "");
-    if (!hasActualTextContent && newMessageAppParts.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            "All uploaded files have types unsupported by the AI or could not be processed. Supported types include common images (PNG, JPEG, WEBP), PDF, and text formats (including source code).",
-        },
-        { status: 400 },
-      );
-    }
-    return NextResponse.json(
-      {
-        error: "No valid content to send to Gemini (message empty or all files unsupported/unprocessed).",
-      },
-      { status: 400 },
-    );
-  }
-
-  const historyGeminiContents: Content[] = [];
-  if (clientHistoryWithAppParts) {
-    for (const prevMsg of clientHistoryWithAppParts) {
-      const prevMsgGeminiParts: Part[] = [];
-      if (prevMsg.parts && Array.isArray(prevMsg.parts)) {
-        for (const appPart of prevMsg.parts) {
-          if (appPart.type === "text" && appPart.text) {
-            prevMsgGeminiParts.push({ text: appPart.text });
-          } else if (appPart.type === "scraped_url" && appPart.text) {
-            prevMsgGeminiParts.push({ text: appPart.text });
-          } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-            if (prevMsg.role === "user") {
-              let effectiveMimeType = appPart.mimeType.toLowerCase();
-              const extension = getFileExtension(appPart.fileName);
-
-              if (
-                !SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType) &&
-                SOURCE_CODE_EXTENSIONS.includes(`.${extension}`)
-              ) {
-                effectiveMimeType = "text/plain";
-              }
-
-              if (!SUPPORTED_GEMINI_MIME_TYPES.includes(effectiveMimeType)) {
-                console.warn(
-                  `Skipping historical file ${appPart.fileName || appPart.objectName} for Gemini due to unsupported MIME type: ${appPart.mimeType} (effective: ${effectiveMimeType})`,
-                );
-                continue;
-              }
-              try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                const chunks: Buffer[] = [];
-                for await (const chunk of fileStream) {
-                  chunks.push(chunk as Buffer);
-                }
-                const fileBuffer = Buffer.concat(chunks);
-                prevMsgGeminiParts.push({
-                  inlineData: {
-                    mimeType: effectiveMimeType,
-                    data: fileBuffer.toString("base64"),
-                  },
-                });
-              } catch (fileError) {
-                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                return NextResponse.json(
-                  {
-                    error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}`,
-                  },
-                  { status: 500 },
-                );
-              }
-            }
-          }
-        }
-      }
-      if (prevMsgGeminiParts.length > 0) {
-        historyGeminiContents.push({
-          role: prevMsg.role,
-          parts: prevMsgGeminiParts,
-        });
-      }
-    }
-  }
-
-  const contentsForApi: Content[] = [...historyGeminiContents, { role: "user", parts: newMessageGeminiParts }];
-
-  const generationConfig: {
-    systemInstruction?: string;
-    tools?: Array<{ googleSearch: Record<string, never> }>;
-    thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
-    safetySettings?: typeof safetySettings;
-    temperature?: number;
-    topP?: number;
-    topK?: number;
-    maxOutputTokens?: number;
-  } = {};
-
-  generationConfig.safetySettings = safetySettings;
-  generationConfig.maxOutputTokens = getModelTokenLimits(model).outputTokenLimit;
-
-  if (temperature !== null) generationConfig.temperature = temperature;
-  if (topP !== null) generationConfig.topP = topP;
-  if (topK !== null) generationConfig.topK = topK;
+  if (topK !== null) generationConfig.topK = Math.min(topK, 64);
 
   if (systemPromptText && systemPromptText.trim() !== "") {
     generationConfig.systemInstruction = systemPromptText;
@@ -942,215 +785,6 @@ async function handleOpenAIRequest(
   if (temperature !== null) requestOptions.temperature = temperature;
   if (topP !== null) requestOptions.top_p = topP;
 
-  const openai = new OpenAI({ apiKey });
-
-  const messages: ChatCompletionMessageParam[] = [];
-
-  if (systemPromptText && systemPromptText.trim() !== "") {
-    messages.push({
-      role: "system",
-      content: systemPromptText,
-    });
-  }
-
-  if (clientHistoryWithAppParts) {
-    for (const prevMsg of clientHistoryWithAppParts) {
-      const contentParts: ChatCompletionContentPart[] = [];
-
-      if (prevMsg.parts && Array.isArray(prevMsg.parts)) {
-        for (const appPart of prevMsg.parts) {
-          if (appPart.type === "text" && appPart.text) {
-            contentParts.push({ type: "text", text: appPart.text });
-          } else if (appPart.type === "scraped_url" && appPart.text) {
-            contentParts.push({ type: "text", text: appPart.text });
-          } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-            const mimeType = appPart.mimeType.toLowerCase();
-
-            if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType)) {
-              try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                const chunks: Buffer[] = [];
-                for await (const chunk of fileStream) {
-                  chunks.push(chunk as Buffer);
-                }
-                const fileBuffer = Buffer.concat(chunks);
-                const base64Data = fileBuffer.toString("base64");
-                contentParts.push({
-                  type: "image_url",
-                  image_url: {
-                    url: `data:${mimeType};base64,${base64Data}`,
-                  },
-                });
-              } catch (fileError) {
-                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                return NextResponse.json(
-                  {
-                    error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}`,
-                  },
-                  { status: 500 },
-                );
-              }
-            } else {
-              const extension = getFileExtension(appPart.fileName);
-              const isTextFile =
-                SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
-                mimeType.startsWith("text/") ||
-                mimeType === "application/json";
-
-              if (isTextFile) {
-                try {
-                  const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                  const chunks: Buffer[] = [];
-                  for await (const chunk of fileStream) {
-                    chunks.push(chunk as Buffer);
-                  }
-                  const fileBuffer = Buffer.concat(chunks);
-                  const textContent = fileBuffer.toString("utf-8");
-                  const fileHeader = appPart.fileName ? `--- File: ${appPart.fileName} ---\n` : "";
-                  contentParts.push({ type: "text", text: fileHeader + textContent });
-                } catch (fileError) {
-                  console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                }
-              } else {
-                console.warn(
-                  `Skipping historical file ${appPart.fileName || appPart.objectName} for OpenAI due to unsupported MIME type: ${appPart.mimeType}`,
-                );
-              }
-            }
-          }
-        }
-      }
-
-      if (contentParts.length > 0) {
-        if (prevMsg.role === "model") {
-          const textContent = contentParts
-            .filter((p): p is { type: "text"; text: string } => p.type === "text")
-            .map((p) => p.text)
-            .join("\n");
-          if (textContent) {
-            messages.push({
-              role: "assistant",
-              content: textContent,
-            });
-          }
-        } else {
-          messages.push({
-            role: "user",
-            content: contentParts,
-          });
-        }
-      }
-    }
-  }
-
-  const newMessageContentParts: ChatCompletionContentPart[] = [];
-
-  for (const appPart of newMessageAppParts) {
-    if (appPart.type === "text" && appPart.text) {
-      newMessageContentParts.push({ type: "text", text: appPart.text });
-    } else if (appPart.type === "scraped_url" && appPart.text) {
-      newMessageContentParts.push({ type: "text", text: appPart.text });
-    } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-      const mimeType = appPart.mimeType.toLowerCase();
-
-      if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType)) {
-        try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-          const chunks: Buffer[] = [];
-          for await (const chunk of fileStream) {
-            chunks.push(chunk as Buffer);
-          }
-          const fileBuffer = Buffer.concat(chunks);
-          const base64Data = fileBuffer.toString("base64");
-          newMessageContentParts.push({
-            type: "image_url",
-            image_url: {
-              url: `data:${mimeType};base64,${base64Data}`,
-            },
-          });
-        } catch (fileError) {
-          console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO for new message:`, fileError);
-          return NextResponse.json(
-            {
-              error: `Failed to process file: ${appPart.fileName || appPart.objectName}`,
-            },
-            { status: 500 },
-          );
-        }
-      } else {
-        const extension = getFileExtension(appPart.fileName);
-        const isTextFile =
-          SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
-          mimeType.startsWith("text/") ||
-          mimeType === "application/json";
-
-        if (isTextFile) {
-          try {
-            const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-            const chunks: Buffer[] = [];
-            for await (const chunk of fileStream) {
-              chunks.push(chunk as Buffer);
-            }
-            const fileBuffer = Buffer.concat(chunks);
-            const textContent = fileBuffer.toString("utf-8");
-            const fileHeader = appPart.fileName ? `--- File: ${appPart.fileName} ---\n` : "";
-            newMessageContentParts.push({ type: "text", text: fileHeader + textContent });
-          } catch (fileError) {
-            console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
-            return NextResponse.json(
-              {
-                error: `Failed to process file: ${appPart.fileName || appPart.objectName}`,
-              },
-              { status: 500 },
-            );
-          }
-        } else {
-          console.warn(
-            `Skipping new file ${appPart.fileName || appPart.objectName} for OpenAI due to unsupported MIME type: ${appPart.mimeType}`,
-          );
-        }
-      }
-    }
-  }
-
-  if (newMessageContentParts.length === 0) {
-    const hasActualTextContent = newMessageAppParts.some((p) => p.type === "text" && p.text && p.text.trim() !== "");
-    if (!hasActualTextContent && newMessageAppParts.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            "All uploaded files have types unsupported by OpenAI or could not be processed. Supported types include images (PNG, JPEG, WEBP, GIF) and text files.",
-        },
-        { status: 400 },
-      );
-    }
-    return NextResponse.json(
-      {
-        error: "No valid content to send to OpenAI (message empty or all files unsupported/unprocessed).",
-      },
-      { status: 400 },
-    );
-  }
-
-  messages.push({
-    role: "user",
-    content: newMessageContentParts,
-  });
-
-  const requestOptions: OpenAI.ChatCompletionCreateParamsStreaming & {
-    reasoning_effort?: string;
-    text?: { verbosity: string };
-  } = {
-    model,
-    messages,
-    stream: true,
-    stream_options: { include_usage: true },
-    max_completion_tokens: getModelTokenLimits(model).outputTokenLimit,
-  };
-
-  if (temperature !== null) requestOptions.temperature = temperature;
-  if (topP !== null) requestOptions.top_p = topP;
-
   if (isOpenAIReasoningModel(model)) {
     const reasoningEffort = mapBudgetToOpenAIReasoningEffort(model, thinkingBudget);
     requestOptions.reasoning_effort = reasoningEffort;
@@ -1256,15 +890,18 @@ async function handleCustomOpenAIRequest(
   topP: number | null,
   topK: number | null,
 ): Promise<Response> {
-  const settings = await getUserSettings(userId);
+  // Fetch custom endpoint and key from database
+  const settingsResult = await pool.query(
+    "SELECT custom_openai_endpoint, custom_openai_key FROM user_settings WHERE user_id = $1",
+    [userId],
+  );
+
+  const settings = settingsResult.rows[0];
   const baseURL = settings?.custom_openai_endpoint;
   const apiKey = settings?.custom_openai_key || "no-key";
 
   if (!baseURL) {
-    return NextResponse.json(
-      { error: "Custom OpenAI endpoint not configured in settings." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Custom OpenAI endpoint not configured in settings." }, { status: 400 });
   }
 
   const openai = new OpenAI({ apiKey, baseURL });
@@ -1304,7 +941,10 @@ async function handleCustomOpenAIRequest(
               }
             } else {
               const extension = getFileExtension(appPart.fileName);
-              const isTextFile = SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) || mimeType.startsWith("text/") || mimeType === "application/json";
+              const isTextFile =
+                SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
+                mimeType.startsWith("text/") ||
+                mimeType === "application/json";
               if (isTextFile) {
                 try {
                   const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
@@ -1328,7 +968,10 @@ async function handleCustomOpenAIRequest(
       if (contentParts.length > 0) {
         const role = prevMsg.role === "model" ? "assistant" : "user";
         if (role === "assistant") {
-          const textContent = contentParts.filter((p): p is { type: "text"; text: string } => p.type === "text").map((p) => p.text).join("\n");
+          const textContent = contentParts
+            .filter((p): p is { type: "text"; text: string } => p.type === "text")
+            .map((p) => p.text)
+            .join("\n");
           if (textContent) messages.push({ role: "assistant", content: textContent });
         } else {
           messages.push({ role: "user", content: contentParts });
@@ -1359,11 +1002,17 @@ async function handleCustomOpenAIRequest(
           });
         } catch (fileError) {
           console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
-          return NextResponse.json({ error: `Failed to process file: ${appPart.fileName || appPart.objectName}` }, { status: 500 });
+          return NextResponse.json(
+            { error: `Failed to process file: ${appPart.fileName || appPart.objectName}` },
+            { status: 500 },
+          );
         }
       } else {
         const extension = getFileExtension(appPart.fileName);
-        const isTextFile = SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) || mimeType.startsWith("text/") || mimeType === "application/json";
+        const isTextFile =
+          SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
+          mimeType.startsWith("text/") ||
+          mimeType === "application/json";
         if (isTextFile) {
           try {
             const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
@@ -1377,7 +1026,10 @@ async function handleCustomOpenAIRequest(
             newMessageContentParts.push({ type: "text", text: fileHeader + textContent });
           } catch (fileError) {
             console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
-            return NextResponse.json({ error: `Failed to process file: ${appPart.fileName || appPart.objectName}` }, { status: 500 });
+            return NextResponse.json(
+              { error: `Failed to process file: ${appPart.fileName || appPart.objectName}` },
+              { status: 500 },
+            );
           }
         }
       }
@@ -1542,7 +1194,7 @@ async function handleOpenAIResponsesAPIRequest(
 
       if (contentParts.length > 0) {
         const role = prevMsg.role === "model" ? "assistant" : "user";
-        inputItems.push({ role, content: contentParts });
+        inputItems.push({ role, content: contentParts as any });
       }
     }
   }
@@ -1625,7 +1277,7 @@ async function handleOpenAIResponsesAPIRequest(
     );
   }
 
-  inputItems.push({ role: "user", content: newMessageContentParts });
+  inputItems.push({ role: "user", content: newMessageContentParts as any });
 
   const reasoningEffort = mapBudgetToOpenAIReasoningEffort(model, thinkingBudget);
   const effectiveVerbosity = verbosity ?? "medium";
@@ -1668,290 +1320,17 @@ async function handleOpenAIResponsesAPIRequest(
   if (temperature !== null) requestOptions.text.temperature = temperature;
   if (topP !== null) requestOptions.text.top_p = topP;
 
-  const openai = new OpenAI({ apiKey });
-
-  const inputItems: ResponsesAPIInputItem[] = [];
-
-  if (clientHistoryWithAppParts) {
-    for (const prevMsg of clientHistoryWithAppParts) {
-      const contentParts: Array<
-        | { type: "input_text"; text: string }
-        | { type: "input_image"; image_url: string }
-        | { type: "input_file"; filename: string; file_data: string }
-      > = [];
-
-      if (prevMsg.parts && Array.isArray(prevMsg.parts)) {
-        for (const appPart of prevMsg.parts) {
-          if (appPart.type === "text" && appPart.text) {
-            contentParts.push({ type: "input_text", text: appPart.text });
-          } else if (appPart.type === "scraped_url" && appPart.text) {
-            contentParts.push({ type: "input_text", text: appPart.text });
-          } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-            const mimeType = appPart.mimeType.toLowerCase();
-
-            if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType)) {
-              try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                const chunks: Buffer[] = [];
-                for await (const chunk of fileStream) {
-                  chunks.push(chunk as Buffer);
-                }
-                const fileBuffer = Buffer.concat(chunks);
-                const base64Data = fileBuffer.toString("base64");
-                contentParts.push({
-                  type: "input_image",
-                  image_url: `data:${mimeType};base64,${base64Data}`,
-                });
-              } catch (fileError) {
-                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                return NextResponse.json(
-                  {
-                    error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}`,
-                  },
-                  { status: 500 },
-                );
-              }
-            } else if (SUPPORTED_OPENAI_DOCUMENT_TYPES.includes(mimeType)) {
-              try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                const chunks: Buffer[] = [];
-                for await (const chunk of fileStream) {
-                  chunks.push(chunk as Buffer);
-                }
-                const fileBuffer = Buffer.concat(chunks);
-                const base64Data = fileBuffer.toString("base64");
-                const filename = appPart.fileName || appPart.objectName;
-
-                // Send PDF directly as base64 to OpenAI Responses API
-                contentParts.push({
-                  type: "input_file",
-                  filename,
-                  file_data: `data:application/pdf;base64,${base64Data}`,
-                });
-              } catch (fileError) {
-                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                return NextResponse.json(
-                  {
-                    error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}`,
-                  },
-                  { status: 500 },
-                );
-              }
-            } else {
-              const extension = getFileExtension(appPart.fileName);
-              const isTextFile =
-                SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
-                mimeType.startsWith("text/") ||
-                mimeType === "application/json";
-
-              if (isTextFile) {
-                try {
-                  const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                  const chunks: Buffer[] = [];
-                  for await (const chunk of fileStream) {
-                    chunks.push(chunk as Buffer);
-                  }
-                  const fileBuffer = Buffer.concat(chunks);
-                  const textContent = fileBuffer.toString("utf-8");
-                  const fileHeader = appPart.fileName ? `--- File: ${appPart.fileName} ---\n` : "";
-                  contentParts.push({ type: "input_text", text: fileHeader + textContent });
-                } catch (fileError) {
-                  console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                }
-              } else {
-                console.warn(
-                  `Skipping historical file ${appPart.fileName || appPart.objectName} for OpenAI Responses API due to unsupported MIME type: ${appPart.mimeType}`,
-                );
-              }
-            }
-          }
-        }
-      }
-
-      if (contentParts.length > 0) {
-        const role = prevMsg.role === "model" ? "assistant" : "user";
-        if (role === "assistant") {
-          const textContent = contentParts
-            .filter((p): p is { type: "input_text"; text: string } => p.type === "input_text")
-            .map((p) => p.text)
-            .join("\n");
-          if (textContent) {
-            inputItems.push({ role: "assistant", content: textContent });
-          }
-        } else {
-          inputItems.push({ role: "user", content: contentParts });
-        }
-      }
+  const stream = await (
+    openai.responses as unknown as {
+      create(params: ResponsesCreateParams): Promise<
+        AsyncIterable<{
+          type: string;
+          delta?: string;
+          text?: string;
+        }>
+      >;
     }
-  }
-
-  const newMessageContentParts: Array<
-    | { type: "input_text"; text: string }
-    | { type: "input_image"; image_url: string }
-    | { type: "input_file"; filename: string; file_data: string }
-  > = [];
-
-  for (const appPart of newMessageAppParts) {
-    if (appPart.type === "text" && appPart.text) {
-      newMessageContentParts.push({ type: "input_text", text: appPart.text });
-    } else if (appPart.type === "scraped_url" && appPart.text) {
-      newMessageContentParts.push({ type: "input_text", text: appPart.text });
-    } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-      const mimeType = appPart.mimeType.toLowerCase();
-
-      if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType)) {
-        try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-          const chunks: Buffer[] = [];
-          for await (const chunk of fileStream) {
-            chunks.push(chunk as Buffer);
-          }
-          const fileBuffer = Buffer.concat(chunks);
-          const base64Data = fileBuffer.toString("base64");
-          newMessageContentParts.push({
-            type: "input_image",
-            image_url: `data:${mimeType};base64,${base64Data}`,
-          });
-        } catch (fileError) {
-          console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO for new message:`, fileError);
-          return NextResponse.json(
-            {
-              error: `Failed to process file: ${appPart.fileName || appPart.objectName}`,
-            },
-            { status: 500 },
-          );
-        }
-      } else if (SUPPORTED_OPENAI_DOCUMENT_TYPES.includes(mimeType)) {
-        try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-          const chunks: Buffer[] = [];
-          for await (const chunk of fileStream) {
-            chunks.push(chunk as Buffer);
-          }
-          const fileBuffer = Buffer.concat(chunks);
-          const base64Data = fileBuffer.toString("base64");
-          const filename = appPart.fileName || appPart.objectName;
-
-          // Send PDF directly as base64 to OpenAI Responses API
-          newMessageContentParts.push({
-            type: "input_file",
-            filename,
-            file_data: `data:application/pdf;base64,${base64Data}`,
-          });
-        } catch (fileError) {
-          console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO for new message:`, fileError);
-          return NextResponse.json(
-            {
-              error: `Failed to process file: ${appPart.fileName || appPart.objectName}`,
-            },
-            { status: 500 },
-          );
-        }
-      } else {
-        const extension = getFileExtension(appPart.fileName);
-        const isTextFile =
-          SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
-          mimeType.startsWith("text/") ||
-          mimeType === "application/json";
-
-        if (isTextFile) {
-          try {
-            const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-            const chunks: Buffer[] = [];
-            for await (const chunk of fileStream) {
-              chunks.push(chunk as Buffer);
-            }
-            const fileBuffer = Buffer.concat(chunks);
-            const textContent = fileBuffer.toString("utf-8");
-            const fileHeader = appPart.fileName ? `--- File: ${appPart.fileName} ---\n` : "";
-            newMessageContentParts.push({ type: "input_text", text: fileHeader + textContent });
-          } catch (fileError) {
-            console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
-            return NextResponse.json(
-              {
-                error: `Failed to process file: ${appPart.fileName || appPart.objectName}`,
-              },
-              { status: 500 },
-            );
-          }
-        } else {
-          console.warn(
-            `Skipping new file ${appPart.fileName || appPart.objectName} for OpenAI Responses API due to unsupported MIME type: ${appPart.mimeType}`,
-          );
-        }
-      }
-    }
-  }
-
-  if (newMessageContentParts.length === 0) {
-    const hasActualTextContent = newMessageAppParts.some((p) => p.type === "text" && p.text && p.text.trim() !== "");
-    if (!hasActualTextContent && newMessageAppParts.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            "All uploaded files have types unsupported by OpenAI or could not be processed. Supported types include images (PNG, JPEG, WEBP, GIF), PDFs, and text files.",
-        },
-        { status: 400 },
-      );
-    }
-    return NextResponse.json(
-      {
-        error: "No valid content to send to OpenAI (message empty or all files unsupported/unprocessed).",
-      },
-      { status: 400 },
-    );
-  }
-
-  inputItems.push({ role: "user", content: newMessageContentParts });
-
-  const reasoningEffort = mapBudgetToOpenAIReasoningEffort(model, thinkingBudget);
-  const effectiveVerbosity = verbosity ?? "medium";
-
-  type ResponsesCreateParams = {
-    model: string;
-    input: ResponsesAPIInputItem[];
-    instructions?: string;
-    stream: true;
-    reasoning?: { effort: string; summary?: string };
-    text?: {
-      format: { type: string };
-      verbosity?: string;
-      temperature?: number;
-      top_p?: number;
-    };
-    max_output_tokens?: number;
-  };
-
-  const requestOptions: ResponsesCreateParams = {
-    model,
-    input: inputItems,
-    stream: true,
-    max_output_tokens: getModelTokenLimits(model).outputTokenLimit,
-  };
-
-  if (systemPromptText && systemPromptText.trim() !== "") {
-    requestOptions.instructions = systemPromptText;
-  }
-
-  if (reasoningEffort !== "none") {
-    requestOptions.reasoning = { effort: reasoningEffort, summary: "auto" };
-  }
-
-  requestOptions.text = {
-    format: { type: "text" },
-    verbosity: effectiveVerbosity,
-  };
-
-  if (temperature !== null) requestOptions.text.temperature = temperature;
-  if (topP !== null) requestOptions.text.top_p = topP;
-
-  const stream = await (openai.responses as unknown as {
-    create(params: ResponsesCreateParams): Promise<AsyncIterable<{
-      type: string;
-      delta?: string;
-      text?: string;
-    }>>;
-  }).create(requestOptions);
+  ).create(requestOptions);
 
   const encoder = new TextEncoder();
   const readableStream = new ReadableStream({
@@ -2294,251 +1673,6 @@ async function handleAnthropicRequest(
   if (topP !== null) requestParams.top_p = topP;
   if (topK !== null) requestParams.top_k = topK;
 
-  const anthropic = new Anthropic({ apiKey });
-
-  const messages: AnthropicMessage[] = [];
-
-  // Build history messages
-  if (clientHistoryWithAppParts) {
-    for (const prevMsg of clientHistoryWithAppParts) {
-      const contentBlocks: AnthropicContentBlock[] = [];
-
-      if (prevMsg.parts && Array.isArray(prevMsg.parts)) {
-        for (const appPart of prevMsg.parts) {
-          if (appPart.type === "text" && appPart.text) {
-            contentBlocks.push({ type: "text", text: appPart.text });
-          } else if (appPart.type === "scraped_url" && appPart.text) {
-            contentBlocks.push({ type: "text", text: appPart.text });
-          } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-            if (prevMsg.role !== "user") continue;
-
-            const mimeType = appPart.mimeType.toLowerCase();
-
-            if (SUPPORTED_ANTHROPIC_IMAGE_TYPES.includes(mimeType)) {
-              try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                const chunks: Buffer[] = [];
-                for await (const chunk of fileStream) {
-                  chunks.push(chunk as Buffer);
-                }
-                const fileBuffer = Buffer.concat(chunks);
-                contentBlocks.push({
-                  type: "image",
-                  source: {
-                    type: "base64",
-                    media_type: mimeType,
-                    data: fileBuffer.toString("base64"),
-                  },
-                });
-              } catch (fileError) {
-                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                return NextResponse.json(
-                  { error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}` },
-                  { status: 500 },
-                );
-              }
-            } else if (SUPPORTED_ANTHROPIC_DOCUMENT_TYPES.includes(mimeType)) {
-              try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                const chunks: Buffer[] = [];
-                for await (const chunk of fileStream) {
-                  chunks.push(chunk as Buffer);
-                }
-                const fileBuffer = Buffer.concat(chunks);
-                contentBlocks.push({
-                  type: "document",
-                  source: {
-                    type: "base64",
-                    media_type: "application/pdf",
-                    data: fileBuffer.toString("base64"),
-                  },
-                });
-              } catch (fileError) {
-                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                return NextResponse.json(
-                  { error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}` },
-                  { status: 500 },
-                );
-              }
-            } else {
-              const extension = getFileExtension(appPart.fileName);
-              const isTextFile =
-                SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
-                mimeType.startsWith("text/") ||
-                mimeType === "application/json";
-
-              if (isTextFile) {
-                try {
-                  const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-                  const chunks: Buffer[] = [];
-                  for await (const chunk of fileStream) {
-                    chunks.push(chunk as Buffer);
-                  }
-                  const fileBuffer = Buffer.concat(chunks);
-                  const textContent = fileBuffer.toString("utf-8");
-                  const fileHeader = appPart.fileName ? `--- File: ${appPart.fileName} ---\n` : "";
-                  contentBlocks.push({ type: "text", text: fileHeader + textContent });
-                } catch (fileError) {
-                  console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
-                }
-              } else {
-                console.warn(
-                  `Skipping historical file ${appPart.fileName || appPart.objectName} for Anthropic due to unsupported MIME type: ${appPart.mimeType}`,
-                );
-              }
-            }
-          }
-        }
-      }
-
-      if (contentBlocks.length > 0) {
-        const role = prevMsg.role === "model" ? "assistant" : "user";
-        if (role === "assistant") {
-          const textContent = contentBlocks
-            .filter((b): b is { type: "text"; text: string } => b.type === "text")
-            .map((b) => b.text)
-            .join("\n");
-          if (textContent) {
-            messages.push({ role: "assistant", content: textContent });
-          }
-        } else {
-          messages.push({ role: "user", content: contentBlocks });
-        }
-      }
-    }
-  }
-
-  // Build new message content blocks
-  const newMessageBlocks: AnthropicContentBlock[] = [];
-
-  for (const appPart of newMessageAppParts) {
-    if (appPart.type === "text" && appPart.text) {
-      newMessageBlocks.push({ type: "text", text: appPart.text });
-    } else if (appPart.type === "scraped_url" && appPart.text) {
-      newMessageBlocks.push({ type: "text", text: appPart.text });
-    } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-      const mimeType = appPart.mimeType.toLowerCase();
-
-      if (SUPPORTED_ANTHROPIC_IMAGE_TYPES.includes(mimeType)) {
-        try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-          const chunks: Buffer[] = [];
-          for await (const chunk of fileStream) {
-            chunks.push(chunk as Buffer);
-          }
-          const fileBuffer = Buffer.concat(chunks);
-          newMessageBlocks.push({
-            type: "image",
-            source: {
-              type: "base64",
-              media_type: mimeType,
-              data: fileBuffer.toString("base64"),
-            },
-          });
-        } catch (fileError) {
-          console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
-          return NextResponse.json(
-            { error: `Failed to process file: ${appPart.fileName || appPart.objectName}` },
-            { status: 500 },
-          );
-        }
-      } else if (SUPPORTED_ANTHROPIC_DOCUMENT_TYPES.includes(mimeType)) {
-        try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-          const chunks: Buffer[] = [];
-          for await (const chunk of fileStream) {
-            chunks.push(chunk as Buffer);
-          }
-          const fileBuffer = Buffer.concat(chunks);
-          newMessageBlocks.push({
-            type: "document",
-            source: {
-              type: "base64",
-              media_type: "application/pdf",
-              data: fileBuffer.toString("base64"),
-            },
-          });
-        } catch (fileError) {
-          console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
-          return NextResponse.json(
-            { error: `Failed to process file: ${appPart.fileName || appPart.objectName}` },
-            { status: 500 },
-          );
-        }
-      } else {
-        const extension = getFileExtension(appPart.fileName);
-        const isTextFile =
-          SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
-          mimeType.startsWith("text/") ||
-          mimeType === "application/json";
-
-        if (isTextFile) {
-          try {
-            const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
-            const chunks: Buffer[] = [];
-            for await (const chunk of fileStream) {
-              chunks.push(chunk as Buffer);
-            }
-            const fileBuffer = Buffer.concat(chunks);
-            const textContent = fileBuffer.toString("utf-8");
-            const fileHeader = appPart.fileName ? `--- File: ${appPart.fileName} ---\n` : "";
-            newMessageBlocks.push({ type: "text", text: fileHeader + textContent });
-          } catch (fileError) {
-            console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
-            return NextResponse.json(
-              { error: `Failed to process file: ${appPart.fileName || appPart.objectName}` },
-              { status: 500 },
-            );
-          }
-        } else {
-          console.warn(
-            `Skipping new file ${appPart.fileName || appPart.objectName} for Anthropic due to unsupported MIME type: ${appPart.mimeType}`,
-          );
-        }
-      }
-    }
-  }
-
-  if (newMessageBlocks.length === 0) {
-    const hasActualTextContent = newMessageAppParts.some((p) => p.type === "text" && p.text && p.text.trim() !== "");
-    if (!hasActualTextContent && newMessageAppParts.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            "All uploaded files have types unsupported by Anthropic or could not be processed. Supported types include images (JPEG, PNG, GIF, WebP), PDFs, and text files.",
-        },
-        { status: 400 },
-      );
-    }
-    return NextResponse.json(
-      { error: "No valid content to send to Anthropic (message empty or all files unsupported/unprocessed)." },
-      { status: 400 },
-    );
-  }
-
-  messages.push({ role: "user", content: newMessageBlocks });
-
-  // Build request parameters
-  const effort = mapBudgetToAnthropicEffort(model, thinkingBudget);
-
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const requestParams: any = {
-    model,
-    max_tokens: getModelTokenLimits(model).outputTokenLimit,
-    messages,
-    thinking: {
-      type: "adaptive",
-    },
-    output_config: {
-      effort,
-    },
-  };
-
-  if (temperature !== null) requestParams.temperature = temperature;
-  if (topP !== null) requestParams.top_p = topP;
-  if (topK !== null) requestParams.top_k = topK;
-  /* eslint-enable @typescript-eslint/no-explicit-any */
-
   if (systemPromptText && systemPromptText.trim() !== "") {
     requestParams.system = systemPromptText;
   }
@@ -2568,7 +1702,7 @@ async function handleAnthropicRequest(
         });
 
         const finalMessage = await stream.finalMessage();
-        
+
         if (finalMessage.usage) {
           const usageChunk = {
             type: "usage",
@@ -2632,14 +1766,14 @@ export async function POST(request: NextRequest) {
     messageParts: originalNewMessageAppParts,
     chatSessionId,
     model,
-    isSearchActive,
+    isSearchActive = false,
     thinkingBudget,
     projectId,
     systemPrompt: newChatSystemPrompt,
     verbosity,
-    temperature,
-    topP,
-    topK,
+    temperature = null,
+    topP = null,
+    topK = null,
   } = (await request.json()) as Omit<ChatRequest, "keySelection" | "isRegeneration">;
 
   const newMessageAppParts: MessagePart[] = [...originalNewMessageAppParts];

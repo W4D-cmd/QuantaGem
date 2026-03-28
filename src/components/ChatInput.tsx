@@ -39,8 +39,19 @@ import {
   Settings2,
 } from "lucide-react";
 import { Message, ProjectFile } from "@/app/page";
-import { ThinkingOption, VerbosityOption, getThinkingConfigForModel, isOpenAIReasoningModel, getOpenAIReasoningConfig } from "@/lib/thinking";
-import { GenerationParameters, GenerationStyleId, GENERATION_STYLES, getStyleFromParams } from "@/lib/generation-styles";
+import {
+  ThinkingOption,
+  VerbosityOption,
+  getThinkingConfigForModel,
+  isOpenAIReasoningModel,
+  getOpenAIReasoningConfig,
+} from "@/lib/thinking";
+import {
+  GenerationParameters,
+  GenerationStyleId,
+  GENERATION_STYLES,
+  getStyleFromParams,
+} from "@/lib/generation-styles";
 import CustomStyleModal from "./CustomStyleModal";
 import { modelSupportsVerbosity } from "@/lib/custom-models";
 import VerbositySelector from "./VerbositySelector";
@@ -223,7 +234,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
     const isVerbositySupported = useMemo(
       () => (selectedModel?.name ? modelSupportsVerbosity(selectedModel.name) : false),
-      [selectedModel]
+      [selectedModel],
     );
 
     const [isRefining, setIsRefining] = useState(false);
@@ -461,7 +472,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const styleDropdownItems = useMemo((): DropdownItem[] => {
       const styleIds: GenerationStyleId[] = ["default", "precise", "balanced", "creative", "unconstrained", "custom"];
-      
+
       const iconMap: Record<GenerationStyleId, React.ReactNode> = {
         default: <Zap className="size-4" />,
         precise: <Target className="size-4" />,
@@ -474,7 +485,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       return styleIds.map((id) => {
         const style = GENERATION_STYLES[id];
         const isActive = currentStyleId === id;
-        
+
         return {
           id: id,
           label: style.label,
@@ -947,8 +958,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           {showFileSuggestions && filteredProjectFiles.length > 0 && (
             <div
               className="absolute bottom-[100%] left-1/2 -translate-x-1/2 w-full max-w-[52rem] mb-2 bg-white
-                dark:bg-zinc-800 border border-neutral-300 dark:border-zinc-700 rounded-lg shadow-lg
-                overflow-hidden z-20"
+                dark:bg-zinc-800 border border-neutral-300 dark:border-zinc-700 rounded-lg shadow-lg overflow-hidden
+                z-20"
             >
               <ul className="max-h-48 overflow-y-auto">
                 {filteredProjectFiles.map((file, index) => {
@@ -1037,7 +1048,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 onChange={handleInputChange}
                 onKeyDown={onKeyDown}
                 onPaste={handlePaste}
-                placeholder={isRefining ? "Refining your prompt..." : isGeneratingSystemPrompt ? "Creating system prompt..." : "Send a message..."}
+                placeholder={
+                  isRefining
+                    ? "Refining your prompt..."
+                    : isGeneratingSystemPrompt
+                      ? "Creating system prompt..."
+                      : "Send a message..."
+                }
                 rows={1}
                 className="w-full resize-none border-none p-0 focus:outline-none bg-white dark:bg-zinc-900
                   transition-colors duration-300 ease-in-out placeholder-neutral-500 dark:placeholder-zinc-400"
@@ -1076,10 +1093,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-700
                       disabled:opacity-50"
                   >
-                    <Paperclip
-                      className="size-5 text-neutral-500 dark:text-zinc-400 transition-colors duration-300
-                        ease-in-out"
-                    />
+                    <Paperclip className="size-5 text-neutral-500 dark:text-zinc-400 transition-colors duration-300
+                      ease-in-out" />
                   </button>
                 </Tooltip>
                 <DropdownMenu
@@ -1095,7 +1110,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   onChange={handleFileChange}
                   multiple
                   className="hidden"
-                  disabled={isLoading || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
+                  disabled={
+                    isLoading || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt
+                  }
                 />
                 <Tooltip text="Search the web">
                   <button
@@ -1107,14 +1124,12 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         isSearchActive
                           ? `bg-black text-white border hover:bg-neutral-600 dark:bg-white dark:text-zinc-800
                             dark:border-zinc-200 dark:hover:bg-zinc-400 dark:hover:border-zinc-400`
-                          : `bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500
-                            dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700`
+                          : `bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-zinc-950
+                            dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700`
                       } `}
                   >
                     {isSearchActive ? (
-                      <Globe
-                        className="size-5 text-white dark:text-zinc-800 transition-colors duration-300 ease-in-out"
-                      />
+                      <Globe className="size-5 text-white dark:text-zinc-800 transition-colors duration-300 ease-in-out" />
                     ) : (
                       <GlobeOff
                         className="size-5 text-neutral-500 dark:text-zinc-400 transition-colors duration-300
@@ -1133,8 +1148,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       disabled={isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
                       className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
                       transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
-                      text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400
-                      dark:hover:bg-zinc-700 disabled:opacity-50`}
+                      text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700
+                      disabled:opacity-50`}
                     >
                       <Cpu className="size-5" />
                       <span className="capitalize">{thinkingOption}</span>
@@ -1156,9 +1171,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     onClick={() => setIsStyleMenuOpen((prev) => !prev)}
                     disabled={isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
                     className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
-                    transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
-                    text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400
-                    dark:hover:bg-zinc-700 disabled:opacity-50`}
+                      transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
+                      text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700
+                      disabled:opacity-50`}
                   >
                     {currentStyleId === "precise" ? (
                       <Target className="size-5" />
@@ -1200,7 +1215,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       <Tooltip text="Create system prompt">
                         <button
                           type="button"
-                          onClick={isGeneratingSystemPrompt ? handleCancelGenerateSystemPrompt : handleGenerateSystemPrompt}
+                          onClick={
+                            isGeneratingSystemPrompt ? handleCancelGenerateSystemPrompt : handleGenerateSystemPrompt
+                          }
                           disabled={
                             isLoading ||
                             isRecording ||
@@ -1210,14 +1227,15 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                             isRefining ||
                             (!isGeneratingSystemPrompt && !input.trim())
                           }
-                          className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
-                            border transition-colors duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${
-                              isGeneratingSystemPrompt
-                                ? `bg-indigo-500 text-white border-indigo-500 hover:bg-indigo-600
-                                  dark:bg-indigo-600 dark:border-indigo-600 dark:hover:bg-indigo-700`
-                                : `bg-white border-neutral-300 hover:bg-neutral-100 text-neutral-500
-                                  dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700`
-                            }`}
+                          className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
+                          font-medium border transition-colors duration-300 ease-in-out disabled:opacity-50
+                          disabled:cursor-not-allowed ${
+                            isGeneratingSystemPrompt
+                              ? `bg-indigo-500 text-white border-indigo-500 hover:bg-indigo-600 dark:bg-indigo-600
+                                dark:border-indigo-600 dark:hover:bg-indigo-700`
+                              : `bg-white border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-zinc-950
+                                dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700`
+                          }`}
                         >
                           {isGeneratingSystemPrompt ? (
                             <RefreshCw className="size-4 animate-spin" />
@@ -1240,13 +1258,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                             (!isRefining && !input.trim())
                           }
                           className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
-                            border transition-colors duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${
-                              isRefining
-                                ? `bg-teal-600 text-white border-teal-600 hover:bg-teal-700
-                                  dark:bg-teal-700 dark:border-teal-700 dark:hover:bg-teal-800`
-                                : `bg-white border-neutral-300 hover:bg-neutral-100 text-neutral-500
-                                  dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700`
-                            }`}
+                          border transition-colors duration-300 ease-in-out disabled:opacity-50
+                          disabled:cursor-not-allowed ${
+                            isRefining
+                              ? `bg-teal-600 text-white border-teal-600 hover:bg-teal-700 dark:bg-teal-700
+                                dark:border-teal-700 dark:hover:bg-teal-800`
+                              : `bg-white border-neutral-300 hover:bg-neutral-100 text-neutral-500 dark:bg-zinc-950
+                                dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700`
+                          }`}
                         >
                           {isRefining ? (
                             <>
@@ -1266,7 +1285,12 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           type="button"
                           onClick={isRecording ? cancelRecording : startRecording}
                           disabled={
-                            isLoading || isTranscribing || uploadingFiles.length > 0 || isScanning || isRefining || isGeneratingSystemPrompt
+                            isLoading ||
+                            isTranscribing ||
+                            uploadingFiles.length > 0 ||
+                            isScanning ||
+                            isRefining ||
+                            isGeneratingSystemPrompt
                           }
                           className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
                             font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
@@ -1309,46 +1333,50 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           dark:hover:bg-zinc-400`
                     }`}
                 >
-          <AnimatePresence mode="wait">
-            {isLoading ? (
-              <motion.div
-                key="stop"
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.5 }}
-              >
-                <Square className="size-5" />
-              </motion.div>
-            ) : isTranscribing || isScanning ? (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.5 }}
-              >
-                <RefreshCw className="size-5 animate-spin" />
-              </motion.div>
-            ) : isRecording ? (
-              <motion.div
-                key="check"
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.5 }}
-              >
-                <Check className="size-5 text-green-500" />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="send"
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.5 }}
-              >
-                <ArrowUp className="size-5" />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </button>
+                  <AnimatePresence mode="wait">
+                    {isLoading ? (
+                      <motion.div
+                        key="stop"
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                      >
+                        <Square className="size-5" />
+                      </motion.div>
+                    ) : isTranscribing || isScanning ? (
+                      <motion.div
+                        key="loading"
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                      >
+                        <RefreshCw className="size-5 animate-spin" />
+                      </motion.div>
+                    ) : isRecording ? (
+                      <motion.div
+                        key="check"
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                      >
+                        <Check className="size-5 text-green-500" />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="send"
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                      >
+                        <ArrowUp className="size-5" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <CustomStyleModal
           isOpen={isCustomStyleModalOpen}
@@ -1358,7 +1386,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         />
       </form>
     );
-  }
+  },
 );
 
 ChatInput.displayName = "ChatInput";

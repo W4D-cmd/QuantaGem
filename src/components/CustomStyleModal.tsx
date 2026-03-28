@@ -11,12 +11,7 @@ interface CustomStyleModalProps {
   initialParams: GenerationParameters;
 }
 
-export default function CustomStyleModal({
-  isOpen,
-  onClose,
-  onSave,
-  initialParams,
-}: CustomStyleModalProps) {
+export default function CustomStyleModal({ isOpen, onClose, onSave, initialParams }: CustomStyleModalProps) {
   const [temperature, setTemperature] = useState<number>(initialParams.temperature ?? 1.0);
   const [topP, setTopP] = useState<number>(initialParams.topP ?? 0.95);
   const [topK, setTopK] = useState<number>(initialParams.topK ?? 40);
@@ -43,7 +38,7 @@ export default function CustomStyleModal({
     <Modal isOpen={isOpen} onClose={onClose} title="Custom Sampling Parameters" size="md">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-neutral-700 dark:text-zinc-300">
+          <label className="text-sm font-medium text-neutral-700 dark:text-zinc-400">
             Allow Really Arbitrary Values
           </label>
           <button
@@ -63,18 +58,18 @@ export default function CustomStyleModal({
         {/* Temperature */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-semibold text-neutral-900 dark:text-zinc-100">
-              Temperature
-            </label>
+            <label className="text-sm font-medium text-neutral-700 dark:text-zinc-400">Temperature</label>
             <input
               type="number"
               step="0.01"
               value={temperature}
               onChange={(e) => setTemperature(parseFloat(e.target.value) || 0)}
-              className="w-20 px-2 py-1 text-sm bg-neutral-100 dark:bg-zinc-800 border border-neutral-200 dark:border-zinc-700 rounded text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-24 p-2 border border-neutral-300 dark:border-zinc-700 rounded-xl shadow-sm text-sm bg-white
+                dark:bg-zinc-950 text-black dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2
+                focus:ring-blue-500 focus:ring-opacity-50 transition-all text-right"
             />
           </div>
-          <p className="text-xs text-neutral-500 dark:text-zinc-400">
+          <p className="text-xs text-neutral-500 dark:text-zinc-500">
             Higher values make the output more random, while lower values make it more focused and deterministic.
           </p>
           {!isArbitrary && (
@@ -85,7 +80,8 @@ export default function CustomStyleModal({
               step="0.1"
               value={temperature}
               onChange={(e) => setTemperature(parseFloat(e.target.value))}
-              className="w-full h-1.5 bg-neutral-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              className="w-full h-1.5 bg-neutral-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer
+                accent-blue-600 dark:accent-blue-400"
             />
           )}
         </div>
@@ -93,18 +89,18 @@ export default function CustomStyleModal({
         {/* Top-P */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-semibold text-neutral-900 dark:text-zinc-100">
-              Top-P
-            </label>
+            <label className="text-sm font-medium text-neutral-700 dark:text-zinc-400">Top-P</label>
             <input
               type="number"
               step="0.01"
               value={topP}
               onChange={(e) => setTopP(parseFloat(e.target.value) || 0)}
-              className="w-20 px-2 py-1 text-sm bg-neutral-100 dark:bg-zinc-800 border border-neutral-200 dark:border-zinc-700 rounded text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-24 p-2 border border-neutral-300 dark:border-zinc-700 rounded-xl shadow-sm text-sm bg-white
+                dark:bg-zinc-950 text-black dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2
+                focus:ring-blue-500 focus:ring-opacity-50 transition-all text-right"
             />
           </div>
-          <p className="text-xs text-neutral-500 dark:text-zinc-400">
+          <p className="text-xs text-neutral-500 dark:text-zinc-500">
             Nucleus sampling: only the smallest set of tokens whose cumulative probability exceeds P are considered.
           </p>
           {!isArbitrary && (
@@ -115,7 +111,8 @@ export default function CustomStyleModal({
               step="0.05"
               value={topP}
               onChange={(e) => setTopP(parseFloat(e.target.value))}
-              className="w-full h-1.5 bg-neutral-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              className="w-full h-1.5 bg-neutral-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer
+                accent-blue-600 dark:accent-blue-400"
             />
           )}
         </div>
@@ -123,42 +120,47 @@ export default function CustomStyleModal({
         {/* Top-K */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-semibold text-neutral-900 dark:text-zinc-100">
-              Top-K
-            </label>
+            <label className="text-sm font-medium text-neutral-700 dark:text-zinc-400">Top-K</label>
             <input
               type="number"
               value={topK}
               onChange={(e) => setTopK(parseInt(e.target.value, 10) || 0)}
-              className="w-20 px-2 py-1 text-sm bg-neutral-100 dark:bg-zinc-800 border border-neutral-200 dark:border-zinc-700 rounded text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-24 p-2 border border-neutral-300 dark:border-zinc-700 rounded-xl shadow-sm text-sm bg-white
+                dark:bg-zinc-950 text-black dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2
+                focus:ring-blue-500 focus:ring-opacity-50 transition-all text-right"
             />
           </div>
-          <p className="text-xs text-neutral-500 dark:text-zinc-400">
+          <p className="text-xs text-neutral-500 dark:text-zinc-500">
             Sample from the best K tokens. Reduces the probability of low-ranked tokens being selected.
           </p>
           {!isArbitrary && (
             <input
               type="range"
               min="1"
-              max="100"
+              max="64"
               step="1"
               value={topK}
               onChange={(e) => setTopK(parseInt(e.target.value, 10))}
-              className="w-full h-1.5 bg-neutral-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              className="w-full h-1.5 bg-neutral-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer
+                accent-blue-600 dark:accent-blue-400"
             />
           )}
         </div>
 
-        <div className="pt-4 flex justify-end gap-3">
+        <div className="flex justify-end space-x-3 pt-4 border-t border-neutral-200 dark:border-zinc-800 mt-4">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-neutral-600 dark:text-zinc-400 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+            className="cursor-pointer h-9 px-4 rounded-full text-sm font-medium transition-colors bg-white
+              dark:bg-zinc-900 border border-neutral-300 dark:border-zinc-800 hover:bg-neutral-100
+              dark:hover:bg-zinc-800 text-neutral-500 dark:text-zinc-300 focus:outline-none"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
+            className="cursor-pointer h-9 px-4 rounded-full text-sm font-medium transition-colors bg-black
+              dark:bg-blue-600 text-white border border-transparent shadow-sm hover:bg-neutral-600
+              dark:hover:bg-blue-700 focus:outline-none"
           >
             Save Changes
           </button>

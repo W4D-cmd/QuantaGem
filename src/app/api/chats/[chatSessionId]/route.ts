@@ -25,7 +25,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
               project_id      AS "projectId",
               updated_at      AS "updatedAt",
               thinking_budget AS "thinkingBudget",
-              generation_style AS "generationStyle",
+              temperature,
+              top_p           AS "topP",
+              top_k           AS "topK",
               total_tokens    AS "totalTokens",
               accumulated_cost AS "accumulatedCost"
        FROM chat_sessions
@@ -75,13 +77,15 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     return NextResponse.json({ error: "Invalid Chat Session ID format" }, { status: 400 });
   }
 
-  const { title, lastModel, systemPrompt, projectId, thinkingBudget, generationStyle, totalTokens, accumulatedCost } = (await request.json()) as {
+  const { title, lastModel, systemPrompt, projectId, thinkingBudget, temperature, topP, topK, totalTokens, accumulatedCost } = (await request.json()) as {
     title?: string;
     lastModel?: string;
     systemPrompt?: string;
     projectId?: number | null;
     thinkingBudget?: number;
-    generationStyle?: string;
+    temperature?: number | null;
+    topP?: number | null;
+    topK?: number | null;
     totalTokens?: number;
     accumulatedCost?: number;
   };
@@ -110,9 +114,17 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     sets.push(`thinking_budget = $${idx++}`);
     vals.push(thinkingBudget);
   }
-  if (generationStyle !== undefined) {
-    sets.push(`generation_style = $${idx++}`);
-    vals.push(generationStyle);
+  if (temperature !== undefined) {
+    sets.push(`temperature = $${idx++}`);
+    vals.push(temperature);
+  }
+  if (topP !== undefined) {
+    sets.push(`top_p = $${idx++}`);
+    vals.push(topP);
+  }
+  if (topK !== undefined) {
+    sets.push(`top_k = $${idx++}`);
+    vals.push(topK);
   }
   if (totalTokens !== undefined) {
     sets.push(`total_tokens = $${idx++}`);
@@ -147,7 +159,9 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
               system_prompt   AS "systemPrompt",
               project_id      AS "projectId",
               thinking_budget AS "thinkingBudget",
-              generation_style AS "generationStyle",
+              temperature,
+              top_p           AS "topP",
+              top_k           AS "topK",
               total_tokens    AS "totalTokens",
               accumulated_cost AS "accumulatedCost"
        FROM chat_sessions

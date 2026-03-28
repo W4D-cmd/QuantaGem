@@ -10,6 +10,8 @@ export interface DropdownItem {
   label: string;
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   className?: string;
+  title?: string;
+  isSeparator?: boolean;
 }
 
 interface Props {
@@ -129,20 +131,25 @@ export default function DropdownMenu({
             </>
           )}
           <div className="p-2 space-y-1">
-            {items.map((item) => (
-              <button
-                key={item.id ?? item.label}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCloseAction();
-                  item.onClick(e);
-                }}
-                className={`cursor-pointer w-full flex items-center px-4 py-2 text-sm text-left hover:bg-neutral-100
-                dark:hover:bg-zinc-800 rounded-lg transition-colors duration-300 ease-in-out ${item.className || ""}`}
-              >
-                {item.icon && <span className="mr-2">{item.icon}</span>}
-                {item.label}
-              </button>
+            {items.map((item, index) => (
+              <React.Fragment key={item.id ?? `${item.label}-${index}`}>
+                {item.isSeparator && (
+                  <div className="h-px bg-neutral-200 dark:bg-zinc-800 my-1 mx-2" />
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCloseAction();
+                    item.onClick(e);
+                  }}
+                  title={item.title}
+                  className={`cursor-pointer w-full flex items-center px-4 py-2 text-sm text-left hover:bg-neutral-100
+                  dark:hover:bg-zinc-800 rounded-lg transition-colors duration-300 ease-in-out ${item.className || ""}`}
+                >
+                  {item.icon && <span className="mr-2">{item.icon}</span>}
+                  {item.label}
+                </button>
+              </React.Fragment>
             ))}
           </div>
         </motion.div>

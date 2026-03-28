@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
            , project_id      AS "projectId"
             , updated_at      AS "updatedAt"
             , thinking_budget AS "thinkingBudget"
-            , generation_style AS "generationStyle"
+            , temperature
+            , top_p           AS "topP"
+            , top_k           AS "topK"
             , pinned_at       AS "pinnedAt"
 
       FROM chat_sessions

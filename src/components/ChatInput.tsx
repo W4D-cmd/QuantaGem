@@ -33,10 +33,15 @@ import {
   Code,
   Type,
   MessageSquare,
+  Target,
+  Scale,
+  Wind,
+  Settings2,
 } from "lucide-react";
 import { Message, ProjectFile } from "@/app/page";
 import { ThinkingOption, VerbosityOption, getThinkingConfigForModel, isOpenAIReasoningModel, getOpenAIReasoningConfig } from "@/lib/thinking";
-import { GenerationStyle, STYLE_LABELS } from "@/lib/generation-styles";
+import { GenerationParameters, GenerationStyleId, GENERATION_STYLES, getStyleFromParams } from "@/lib/generation-styles";
+import CustomStyleModal from "./CustomStyleModal";
 import { modelSupportsVerbosity } from "@/lib/custom-models";
 import VerbositySelector from "./VerbositySelector";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
@@ -68,8 +73,8 @@ interface ChatInputProps {
   selectedModel: Model | null;
   verbosity: VerbosityOption;
   onVerbosityChange: (verbosity: VerbosityOption) => void;
-  generationStyle: GenerationStyle;
-  onGenerationStyleChange: (style: GenerationStyle) => void;
+  generationParams: GenerationParameters;
+  onGenerationParamsChange: (params: GenerationParameters) => void;
   currentSystemPrompt: string;
   onSystemPromptGenerated: (prompt: string) => void;
   isTemporaryChat: boolean;
@@ -178,8 +183,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       selectedModel,
       verbosity,
       onVerbosityChange,
-      generationStyle,
-      onGenerationStyleChange,
+      generationParams,
+      onGenerationParamsChange,
       currentSystemPrompt,
       onSystemPromptGenerated,
       isTemporaryChat,
@@ -195,6 +200,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
     const [isThinkingMenuOpen, setIsThinkingMenuOpen] = useState(false);
     const [isStyleMenuOpen, setIsStyleMenuOpen] = useState(false);
+    const [isCustomStyleModalOpen, setIsCustomStyleModalOpen] = useState(false);
     const [selectedFiles, setSelectedFiles] = useState<UploadedFileInfo[]>([]);
     const [uploadingFiles, setUploadingFiles] = useState<
       { file: File; id: string; progress: number; error?: string }[]
@@ -451,24 +457,41 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       }));
     }, [selectedModel, thinkingOption, onThinkingOptionChange]);
 
-    const styleDropdownItems = useMemo((): DropdownItem[] => {
-      const styles: { id: GenerationStyle; label: string; icon: React.ReactNode }[] = [
-        { id: "default", label: STYLE_LABELS.default, icon: <Zap className="size-4" /> },
-        { id: "scientific", label: STYLE_LABELS.scientific, icon: <FlaskConical className="size-4" /> },
-        { id: "creative", label: STYLE_LABELS.creative, icon: <Sparkles className="size-4" /> },
-        { id: "coding", label: STYLE_LABELS.coding, icon: <Code className="size-4" /> },
-        { id: "concise", label: STYLE_LABELS.concise, icon: <Type className="size-4" /> },
-        { id: "chatty", label: STYLE_LABELS.chatty, icon: <MessageSquare className="size-4" /> },
-      ];
+    const currentStyleId = useMemo(() => getStyleFromParams(generationParams), [generationParams]);
 
-      return styles.map((style) => ({
-        id: style.id,
-        label: style.label,
-        icon: generationStyle === style.id ? <Check className="size-4 text-blue-500" /> : style.icon,
-        onClick: () => onGenerationStyleChange(style.id),
-        className: generationStyle === style.id ? "font-semibold" : "",
-      }));
-    }, [generationStyle, onGenerationStyleChange]);
+    const styleDropdownItems = useMemo((): DropdownItem[] => {
+      const styleIds: GenerationStyleId[] = ["default", "precise", "balanced", "creative", "unconstrained", "custom"];
+      
+      const iconMap: Record<GenerationStyleId, React.ReactNode> = {
+        default: <Zap className="size-4" />,
+        precise: <Target className="size-4" />,
+        balanced: <Scale className="size-4" />,
+        creative: <Sparkles className="size-4" />,
+        unconstrained: <Wind className="size-4" />,
+        custom: <Settings2 className="size-4" />,
+      };
+
+      return styleIds.map((id) => {
+        const style = GENERATION_STYLES[id];
+        const isActive = currentStyleId === id;
+        
+        return {
+          id: id,
+          label: style.label,
+          title: style.description,
+          icon: isActive ? <Check className="size-4 text-blue-500" /> : iconMap[id],
+          onClick: () => {
+            if (id === "custom") {
+              setIsCustomStyleModalOpen(true);
+            } else {
+              onGenerationParamsChange(style.params);
+            }
+          },
+          className: isActive ? "font-semibold" : "",
+          isSeparator: id === "custom",
+        };
+      });
+    }, [currentStyleId, onGenerationParamsChange]);
 
     useEffect(() => {
       const ta = textareaRef.current;
@@ -1137,20 +1160,20 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400
                     dark:hover:bg-zinc-700 disabled:opacity-50`}
                   >
-                    {generationStyle === "scientific" ? (
-                      <FlaskConical className="size-5" />
-                    ) : generationStyle === "creative" ? (
+                    {currentStyleId === "precise" ? (
+                      <Target className="size-5" />
+                    ) : currentStyleId === "balanced" ? (
+                      <Scale className="size-5" />
+                    ) : currentStyleId === "creative" ? (
                       <Sparkles className="size-5" />
-                    ) : generationStyle === "coding" ? (
-                      <Code className="size-5" />
-                    ) : generationStyle === "concise" ? (
-                      <Type className="size-5" />
-                    ) : generationStyle === "chatty" ? (
-                      <MessageSquare className="size-5" />
+                    ) : currentStyleId === "unconstrained" ? (
+                      <Wind className="size-5" />
+                    ) : currentStyleId === "custom" ? (
+                      <Settings2 className="size-5" />
                     ) : (
                       <Zap className="size-5" />
                     )}
-                    <span className="capitalize">{STYLE_LABELS[generationStyle]}</span>
+                    <span className="capitalize">{GENERATION_STYLES[currentStyleId].label}</span>
                     <ChevronDown className="size-3" />
                   </button>
                 </Tooltip>
@@ -1286,52 +1309,57 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           dark:hover:bg-zinc-400`
                     }`}
                 >
-                  <AnimatePresence mode="wait">
-                    {isLoading ? (
-                      <motion.div
-                        key="stop"
-                        initial={{ opacity: 0, scale: 0.5 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.5 }}
-                      >
-                        <Square className="size-5" />
-                      </motion.div>
-                    ) : isTranscribing || isScanning ? (
-                      <motion.div
-                        key="loading"
-                        initial={{ opacity: 0, scale: 0.5 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.5 }}
-                      >
-                        <RefreshCw className="size-5 animate-spin" />
-                      </motion.div>
-                    ) : isRecording ? (
-                      <motion.div
-                        key="check"
-                        initial={{ opacity: 0, scale: 0.5 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.5 }}
-                      >
-                        <Check className="size-5 text-green-500" />
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="send"
-                        initial={{ opacity: 0, scale: 0.5 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.5 }}
-                      >
-                        <ArrowUp className="size-5 stroke-2" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+          <AnimatePresence mode="wait">
+            {isLoading ? (
+              <motion.div
+                key="stop"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+              >
+                <Square className="size-5" />
+              </motion.div>
+            ) : isTranscribing || isScanning ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+              >
+                <RefreshCw className="size-5 animate-spin" />
+              </motion.div>
+            ) : isRecording ? (
+              <motion.div
+                key="check"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+              >
+                <Check className="size-5 text-green-500" />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="send"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+              >
+                <ArrowUp className="size-5" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </button>
+
+        <CustomStyleModal
+          isOpen={isCustomStyleModalOpen}
+          onClose={() => setIsCustomStyleModalOpen(false)}
+          onSave={onGenerationParamsChange}
+          initialParams={generationParams}
+        />
       </form>
     );
+  }
+);
   },
 );
 

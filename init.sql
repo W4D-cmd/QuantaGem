@@ -40,7 +40,9 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
   system_prompt TEXT DEFAULT '',
   key_selection TEXT DEFAULT 'free',
   thinking_budget INTEGER DEFAULT -1,
-  generation_style TEXT DEFAULT 'default',
+  temperature NUMERIC,
+  top_p NUMERIC,
+  top_k INTEGER,
   pinned_at TIMESTAMPTZ DEFAULT NULL,
   total_tokens INTEGER,
   accumulated_cost NUMERIC DEFAULT 0

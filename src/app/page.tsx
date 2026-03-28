@@ -109,7 +109,9 @@ export interface ChatListItem {
   projectId: number | null;
   updatedAt: string;
   thinkingBudget: number;
-  generationStyle: string;
+  temperature: number | null;
+  topP: number | null;
+  topK: number | null;
   pinnedAt: string | null;
   totalTokens: number | null;
   accumulatedCost: number | null;
@@ -236,7 +238,11 @@ export default function Home() {
     onConfirm: () => {},
   });
   const [thinkingOption, setThinkingOption] = useState<ThinkingOption>("dynamic");
-  const [generationStyle, setGenerationStyle] = useState<GenerationStyle>("default");
+  const [generationParams, setGenerationParams] = useState<GenerationParameters>({
+    temperature: null,
+    topP: null,
+    topK: null,
+  });
   const [verbosity, setVerbosity] = useState<VerbosityOption>("medium");
   const [newChatSystemPrompt, setNewChatSystemPrompt] = useState<string>("");
   const [isSaveSuggestionModalOpen, setIsSaveSuggestionModalOpen] = useState(false);
@@ -261,7 +267,9 @@ export default function Home() {
     systemPrompt: string;
     projectId: number | null;
     thinkingBudget: number;
-    generationStyle: string;
+    temperature: number | null;
+    topP: number | null;
+    topK: number | null;
     lastModel: string;
     totalTokens: number | null;
     accumulatedCost: number | null;
@@ -601,22 +609,29 @@ export default function Home() {
     setVerbosity(newVerbosity);
   }, []);
 
-  const handleGenerationStyleChange = useCallback((newStyle: GenerationStyle) => {
-    setGenerationStyle(newStyle);
-    if (activeChatId !== null) {
-      invalidateChatCache(activeChatId);
-      fetch(`/api/chats/${activeChatId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify({ generationStyle: newStyle }),
-      })
-        .then(() => fetchAllChats())
-        .catch((err) => showToast(extractErrorMessage(err), "error"));
-    }
-  }, [activeChatId, getAuthHeaders, showToast, fetchAllChats, invalidateChatCache]);
+  const handleGenerationParamsChange = useCallback(
+    (newParams: GenerationParameters) => {
+      setGenerationParams(newParams);
+      if (activeChatId !== null) {
+        invalidateChatCache(activeChatId);
+        fetch(`/api/chats/${activeChatId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({
+            temperature: newParams.temperature,
+            topP: newParams.topP,
+            topK: newParams.topK,
+          }),
+        })
+          .then(() => fetchAllChats())
+          .catch((err) => showToast(extractErrorMessage(err), "error"));
+      }
+    },
+    [activeChatId, getAuthHeaders, showToast, fetchAllChats, invalidateChatCache],
+  );
 
   const fetchModelList = useCallback(async () => {
     try {
@@ -912,7 +927,9 @@ export default function Home() {
             systemPrompt: string;
             projectId: number | null;
             thinkingBudget: number;
-            generationStyle: string;
+            temperature: number | null;
+            topP: number | null;
+            topK: number | null;
             lastModel: string;
             totalTokens: number | null;
             accumulatedCost: number | null;
@@ -942,7 +959,11 @@ export default function Home() {
         setEditingPromptInitialValue(cached.systemPrompt);
         setCurrentChatProjectId(cached.projectId);
         setThinkingOption(modelValueMap?.[cached.thinkingBudget] || "dynamic");
-        setGenerationStyle((cached.generationStyle as GenerationStyle) || "default");
+        setGenerationParams({
+          temperature: cached.temperature,
+          topP: cached.topP,
+          topK: cached.topK,
+        });
         setTotalTokens(cached.totalTokens !== null ? Number(cached.totalTokens) : null);
         setAccumulatedCost(Number(cached.accumulatedCost || 0));
         return { messages: cached.messages, lastModel: cached.lastModel, totalTokens: cached.totalTokens !== null ? Number(cached.totalTokens) : null, accumulatedCost: Number(cached.accumulatedCost || 0) };
@@ -974,7 +995,9 @@ export default function Home() {
           systemPrompt: string;
           projectId: number | null;
           thinkingBudget: number;
-          generationStyle: string;
+          temperature: number | null;
+          topP: number | null;
+          topK: number | null;
           lastModel: string;
           totalTokens: number | null;
           accumulatedCost: number | null;
@@ -985,7 +1008,11 @@ export default function Home() {
         setEditingPromptInitialValue(data.systemPrompt);
         setCurrentChatProjectId(data.projectId);
         setThinkingOption(modelValueMap?.[data.thinkingBudget] || "dynamic");
-        setGenerationStyle((data.generationStyle as GenerationStyle) || "default");
+        setGenerationParams({
+          temperature: data.temperature,
+          topP: data.topP,
+          topK: data.topK,
+        });
         setTotalTokens(data.totalTokens !== null ? Number(data.totalTokens) : null);
         setAccumulatedCost(Number(data.accumulatedCost || 0));
         return { messages: data.messages, lastModel: data.lastModel, totalTokens: data.totalTokens !== null ? Number(data.totalTokens) : null, accumulatedCost: Number(data.accumulatedCost || 0) };
@@ -1228,7 +1255,7 @@ export default function Home() {
       currentChatId: number | null,
       isSearchEnabled: boolean,
       currentThinkingOption: ThinkingOption,
-      currentGenerationStyle: GenerationStyle,
+      currentGenerationParams: GenerationParameters,
       isRegeneration = false,
       placeholderIdToUpdate?: number,
       systemPromptForNewChat?: string,
@@ -1272,7 +1299,9 @@ export default function Home() {
             systemPrompt: systemPromptForNewChat,
             projectId: projectIdForNewChat,
             verbosity,
-            generationStyle: currentGenerationStyle,
+            temperature: currentGenerationParams.temperature,
+            topP: currentGenerationParams.topP,
+            topK: currentGenerationParams.topK,
           }),
           signal: ctrl.signal,
         });
@@ -1482,7 +1511,7 @@ export default function Home() {
       activeChatId,
       sendWithSearch,
       thinkingOption,
-      generationStyle,
+      generationParams,
       false,
       placeholderMessage.id,
       isNewChat ? newChatSystemPrompt : undefined,
@@ -1526,7 +1555,9 @@ export default function Home() {
               modelName: selectedModel.name,
               projectId: currentChatProjectId,
               thinkingBudget: budgetValue,
-              generationStyle: generationStyle,
+              temperature: generationParams.temperature,
+              topP: generationParams.topP,
+              topK: generationParams.topK,
               systemPrompt: isNewChat ? newChatSystemPrompt : undefined,
               unsavedMessages: unsavedMessages.length > 0 ? unsavedMessages : undefined,
               totalTokens: modelResponse.totalTokensToSave,
@@ -1734,7 +1765,7 @@ export default function Home() {
         activeChatId,
         isSearchActive,
         thinkingOption,
-        generationStyle,
+        generationParams,
         true,
         placeholderMessage.id,
       );
@@ -1839,7 +1870,7 @@ export default function Home() {
         activeChatId,
         isSearchActive,
         thinkingOption,
-        generationStyle,
+        generationParams,
         true,
         placeholderMessage.id,
       );
@@ -2270,10 +2301,10 @@ export default function Home() {
                       onThinkingOptionChange={handleThinkingOptionChange}
                       selectedModel={selectedModel}
             verbosity={verbosity}
-            onVerbosityChange={handleVerbosityChange}
-            generationStyle={generationStyle}
-            onGenerationStyleChange={handleGenerationStyleChange}
-            currentSystemPrompt={newChatSystemPrompt}
+                      onVerbosityChange={handleVerbosityChange}
+                      generationParams={generationParams}
+                      onGenerationParamsChange={handleGenerationParamsChange}
+                      currentSystemPrompt={newChatSystemPrompt}
 
                       onSystemPromptGenerated={setNewChatSystemPrompt}
                       isTemporaryChat={isTemporaryChat}

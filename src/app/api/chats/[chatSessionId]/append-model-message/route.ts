@@ -25,7 +25,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ch
     return NextResponse.json({ error: "Chat session ID is required" }, { status: 400 });
   }
 
-  const { modelMessageParts, modelThoughtSummary, modelSources, totalTokens, accumulatedCost } = (await request.json()) as AppendModelMessageRequest;
+  const { modelMessageParts, modelThoughtSummary, modelSources, totalTokens, accumulatedCost } =
+    (await request.json()) as AppendModelMessageRequest;
 
   if (!modelMessageParts || modelMessageParts.length === 0) {
     return NextResponse.json({ error: "Cannot save an empty model message." }, { status: 400 });
@@ -48,9 +49,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ch
       .map((p) => p.text)
       .join(" ");
 
-    await client.query(
+    const modelMessageResult = await client.query(
       `INSERT INTO messages (chat_session_id, role, content, parts, position, sources, thought_summary)
-             VALUES ($1, 'model', $2, $3, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $4, $5)`,
+             VALUES ($1, 'model', $2, $3, (SELECT COALESCE(MAX(position), 0) + 1 FROM messages WHERE chat_session_id = $1), $4, $5)
+             RETURNING id, position, role, parts, sources, thought_summary as "thoughtSummary"`,
       [
         chatSessionId,
         modelContent,
@@ -59,14 +61,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ch
         modelThoughtSummary,
       ],
     );
+    const savedModelMessage = modelMessageResult.rows[0];
 
     if (totalTokens !== undefined && accumulatedCost !== undefined) {
-      await client.query(`UPDATE chat_sessions SET updated_at = now(), total_tokens = $3, accumulated_cost = $4 WHERE id = $1 AND user_id = $2`, [
-        chatSessionId,
-        userId,
-        totalTokens,
-        accumulatedCost,
-      ]);
+      await client.query(
+        `UPDATE chat_sessions SET updated_at = now(), total_tokens = $3, accumulated_cost = $4 WHERE id = $1 AND user_id = $2`,
+        [chatSessionId, userId, totalTokens, accumulatedCost],
+      );
     } else {
       await client.query(`UPDATE chat_sessions SET updated_at = now() WHERE id = $1 AND user_id = $2`, [
         chatSessionId,
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ch
 
     await client.query("COMMIT");
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, modelMessage: savedModelMessage });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error appending model message:", error);

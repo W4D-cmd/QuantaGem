@@ -323,7 +323,7 @@ export default function Home() {
   const fetchCustomModels = useCallback(async () => {
     setIsLoadingCustomModels(true);
     try {
-      const res = await fetch("/api/models/custom", { headers: getAuthHeaders() });
+      const res = await fetch("/api/models/custom", { headers: getAuthHeaders(), cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
       if (data.models && Array.isArray(data.models)) {
@@ -485,7 +485,7 @@ export default function Home() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("/api/user", { headers: getAuthHeaders() });
+        const res = await fetch("/api/user", { headers: getAuthHeaders(), cache: "no-store" });
         if (res.status === 401) {
           router.replace("/login");
           return;
@@ -1856,10 +1856,9 @@ export default function Home() {
           await showApiErrorToast(persistRes, showToast);
           throw new Error("Failed to save model response after edit.");
         }
-      }
 
-      if (!willBeTemporary && activeChatId) {
-        await loadChat(activeChatId);
+        const { modelMessage: savedModelMessage } = await persistRes.json();
+        setMessages((prev) => prev.map((msg) => (msg.id === placeholderMessage.id ? savedModelMessage : msg)));
       }
     } catch (err: unknown) {
       if (err instanceof Error && !err.message.startsWith("Failed to")) {
@@ -1961,9 +1960,9 @@ export default function Home() {
           await showApiErrorToast(persistRes, showToast);
           throw new Error("Failed to save regenerated model response.");
         }
-      }
-      if (!willBeTemporary && activeChatId) {
-        await loadChat(activeChatId);
+
+        const { modelMessage: savedModelMessage } = await persistRes.json();
+        setMessages((prev) => prev.map((msg) => (msg.id === placeholderMessage.id ? savedModelMessage : msg)));
       }
     } catch (err: unknown) {
       if (err instanceof Error && !err.message.startsWith("Failed to")) {
@@ -2130,12 +2129,12 @@ export default function Home() {
           onRenameChat={handleRenameChat}
           onDeleteChat={confirmDeleteChat}
           onDeleteAllGlobalChats={confirmDeleteAllGlobalChats}
+          onDuplicateChat={handleDuplicateChat}
           onOpenChatSettings={openChatSettingsModal}
           onNewProject={handleNewProject}
           onSelectProject={handleSelectProject}
           onRenameProject={handleRenameProject}
           onDeleteProject={confirmDeleteProject}
-          onDuplicateChat={handleDuplicateChat}
           expandedProjects={expandedProjects}
           onToggleProjectExpansion={setExpandedProjects}
           onMoveChat={handleMoveChat}

@@ -4,6 +4,7 @@ import React from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { WebRProvider } from "@/components/WebRProvider";
 import localFont from "next/font/local";
+import { Noto_Color_Emoji } from "next/font/google";
 
 const roboto = localFont({
   src: [
@@ -61,6 +62,12 @@ const symbolsNerdFont = localFont({
   variable: "--font-symbols",
 });
 
+const notoEmoji = Noto_Color_Emoji({
+  weight: "400",
+  subsets: ["emoji"],
+  variable: "--font-emoji",
+});
+
 export const metadata: Metadata = {
   title: "QuantaGem",
   description: "WebUI for Google Gemini API",
@@ -72,7 +79,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${roboto.variable} ${jetbrainsMono.variable} ${symbolsNerdFont.variable}`}>
+    <html lang="en" className={`${roboto.variable} ${jetbrainsMono.variable} ${symbolsNerdFont.variable} ${notoEmoji.variable}`}>
       <body
         className={`antialiased bg-white dark:bg-zinc-800 text-black dark:text-zinc-100 transition-colors duration-300
           ease-in-out`}

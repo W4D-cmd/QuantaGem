@@ -6,8 +6,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-sans)", "var(--font-symbols)", "sans-serif"],
-        mono: ["var(--font-mono)", "var(--font-symbols)", "monospace"],
+        sans: ["var(--font-sans)", "var(--font-symbols)", "var(--font-emoji)", "sans-serif"],
+        mono: ["var(--font-mono)", "var(--font-symbols)", "var(--font-emoji)", "monospace"],
       },
     },
   },

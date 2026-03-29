@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from "react";
 import Modal from "./Modal";
 import { ToastProps } from "./Toast";
-import { Server, RefreshCw, Settings } from "lucide-react";
+import { Server, RefreshCw, Settings, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
-type SettingsTab = "general" | "providers";
+type SettingsTab = "general" | "providers" | "security";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -35,6 +35,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [customApiKey, setCustomApiKey] = useState<string>("");
   const [hasExistingKey, setHasExistingKey] = useState<boolean>(false);
   const [isTestingConnection, setIsTestingConnection] = useState<boolean>(false);
+
+  // Security settings
+  const [currentPassword, setCurrentPassword] = useState<string>("");
+  const [newPassword, setNewPassword] = useState<string>("");
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [isChangingPassword, setIsChangingPassword] = useState<boolean>(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState<boolean>(false);
+  const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
 
   // UI state
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
@@ -120,6 +129,50 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!currentPassword) {
+      showToast("Current password is required", "error");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      showToast("New password must be at least 8 characters long", "error");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showToast("Passwords do not match", "error");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to change password");
+      }
+
+      showToast("Password updated successfully", "success");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
+      showToast(errorMessage, "error");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   const handleSave = async () => {
     setIsLoading(true);
     try {
@@ -180,7 +233,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     chatId === null &&
     (customEndpoint !== initialSettings.customEndpoint || customApiKey.trim() !== "");
 
-  const hasChanges = hasGeneralChanges || hasProviderChanges;
+  const hasSecurityChanges =
+    chatId === null &&
+    (currentPassword !== "" || newPassword !== "" || confirmPassword !== "");
+
+  const hasChanges = activeTab !== "security" && (hasGeneralChanges || hasProviderChanges);
 
   const modalTitle = chatId !== null ? "Chat Settings" : "Settings";
   const promptDescription =
@@ -190,7 +247,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const tabs = [
     { id: "general" as const, label: "General", icon: Settings },
-    ...(chatId === null ? [{ id: "providers" as const, label: "Providers", icon: Server }] : []),
+    ...(chatId === null ? [
+      { id: "providers" as const, label: "Providers", icon: Server },
+      { id: "security" as const, label: "Security", icon: ShieldCheck }
+    ] : []),
   ];
 
   return (
@@ -245,6 +305,126 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
                   </div>
                 </div>
+              )}
+
+              {activeTab === "security" && chatId === null && (
+                <form onSubmit={handlePasswordChange} className="space-y-6">
+                  <div>
+                    <h3 className="text-sm font-medium text-neutral-700 dark:text-zinc-400 mb-1">
+                      Change Password
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-zinc-500 mb-4">
+                      Update your account password. Use at least 8 characters.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-zinc-400 mb-1">
+                        Current Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showCurrentPassword ? "text" : "password"}
+                          className="w-full p-3 pr-10 border border-neutral-300 dark:border-zinc-700 rounded-xl
+                            shadow-sm text-sm bg-white dark:bg-zinc-950 text-black dark:text-zinc-100 placeholder-neutral-400
+                            dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-2
+                            focus:ring-blue-500 focus:ring-opacity-50 transition-all"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="••••••••"
+                          disabled={isChangingPassword}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-300"
+                        >
+                          {showCurrentPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-zinc-400 mb-1">
+                        New Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showNewPassword ? "text" : "password"}
+                          className="w-full p-3 pr-10 border border-neutral-300 dark:border-zinc-700 rounded-xl
+                            shadow-sm text-sm bg-white dark:bg-zinc-950 text-black dark:text-zinc-100 placeholder-neutral-400
+                            dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-2
+                            focus:ring-blue-500 focus:ring-opacity-50 transition-all"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Min. 8 characters"
+                          disabled={isChangingPassword}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-300"
+                        >
+                          {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-zinc-400 mb-1">
+                        Confirm New Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          className="w-full p-3 pr-10 border border-neutral-300 dark:border-zinc-700 rounded-xl
+                            shadow-sm text-sm bg-white dark:bg-zinc-950 text-black dark:text-zinc-100 placeholder-neutral-400
+                            dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-2
+                            focus:ring-blue-500 focus:ring-opacity-50 transition-all"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Repeat new password"
+                          disabled={isChangingPassword}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-300"
+                        >
+                          {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
+                      className="flex items-center gap-2 cursor-pointer h-9 px-4 rounded-full text-sm font-medium
+                        transition-colors bg-black dark:bg-blue-600 text-white border border-transparent shadow-sm
+                        hover:bg-neutral-600 dark:hover:bg-blue-700 focus:outline-none disabled:opacity-50"
+                    >
+                      {isChangingPassword ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          >
+                            <RefreshCw className="size-4" />
+                          </motion.div>
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="size-4" />
+                          Update Password
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
               )}
 
               {activeTab === "providers" && chatId === null && (

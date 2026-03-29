@@ -22,6 +22,12 @@ body {
 
 code.hljs {
   background-color: transparent !important;
+  font-variant-ligatures: contextual;
+}
+
+.prose pre,
+.prose code {
+  font-variant-ligatures: contextual;
 }
 
 .overflow-y-auto,

@@ -53,6 +53,14 @@ const jetbrainsMono = localFont({
   variable: "--font-mono",
 });
 
+const symbolsNerdFont = localFont({
+  src: [
+    { path: "../../public/fonts/SymbolsNerdFont-Regular.ttf", weight: "400", style: "normal" },
+  ],
+  display: "swap",
+  variable: "--font-symbols",
+});
+
 export const metadata: Metadata = {
   title: "QuantaGem",
   description: "WebUI for Google Gemini API",
@@ -64,7 +72,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${roboto.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${roboto.variable} ${jetbrainsMono.variable} ${symbolsNerdFont.variable}`}>
       <body
         className={`antialiased bg-white dark:bg-zinc-800 text-black dark:text-zinc-100 transition-colors duration-300
           ease-in-out`}

@@ -77,7 +77,8 @@ export function preprocessMarkdown(text: string): string {
     // If it has math indicators and is NOT a simple number, range, or currency text,
     // it is legitimate math (e.g., "$115 \, \text{€}$", "$x=5$", "$a^2 + b^2$").
     if (hasMathIndicators && !isPureNumber && !isRange && !hasCurrencyText) {
-      return addPlaceholder(match);
+      const safeContent = content.replace(/\\\$/g, "\\dollar ");
+      return addPlaceholder(`$${safeContent}$`);
     }
 
     // If it's clearly currency, escape the dollar signs.

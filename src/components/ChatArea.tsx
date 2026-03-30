@@ -68,6 +68,7 @@ import Tooltip from "@/components/Tooltip";
 import MessageSkeleton from "./MessageSkeleton";
 import LazyMarkdownRenderer from "./LazyMarkdownRenderer";
 import { motion, AnimatePresence } from "framer-motion";
+import { preprocessMarkdown } from "@/lib/markdown-utils";
 
 type GetAuthHeaders = () => HeadersInit;
 
@@ -288,7 +289,7 @@ const ThinkingSummary: React.FC<{ summary: string; isStreaming: boolean }> = ({ 
                 remarkPlugins={[remarkMath, remarkGfm]}
                 rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeHighlight, { detect: true }]]}
               >
-                {summary}
+                {preprocessMarkdown(summary)}
               </ReactMarkdown>
             </div>
           </motion.div>
@@ -886,14 +887,14 @@ function ChatAreaComponent(
                               prose-code:py-0.5 prose-code:px-1"
                           >
                             {isUserMessage ? (
-                              <LazyMarkdownRenderer content={part.text} components={messageComponents} />
+                              <LazyMarkdownRenderer content={preprocessMarkdown(part.text)} components={messageComponents} />
                             ) : (
                               <ReactMarkdown
                                 remarkPlugins={[remarkMath, remarkGfm]}
                                 rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeHighlight, { detect: true }]]}
                                 components={messageComponents}
                               >
-                                {part.text}
+                                {preprocessMarkdown(part.text)}
                               </ReactMarkdown>
                             )}
                           </div>

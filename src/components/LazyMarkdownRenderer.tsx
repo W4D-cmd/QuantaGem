@@ -5,6 +5,7 @@ import rehypeHighlight from "rehype-highlight";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
+import { preprocessMarkdown } from "@/lib/markdown-utils";
 
 interface LazyMarkdownRendererProps {
   content: string;
@@ -35,7 +36,7 @@ const LazyMarkdownRenderer: React.FC<LazyMarkdownRendererProps> = ({ content, co
         rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeHighlight, { detect: true }]]}
         components={components}
       >
-        {displayContent}
+        {preprocessMarkdown(displayContent)}
       </ReactMarkdown>
 
       {needsTruncation && (

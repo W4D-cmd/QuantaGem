@@ -53,7 +53,7 @@ function extractTextFromChildren(children: ReactNode): string {
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
+import rehypeKatex, { Options as KatexOptions } from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import { Message, MessagePart } from "@/app/page";
 import {
@@ -64,6 +64,8 @@ import {
   XCircle,
   ChevronRight,
 } from "lucide-react";
+
+const KATEX_OPTIONS: KatexOptions = { macros: { "\\dollar": "\\$" } };
 import Tooltip from "@/components/Tooltip";
 import MessageSkeleton from "./MessageSkeleton";
 import LazyMarkdownRenderer from "./LazyMarkdownRenderer";
@@ -287,7 +289,7 @@ const ThinkingSummary: React.FC<{ summary: string; isStreaming: boolean }> = ({ 
             >
               <ReactMarkdown
                 remarkPlugins={[remarkMath, remarkGfm]}
-                rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeHighlight, { detect: true }]]}
+                rehypePlugins={[rehypeRaw, [rehypeKatex, KATEX_OPTIONS], [rehypeHighlight, { detect: true }]]}
               >
                 {preprocessMarkdown(summary)}
               </ReactMarkdown>
@@ -891,7 +893,7 @@ function ChatAreaComponent(
                             ) : (
                               <ReactMarkdown
                                 remarkPlugins={[remarkMath, remarkGfm]}
-                                rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeHighlight, { detect: true }]]}
+                                rehypePlugins={[rehypeRaw, [rehypeKatex, KATEX_OPTIONS], [rehypeHighlight, { detect: true }]]}
                                 components={messageComponents}
                               >
                                 {preprocessMarkdown(part.text)}

@@ -3,9 +3,11 @@ import ReactMarkdown, { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
+import rehypeKatex, { Options as KatexOptions } from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import { preprocessMarkdown } from "@/lib/markdown-utils";
+
+const KATEX_OPTIONS: KatexOptions = { macros: { "\\dollar": "\\$" } };
 
 interface LazyMarkdownRendererProps {
   content: string;
@@ -33,7 +35,7 @@ const LazyMarkdownRenderer: React.FC<LazyMarkdownRendererProps> = ({ content, co
     <>
       <ReactMarkdown
         remarkPlugins={[remarkMath, remarkGfm]}
-        rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeHighlight, { detect: true }]]}
+        rehypePlugins={[rehypeRaw, [rehypeKatex, KATEX_OPTIONS], [rehypeHighlight, { detect: true }]]}
         components={components}
       >
         {preprocessMarkdown(displayContent)}

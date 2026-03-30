@@ -51,9 +51,17 @@ export function preprocessMarkdown(text: string): string {
         content,
       );
     if (isCurrencyInLatex) {
-      // Strip the outer $...$ delimiters and return just the content.
-      // The \$ sequences inside will be rendered as literal $ by the markdown parser.
-      return content;
+      const hasTextSeparator = /\s+(and|or|to|bis|und|oder)\s+/i.test(content);
+      if (hasTextSeparator) {
+        // Text separators ("und", "bis") cannot be rendered in math mode without
+        // appearing as italic variables. Fallback: unwrap to plain text.
+        return content;
+      }
+      // Single prices or dash-separated ranges: replace \$ with \dollar (a custom
+      // KaTeX macro) and keep the math block intact for proper math-font rendering.
+      // \dollar is NOT a markdown escape sequence, so remark-math parses it correctly.
+      const transformed = content.replace(/\\\$/g, "\\dollar ");
+      return addPlaceholder(`$${transformed}$`);
     }
 
     // 4b. Detect legitimate math expressions and protect them with placeholders.

@@ -28,34 +28,32 @@ export function preprocessMarkdown(text: string): string {
 
   // Phase 4: Process potential Inline Math / Balanced Currency pairs ($...$)
   processed = processed.replace(/(?<!\\)\$(?!\$)(.+?)(?<!\\)\$/g, (match, content) => {
-    // 1. Check for "Hard Math" (features that are definitely LaTeX and not currency)
-    // Indicators: =, _, ^, {, }, <, >, or specific math commands not used in currency
+    // 1. Check for "Hard Math" (definite LaTeX features)
     const hasHardMath = /[\_=^{}<>]|\\(?!text|[\$€£¥\s])|sin|cos|tan|log|exp|sqrt/i.test(content);
     
-    // 2. Check for "Currency" (numbers, symbols, and conjunctions)
-    // We include patterns like \text{€}, \$, etc.
+    // 2. Check for "Currency" patterns
     const isCurrencyLike = /^[\s\d.,$€£¥\\/|+-–—]+$/i.test(content) || 
                           /\\text\{[€£¥$]|USD|EUR|GBP\}/.test(content) ||
                           /\s+(and|or|to|bis|und|oder|bis)\s+/i.test(content);
 
-    // If it's hard math, protect it as a LaTeX block
     if (hasHardMath) {
       return addPlaceholder(match);
     }
     
-    // If it looks like currency (even with pseudo-LaTeX formatting), normalize it to plain text
     if (isCurrencyLike) {
-      // Escape all unescaped dollar signs in the entire match to render them as plain text
-      return match.replace(/(?<!\\)\$/g, '\\$');
+      // Escape ALL dollars in the match to treat as plain text.
+      // We use a function replacement to prevent $n backreference issues.
+      return match.replace(/\$/g, () => '\\$');
     }
 
-    // Default: protect as math if we're not sure (to avoid breaking legit $x$ notation)
+    // Default: protect as math if we're not sure
     return addPlaceholder(match);
   });
 
-  // Phase 5: Escape isolated $ signs (Prefix/Suffix) that are not already escaped
-  processed = processed.replace(/(?<![\w\\$])\$(?=\s*\d)/g, "\\$");
-  processed = processed.replace(/(?<=\d)\s*\$(?![\w$])/g, "\\$");
+  // Phase 5: Escape remaining isolated $ signs (Prefix/Suffix)
+  // We MUST use functions for replacements to avoid $n interpolation bugs.
+  processed = processed.replace(/(?<![\w\\$])\$(?=\s*\d)/g, () => "\\$");
+  processed = processed.replace(/(?<=\d)\s*\$(?![\w$])/g, () => "\\$");
 
   // Phase 6: Restore all placeholders in reverse order
   for (let i = placeholderCount - 1; i >= 0; i--) {

@@ -1,9 +1,22 @@
 /**
  * Preprocesses markdown text to distinguish between LaTeX math and currency symbols.
  *
- * This utility addresses the issue where currency values are misinterpreted
- * as LaTeX math delimiters ($). It uses a placeholder-based strategy to protect
- * legitimate math and code blocks while escaping currency-related dollar signs.
+ * This utility addresses the issue where currency values like "$10" or model-generated
+ * LaTeX currency like "$\$120 - \$130$" are misinterpreted by remark-math / rehype-katex.
+ *
+ * It uses a placeholder-based strategy to protect legitimate math and code blocks
+ * while escaping or unwrapping currency-related dollar signs.
+ *
+ * Processing phases:
+ * 1. Protect fenced code blocks with placeholders.
+ * 2. Protect block math ($$...$$) with placeholders.
+ * 3. Protect inline code (`...`) with placeholders.
+ * 4. Evaluate inline math pairs ($...$):
+ *    a. Unwrap currency amounts that the model wrapped in LaTeX math mode ($\$120 - \$130$).
+ *    b. Protect legitimate math expressions (operators, LaTeX commands, variables).
+ *    c. Escape pure currency pairs ($100$, $10 and $20, etc.).
+ * 5. Escape remaining isolated currency dollar signs ($10, 30$).
+ * 6. Restore all placeholders.
  */
 export function preprocessMarkdown(text: string): string {
   if (!text) return text;
@@ -26,34 +39,54 @@ export function preprocessMarkdown(text: string): string {
   // Phase 3: Protect Inline Code (`...`)
   processed = processed.replace(/`[^`\n]*?`/g, (match) => addPlaceholder(match));
 
-  // Phase 4: Process potential Inline Math / Balanced Currency pairs ($...$)
+  // Phase 4: Process potential Inline Math pairs ($...$)
   processed = processed.replace(/(?<!\\)\$(?!\$)(.+?)(?<!\\)\$/g, (match, content) => {
-    // 1. Check for "Hard Math" (definite LaTeX features)
-    const hasHardMath = /[\_=^{}<>]|\\(?!text|[\$€£¥\s])|sin|cos|tan|log|exp|sqrt/i.test(content);
-    
-    // 2. Check for "Currency" patterns
-    const isCurrencyLike = /^[\s\d.,$€£¥\\/|+-–—]+$/i.test(content) || 
-                          /\\text\{[€£¥$]|USD|EUR|GBP\}/.test(content) ||
-                          /\s+(and|or|to|bis|und|oder|bis)\s+/i.test(content);
+    // 4a. Detect currency amounts wrapped in LaTeX math mode by the AI model.
+    // Pattern: Content consists exclusively of \$ followed by digits, with optional
+    // range separators (-, –, —) or natural language connectors (and, bis, to, etc.).
+    // Examples: "\$120 - \$130", "\$50", "\$10 und \$20"
+    // This fixes the remark-math bug where $\$ resolves to $$ (block math delimiter).
+    const isCurrencyInLatex =
+      /^\s*\\\$\s*[\d.,]+(\s*[-–—]\s*\\\$\s*[\d.,]+|\s+(and|or|to|bis|und|oder)\s+\\\$\s*[\d.,]+)*\s*$/i.test(
+        content,
+      );
+    if (isCurrencyInLatex) {
+      // Strip the outer $...$ delimiters and return just the content.
+      // The \$ sequences inside will be rendered as literal $ by the markdown parser.
+      return content;
+    }
 
-    if (hasHardMath) {
+    // 4b. Detect legitimate math expressions and protect them with placeholders.
+    // Math indicators: LaTeX commands (\frac, \alpha), operators (=, ^, _, +, etc.),
+    // braces ({, }), comparison operators (<, >), or trig/log functions.
+    const hasMathIndicators = /[\_=^\\{}<>+\-*/]|sin|cos|tan|log|exp|sqrt/i.test(content);
+
+    // 4c. Detect currency patterns that should be escaped.
+    const isPureNumber = /^\s*\d+([.,]\d+)?\s*$/.test(content);
+    const isRange = /^\s*\d+([.,]\d+)?\s*[-–—]\s*\d+([.,]\d+)?\s*$/.test(content);
+    const hasCurrencyText = /\s+(and|or|to|bis|und|oder)\s+/i.test(content);
+
+    // If it has math indicators and is NOT a simple number, range, or currency text,
+    // it is legitimate math (e.g., "$115 \, \text{€}$", "$x=5$", "$a^2 + b^2$").
+    if (hasMathIndicators && !isPureNumber && !isRange && !hasCurrencyText) {
       return addPlaceholder(match);
     }
-    
-    if (isCurrencyLike) {
-      // Escape ALL dollars in the match to treat as plain text.
-      // We use a function replacement to prevent $n backreference issues.
-      return match.replace(/\$/g, () => '\\$');
+
+    // If it's clearly currency, escape the dollar signs.
+    if (isPureNumber || isRange || hasCurrencyText) {
+      return `\\$${content}\\$`;
     }
 
-    // Default: protect as math if we're not sure
-    return addPlaceholder(match);
+    // Default: leave as-is for Phase 5 to handle isolated dollar signs.
+    return match;
   });
 
-  // Phase 5: Escape remaining isolated $ signs (Prefix/Suffix)
-  // We MUST use functions for replacements to avoid $n interpolation bugs.
-  processed = processed.replace(/(?<![\w\\$])\$(?=\s*\d)/g, () => "\\$");
-  processed = processed.replace(/(?<=\d)\s*\$(?![\w$])/g, () => "\\$");
+  // Phase 5: Escape isolated $ signs that are likely currency (not already escaped)
+  // Prefix: $10, $ 10 (dollar sign followed by digits)
+  processed = processed.replace(/(?<![\w\\$])\$(?=\s*\d)/g, "\\$");
+
+  // Suffix: 10$, 10 $ (dollar sign after digits)
+  processed = processed.replace(/(?<=\d)\s*\$(?![\w$])/g, "\\$");
 
   // Phase 6: Restore all placeholders in reverse order
   for (let i = placeholderCount - 1; i >= 0; i--) {

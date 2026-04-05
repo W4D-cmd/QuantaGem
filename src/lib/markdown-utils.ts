@@ -64,18 +64,28 @@ export function preprocessMarkdown(text: string): string {
       return addPlaceholder(`$${transformed}$`);
     }
 
-    // 4b. Detect legitimate math expressions and protect them with placeholders.
-    // Math indicators: LaTeX commands (\frac, \alpha), operators (=, ^, _, +, etc.),
-    // braces ({, }), comparison operators (<, >), or trig/log functions.
+    // 4b. Detect LaTeX commands — a strong signal for legitimate math.
+    // Matches \text, \frac, \alpha, \sqrt, etc. (two or more letters after \).
+    // Single-char escapes like \$ are excluded by requiring 2+ letters.
+    const hasLatexCommands = /\\[a-zA-Z]{2,}/.test(content);
+
+    // 4c. Detect other math indicators: operators, braces, sub/superscript, trig/log.
     const hasMathIndicators = /[\_=^\\{}<>+\-*/]|sin|cos|tan|log|exp|sqrt/i.test(content);
 
-    // 4c. Detect currency patterns that should be escaped.
+    // 4d. Detect currency patterns that should be escaped.
     const isPureNumber = /^\s*\d+([.,]\d+)?\s*$/.test(content);
     const isRange = /^\s*\d+([.,]\d+)?\s*[-–—]\s*\d+([.,]\d+)?\s*$/.test(content);
     const hasCurrencyText = /\s+(and|or|to|bis|und|oder)\s+/i.test(content);
 
-    // If it has math indicators and is NOT a simple number, range, or currency text,
-    // it is legitimate math (e.g., "$115 \, \text{€}$", "$x=5$", "$a^2 + b^2$").
+    // LaTeX commands are a definitive math signal — they override currency-text
+    // heuristics because words like "und" or "and" can appear inside \text{...}.
+    if (hasLatexCommands) {
+      const safeContent = content.replace(/\\\$/g, "\\dollar ");
+      return addPlaceholder(`$${safeContent}$`);
+    }
+
+    // Weaker math indicators (operators, braces) count as math only when no
+    // currency signals (pure number, range, or connector words) are present.
     if (hasMathIndicators && !isPureNumber && !isRange && !hasCurrencyText) {
       const safeContent = content.replace(/\\\$/g, "\\dollar ");
       return addPlaceholder(`$${safeContent}$`);

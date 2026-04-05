@@ -889,7 +889,7 @@ function ChatAreaComponent(
                               prose-code:py-0.5 prose-code:px-1"
                           >
                             {isUserMessage ? (
-                              <LazyMarkdownRenderer content={preprocessMarkdown(part.text)} components={messageComponents} />
+                              <LazyMarkdownRenderer content={part.text} components={messageComponents} />
                             ) : (
                               <ReactMarkdown
                                 remarkPlugins={[remarkMath, remarkGfm]}

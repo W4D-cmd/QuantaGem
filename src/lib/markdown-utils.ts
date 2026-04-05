@@ -13,8 +13,10 @@
  * 3. Protect inline code (`...`) with placeholders.
  * 4. Evaluate inline math pairs ($...$):
  *    a. Unwrap currency amounts that the model wrapped in LaTeX math mode ($\$120 - \$130$).
- *    b. Protect legitimate math expressions (operators, LaTeX commands, variables).
- *    c. Escape pure currency pairs ($100$, $10 and $20, etc.).
+ *    b. Protect expressions containing LaTeX commands (\text, \frac, etc.).
+ *    c. Unwrap non-dollar currency symbols (€, £, ¥, etc.) that cause KaTeX failures.
+ *    d. Protect weaker math indicators (operators, braces) when no currency signal present.
+ *    e. Escape pure currency pairs ($100$, $10 and $20, etc.).
  * 5. Escape remaining isolated currency dollar signs ($10, 30$).
  * 6. Restore all placeholders.
  */
@@ -69,10 +71,20 @@ export function preprocessMarkdown(text: string): string {
     // Single-char escapes like \$ are excluded by requiring 2+ letters.
     const hasLatexCommands = /\\[a-zA-Z]{2,}/.test(content);
 
-    // 4c. Detect other math indicators: operators, braces, sub/superscript, trig/log.
+    // 4c. Detect currency amounts with non-dollar symbols (€, £, ¥, etc.).
+    // These are not meaningful in math mode and bare currency symbols cause KaTeX
+    // parse errors. Unwrap to plain text by stripping the $ delimiters.
+    const isCurrencyValue =
+      /[€£¥₹₽₩₪₫₴₦¢₿]/.test(content) &&
+      /^[\s€£¥₹₽₩₪₫₴₦¢₿\d,.\-–—\s]+$/.test(content);
+    if (isCurrencyValue) {
+      return content;
+    }
+
+    // 4d. Detect other math indicators: operators, braces, sub/superscript, trig/log.
     const hasMathIndicators = /[\_=^\\{}<>+\-*/]|sin|cos|tan|log|exp|sqrt/i.test(content);
 
-    // 4d. Detect currency patterns that should be escaped.
+    // 4e. Detect currency patterns that should be escaped.
     const isPureNumber = /^\s*\d+([.,]\d+)?\s*$/.test(content);
     const isRange = /^\s*\d+([.,]\d+)?\s*[-–—]\s*\d+([.,]\d+)?\s*$/.test(content);
     const hasCurrencyText = /\s+(and|or|to|bis|und|oder)\s+/i.test(content);

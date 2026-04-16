@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18-alpine@sha256:c48f944df2efbcece2dc4ea6725554f97d430fc0a4fbcfbeb31803b22dc33331
+    image: postgres:18-alpine@sha256:52098013b4b64a746626437d38afc03cabff6cdeb4d3d92e2342aa95f0ce56ea
     restart: unless-stopped
     env_file:
       - .env
@@ -51,7 +51,7 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:8-alpine@sha256:885cba5f568cc9b05cbeb1fd7d41b860da06983c24bbb0d7027332a2e82def87
+    image: redis:8-alpine@sha256:c5e375abb885e6b2021c0377879e4890bf76f9065b8922ffc113f2b226b9fc17
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]

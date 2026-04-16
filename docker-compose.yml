@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18-alpine@sha256:4da1a4828be12604092fa55311276f08f9224a74a62dcb4708bd7439e2a03911
+    image: postgres:18-alpine@sha256:c48f944df2efbcece2dc4ea6725554f97d430fc0a4fbcfbeb31803b22dc33331
     restart: unless-stopped
     env_file:
       - .env
@@ -72,7 +72,7 @@ services:
       start_period: 300s
 
   redis:
-    image: redis:8-alpine@sha256:81b6f81d6a6c5b9019231a2e8eb10085e3a139a34f833dcc965a8a959b040b72
+    image: redis:8-alpine@sha256:885cba5f568cc9b05cbeb1fd7d41b860da06983c24bbb0d7027332a2e82def87
     restart: unless-stopped
     networks:
       - app-network

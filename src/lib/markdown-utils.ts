@@ -85,8 +85,8 @@ export function preprocessMarkdown(text: string): string {
     const hasMathIndicators = /[\_=^\\{}<>+\-*/]|sin|cos|tan|log|exp|sqrt/i.test(content);
 
     // 4e. Detect currency patterns that should be escaped.
-    const isPureNumber = /^\s*\d+([.,]\d+)?\s*$/.test(content);
-    const isRange = /^\s*\d+([.,]\d+)?\s*[-–—]\s*\d+([.,]\d+)?\s*$/.test(content);
+    const isPureNumber = /^\s*\d+([.,]\d+)*\s*$/.test(content);
+    const isRange = /^\s*\d+([.,]\d+)*\s*[-–—]\s*\d+([.,]\d+)*\s*$/.test(content);
     const hasCurrencyText = /\s+(and|or|to|bis|und|oder)\s+/i.test(content);
 
     // LaTeX commands are a definitive math signal — they override currency-text
@@ -97,14 +97,14 @@ export function preprocessMarkdown(text: string): string {
     }
 
     // Weaker math indicators (operators, braces) count as math only when no
-    // currency signals (pure number, range, or connector words) are present.
-    if (hasMathIndicators && !isPureNumber && !isRange && !hasCurrencyText) {
+    // currency signals (range, or connector words) are present. Pure numbers are protected.
+    if (isPureNumber || (hasMathIndicators && !isRange && !hasCurrencyText)) {
       const safeContent = content.replace(/\\\$/g, "\\dollar ");
       return addPlaceholder(`$${safeContent}$`);
     }
 
     // If it's clearly currency, escape the dollar signs.
-    if (isPureNumber || isRange || hasCurrencyText) {
+    if (isRange || hasCurrencyText) {
       return `\\$${content}\\$`;
     }
 

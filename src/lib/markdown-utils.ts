@@ -42,7 +42,14 @@ export function preprocessMarkdown(text: string): string {
   processed = processed.replace(/`[^`\n]*?`/g, (match) => addPlaceholder(match));
 
   // Phase 4: Process potential Inline Math pairs ($...$)
-  processed = processed.replace(/(?<!\\)\$(?!\$)(.+?)(?<!\\)\$/g, (match, content) => {
+  processed = processed.replace(/(?<!\\)\$(?!\$)(.+?)(?<!\\)\$/g, (match, content, offset, fullString) => {
+    // Fake math detection: check if match is adjacent to digits
+    const nextChars = fullString.slice(offset + match.length, offset + match.length + 2);
+    const prevChars = fullString.slice(Math.max(0, offset - 2), offset);
+    if (/^[.,]?\d/.test(nextChars) || /\d[.,]?$/.test(prevChars)) {
+      return match;
+    }
+
     // 4a. Detect currency amounts wrapped in LaTeX math mode by the AI model.
     // Pattern: Content consists exclusively of \$ followed by digits, with optional
     // range separators (-, –, —) or natural language connectors (and, bis, to, etc.).
@@ -101,11 +108,6 @@ export function preprocessMarkdown(text: string): string {
     if (isPureNumber || (hasMathIndicators && !isRange && !hasCurrencyText)) {
       const safeContent = content.replace(/\\\$/g, "\\dollar ");
       return addPlaceholder(`$${safeContent}$`);
-    }
-
-    // If it's clearly currency, escape the dollar signs.
-    if (isRange || hasCurrencyText) {
-      return `\\$${content}\\$`;
     }
 
     // Default: leave as-is for Phase 5 to handle isolated dollar signs.

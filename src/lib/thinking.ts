@@ -1,3 +1,5 @@
+import { isCustomModel } from "./custom-models";
+
 export type ThinkingOption = "dynamic" | "off" | "low" | "medium" | "high" | "xhigh";
 
 export type OpenAIReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh";
@@ -100,6 +102,8 @@ function getOpenAIModelBase(modelName: string): string | null {
 
 export function isOpenAIReasoningModel(modelName: string | null | undefined): boolean {
   if (!modelName) return false;
+  // Custom models should not show reasoning controls in the UI
+  if (isCustomModel(modelName)) return false;
   const baseModel = getOpenAIModelBase(modelName);
   return baseModel !== null && baseModel in openAIReasoningModelConfigs;
 }
@@ -113,6 +117,8 @@ export function isGPT5FamilyModel(modelName: string | null | undefined): boolean
 
 export function getOpenAIReasoningConfig(modelName: string | null | undefined): OpenAIReasoningModelConfig | null {
   if (!modelName) return null;
+  // Custom models should not show reasoning controls in the UI
+  if (isCustomModel(modelName)) return null;
   const baseModel = getOpenAIModelBase(modelName);
   if (!baseModel) return null;
   return openAIReasoningModelConfigs[baseModel] ?? null;
@@ -120,6 +126,8 @@ export function getOpenAIReasoningConfig(modelName: string | null | undefined): 
 
 export function supportsVerbosity(modelName: string | null | undefined): boolean {
   if (!modelName) return false;
+  // Custom models don't support verbosity control in the UI
+  if (isCustomModel(modelName)) return false;
   const baseModel = getOpenAIModelBase(modelName);
   if (!baseModel) return false;
   const config = openAIReasoningModelConfigs[baseModel];

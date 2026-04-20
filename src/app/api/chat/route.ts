@@ -1042,6 +1042,7 @@ async function handleCustomOpenAIRequest(
     model: actualModelId,
     messages,
     stream: true,
+    stream_options: { include_usage: true },
   };
 
   if (temperature !== null) requestOptions.temperature = temperature;
@@ -1058,7 +1059,15 @@ async function handleCustomOpenAIRequest(
       try {
         for await (const chunk of stream) {
           if (chunk.usage) usage = chunk.usage;
+          
           const delta = chunk.choices[0]?.delta;
+          
+          if (delta?.reasoning_content) {
+            const reasoningText = delta.reasoning_content as string;
+            const jsonChunk = { type: "thought", value: reasoningText };
+            controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+          }
+          
           if (delta?.content) {
             modelOutput += delta.content;
             const jsonChunk = { type: "text", value: delta.content };

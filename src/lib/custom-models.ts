@@ -73,7 +73,7 @@ export function modelSupportsVerbosity(modelId: string): boolean {
 }
 
 export function modelSupportsReasoning(modelId: string): boolean {
-  // Custom models don't support extended reasoning
+  // Custom models don't support reasoning effort control in the UI
   if (isCustomModel(modelId)) {
     return false;
   }

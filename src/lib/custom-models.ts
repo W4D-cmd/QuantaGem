@@ -1,7 +1,9 @@
-export type ModelProvider = "gemini" | "openai" | "anthropic" | "custom-openai";
+export type ModelProvider = "gemini" | "openai" | "anthropic" | "custom-openai" | "custom-anthropic";
 
 // Prefix used to identify custom provider models
 export const CUSTOM_PROVIDER_PREFIX = "custom:";
+export const CUSTOM_OPENAI_PREFIX = "custom-openai:";
+export const CUSTOM_ANTHROPIC_PREFIX = "custom-anthropic:";
 
 export interface CustomModelEntry {
   displayName: string;
@@ -23,22 +25,32 @@ export interface CustomModelEntry {
 export interface FetchedCustomModel {
   id: string;
   displayName: string;
+  apiType?: "openai" | "anthropic";
 }
 
 /**
  * Checks if a model ID belongs to a custom provider.
- * Custom models are prefixed with "custom:" to distinguish them from built-in models.
+ * Custom models are prefixed with "custom-openai:" or "custom-anthropic:" to distinguish them from built-in models.
+ * For backwards compatibility, also checks "custom:"
  */
 export function isCustomModel(modelId: string): boolean {
-  return modelId.startsWith(CUSTOM_PROVIDER_PREFIX);
+  return modelId.startsWith(CUSTOM_PROVIDER_PREFIX) || 
+         modelId.startsWith(CUSTOM_OPENAI_PREFIX) || 
+         modelId.startsWith(CUSTOM_ANTHROPIC_PREFIX);
 }
 
 /**
  * Extracts the original model ID from a custom model identifier.
- * E.g., "custom:llama-3.2-3b" -> "llama-3.2-3b"
+ * E.g., "custom-openai:llama-3.2-3b" -> "llama-3.2-3b"
  */
 export function getOriginalModelId(customModelId: string): string {
-  if (isCustomModel(customModelId)) {
+  if (customModelId.startsWith(CUSTOM_OPENAI_PREFIX)) {
+    return customModelId.slice(CUSTOM_OPENAI_PREFIX.length);
+  }
+  if (customModelId.startsWith(CUSTOM_ANTHROPIC_PREFIX)) {
+    return customModelId.slice(CUSTOM_ANTHROPIC_PREFIX.length);
+  }
+  if (customModelId.startsWith(CUSTOM_PROVIDER_PREFIX)) {
     return customModelId.slice(CUSTOM_PROVIDER_PREFIX.length);
   }
   return customModelId;
@@ -46,15 +58,21 @@ export function getOriginalModelId(customModelId: string): string {
 
 /**
  * Creates a custom model identifier from an original model ID.
- * E.g., "llama-3.2-3b" -> "custom:llama-3.2-3b"
+ * E.g., "llama-3.2-3b" -> "custom-openai:llama-3.2-3b"
  */
-export function createCustomModelId(originalModelId: string): string {
-  return `${CUSTOM_PROVIDER_PREFIX}${originalModelId}`;
+export function createCustomModelId(originalModelId: string, apiType: "openai" | "anthropic" = "openai"): string {
+  if (apiType === "anthropic") {
+    return `${CUSTOM_ANTHROPIC_PREFIX}${originalModelId}`;
+  }
+  return `${CUSTOM_OPENAI_PREFIX}${originalModelId}`;
 }
 
 export function getProviderForModel(modelId: string): ModelProvider | undefined {
   // Check for custom provider first
-  if (isCustomModel(modelId)) {
+  if (modelId.startsWith(CUSTOM_ANTHROPIC_PREFIX)) {
+    return "custom-anthropic";
+  }
+  if (modelId.startsWith(CUSTOM_OPENAI_PREFIX) || modelId.startsWith(CUSTOM_PROVIDER_PREFIX)) {
     return "custom-openai";
   }
 
@@ -141,8 +159,8 @@ export function getModelPricing(modelId: string): {
  */
 export const STATIC_CUSTOM_PROVIDERS: Record<string, FetchedCustomModel[]> = {
   "minimax.io": [
-    { id: "MiniMax-M2.7", displayName: "MiniMax-M2.7" },
-    { id: "MiniMax-M2.5", displayName: "MiniMax-M2.5" },
+    { id: "MiniMax-M2.7", displayName: "MiniMax-M2.7", apiType: "openai" },
+    { id: "MiniMax-M2.5", displayName: "MiniMax-M2.5", apiType: "openai" },
   ],
 };
 

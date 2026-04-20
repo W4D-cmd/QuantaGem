@@ -463,6 +463,74 @@ async function handleCustomOpenAIGenerate(
   });
 }
 
+async function handleCustomAnthropicGenerate(
+  model: string,
+  userPrompt: string,
+  userId: number,
+): Promise<Response> {
+  const settingsResult = await pool.query(
+    "SELECT custom_anthropic_endpoint, custom_anthropic_key FROM user_settings WHERE user_id = $1",
+    [userId],
+  );
+
+  const settings = settingsResult.rows[0];
+  if (!settings?.custom_anthropic_endpoint) {
+    return NextResponse.json(
+      { error: "Custom Anthropic endpoint not configured. Please set it in Settings > Providers." },
+      { status: 400 },
+    );
+  }
+
+  const baseURL = settings.custom_anthropic_endpoint;
+  const apiKey = settings.custom_anthropic_key || "no-key";
+
+  const anthropic = new Anthropic({ apiKey, baseURL });
+
+  const actualModelId = getOriginalModelId(model);
+
+  const stream = anthropic.messages.stream({
+    model: actualModelId,
+    max_tokens: 8192,
+    messages: [{ role: "user", content: userPrompt }],
+    system: GENERATE_SYSTEM_PROMPT_INSTRUCTION,
+  });
+
+  const encoder = new TextEncoder();
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      try {
+        stream.on("text", (text) => {
+          const jsonChunk = { type: "text", value: text };
+          controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+        });
+
+        await stream.finalMessage();
+      } catch (streamError) {
+        console.error("Error during Custom Anthropic system prompt stream processing:", streamError);
+        const errorMessage = {
+          type: "error",
+          value: "An error occurred during system prompt generation. Please try again.",
+        };
+        controller.enqueue(encoder.encode(JSON.stringify(errorMessage) + "\n"));
+      } finally {
+        controller.close();
+      }
+    },
+    cancel() {
+      stream.abort();
+      console.log("Custom Anthropic system prompt generation stream cancelled");
+    },
+  });
+
+  return new Response(readableStream, {
+    headers: {
+      "Content-Type": "application/jsonl; charset=utf-8",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const userIdHeader = request.headers.get("x-user-id");
   if (!userIdHeader) {
@@ -492,6 +560,8 @@ export async function POST(request: NextRequest) {
       return await handleAnthropicGenerate(model, prompt);
     } else if (provider === "custom-openai") {
       return await handleCustomOpenAIGenerate(model, prompt, userId);
+    } else if (provider === "custom-anthropic") {
+      return await handleCustomAnthropicGenerate(model, prompt, userId);
     } else {
       return await handleGeminiGenerate(model, prompt);
     }

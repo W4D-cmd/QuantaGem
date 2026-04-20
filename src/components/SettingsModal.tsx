@@ -36,6 +36,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [hasExistingKey, setHasExistingKey] = useState<boolean>(false);
   const [isTestingConnection, setIsTestingConnection] = useState<boolean>(false);
 
+  const [customAnthropicEndpoint, setCustomAnthropicEndpoint] = useState<string>("");
+  const [customAnthropicApiKey, setCustomAnthropicApiKey] = useState<string>("");
+  const [hasExistingAnthropicKey, setHasExistingAnthropicKey] = useState<boolean>(false);
+  const [isTestingAnthropicConnection, setIsTestingAnthropicConnection] = useState<boolean>(false);
+
   // Security settings
   const [currentPassword, setCurrentPassword] = useState<string>("");
   const [newPassword, setNewPassword] = useState<string>("");
@@ -52,6 +57,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [initialSettings, setInitialSettings] = useState({
     systemPrompt: "",
     customEndpoint: "",
+    customAnthropicEndpoint: "",
   });
 
   useEffect(() => {
@@ -79,10 +85,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             const settings = {
               systemPrompt: data.system_prompt || "",
               customEndpoint: data.custom_openai_endpoint || "",
+              customAnthropicEndpoint: data.custom_anthropic_endpoint || "",
             };
             setSystemPrompt(settings.systemPrompt);
             setCustomEndpoint(settings.customEndpoint);
             setHasExistingKey(data.custom_openai_key_set || false);
+            setCustomAnthropicEndpoint(settings.customAnthropicEndpoint);
+            setHasExistingAnthropicKey(data.custom_anthropic_key_set || false);
             setInitialSettings(settings);
           })
           .catch((err) => {
@@ -95,20 +104,29 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, [isOpen, chatId, initialSystemPromptValue, getAuthHeaders, showToast]);
 
-  const handleTestConnection = async () => {
-    if (!customEndpoint.trim()) {
-      showToast("Please enter a valid endpoint URL", "error");
+  const handleTestConnection = async (apiType: "openai" | "anthropic") => {
+    const endpoint = apiType === "openai" ? customEndpoint : customAnthropicEndpoint;
+    const apiKey = apiType === "openai" ? customApiKey : customAnthropicApiKey;
+    
+    if (!endpoint.trim()) {
+      showToast(`Please enter a valid ${apiType === "openai" ? "OpenAI" : "Anthropic"} endpoint URL`, "error");
       return;
     }
 
-    setIsTestingConnection(true);
+    if (apiType === "openai") {
+      setIsTestingConnection(true);
+    } else {
+      setIsTestingAnthropicConnection(true);
+    }
+    
     try {
       const response = await fetch("/api/models/custom", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({
-          endpoint: customEndpoint,
-          apiKey: customApiKey || undefined,
+          endpoint,
+          apiKey: apiKey || undefined,
+          apiType,
         }),
       });
 
@@ -125,7 +143,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       const errorMessage = err instanceof Error ? err.message : "Connection test failed";
       showToast(errorMessage, "error");
     } finally {
-      setIsTestingConnection(false);
+      if (apiType === "openai") {
+        setIsTestingConnection(false);
+      } else {
+        setIsTestingAnthropicConnection(false);
+      }
     }
   };
 
@@ -191,6 +213,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             systemPrompt,
             customOpenaiEndpoint: customEndpoint || null,
             customOpenaiKey: customApiKey || null,
+            customAnthropicEndpoint: customAnthropicEndpoint || null,
+            customAnthropicKey: customAnthropicApiKey || null,
           }),
         });
       }
@@ -202,9 +226,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         throw new Error(errData.error || "Failed to save settings");
       }
 
-      // Clear the API key field after successful save (it's now stored)
-      setCustomApiKey("");
-      setHasExistingKey(true);
+      // Clear the API key fields after successful save (they're now stored)
+      if (customApiKey) {
+        setCustomApiKey("");
+        setHasExistingKey(true);
+      }
+      if (customAnthropicApiKey) {
+        setCustomAnthropicApiKey("");
+        setHasExistingAnthropicKey(true);
+      }
 
       onSettingsSaved({
         systemPrompt,
@@ -222,6 +252,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     if (chatId === null) {
       setCustomEndpoint(initialSettings.customEndpoint);
       setCustomApiKey("");
+      setCustomAnthropicEndpoint(initialSettings.customAnthropicEndpoint);
+      setCustomAnthropicApiKey("");
     }
     onClose();
   };
@@ -231,7 +263,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const hasProviderChanges =
     chatId === null &&
-    (customEndpoint !== initialSettings.customEndpoint || customApiKey.trim() !== "");
+    (customEndpoint !== initialSettings.customEndpoint || 
+     customApiKey.trim() !== "" ||
+     customAnthropicEndpoint !== initialSettings.customAnthropicEndpoint || 
+     customAnthropicApiKey.trim() !== "");
 
   const hasSecurityChanges =
     chatId === null &&
@@ -488,10 +523,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
                   </div>
 
-                  <div className="pt-2">
+                  <div className="pt-2 border-b border-neutral-200 dark:border-zinc-800 pb-6">
                     <button
                       type="button"
-                      onClick={handleTestConnection}
+                      onClick={() => handleTestConnection("openai")}
                       disabled={isLoading || isTestingConnection || !customEndpoint.trim()}
                       className="flex items-center gap-2 cursor-pointer h-9 px-4 rounded-full text-sm font-medium
                         transition-colors bg-neutral-100 dark:bg-zinc-800 border border-neutral-300 dark:border-zinc-700
@@ -511,7 +546,95 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       ) : (
                         <>
                           <Server className="size-4" />
-                          Test Connection & Fetch Models
+                          Test OpenAI Connection & Fetch Models
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium text-neutral-700 dark:text-zinc-400 mb-1">
+                      Custom Anthropic-compatible Provider
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-zinc-500 mb-4">
+                      Configure a local or self-hosted Anthropic-compatible API.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-zinc-400">
+                      Base URL
+                    </label>
+                    <p className="text-xs text-neutral-500 dark:text-zinc-500 mb-2 mt-1">
+                      The base URL of your Anthropic-compatible API endpoint.
+                    </p>
+                    {isLoading ? (
+                      <div className="w-full h-11 bg-neutral-100 dark:bg-zinc-800 rounded-xl animate-pulse"></div>
+                    ) : (
+                      <input
+                        type="url"
+                        className="w-full p-3 border border-neutral-300 dark:border-zinc-700 rounded-xl
+                          shadow-sm text-sm bg-white dark:bg-zinc-950 text-black dark:text-zinc-100 placeholder-neutral-400
+                          dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-2
+                          focus:ring-blue-500 focus:ring-opacity-50 transition-all"
+                        value={customAnthropicEndpoint}
+                        onChange={(e) => setCustomAnthropicEndpoint(e.target.value)}
+                        placeholder="http://localhost:8080/v1"
+                        disabled={isLoading}
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-zinc-400">
+                      API Key
+                    </label>
+                    <p className="text-xs text-neutral-500 dark:text-zinc-500 mb-2 mt-1">
+                      {hasExistingAnthropicKey
+                        ? "An API key is already configured. Enter a new key to update it."
+                        : "Optional: Enter an API key if your endpoint requires authentication."}
+                    </p>
+                    {isLoading ? (
+                      <div className="w-full h-11 bg-neutral-100 dark:bg-zinc-800 rounded-xl animate-pulse"></div>
+                    ) : (
+                      <input
+                        type="password"
+                        className="w-full p-3 border border-neutral-300 dark:border-zinc-700 rounded-xl
+                          shadow-sm text-sm bg-white dark:bg-zinc-950 text-black dark:text-zinc-100 placeholder-neutral-400
+                          dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-2
+                          focus:ring-blue-500 focus:ring-opacity-50 transition-all"
+                        value={customAnthropicApiKey}
+                        onChange={(e) => setCustomAnthropicApiKey(e.target.value)}
+                        placeholder={hasExistingAnthropicKey ? "Leave empty to keep existing key" : "Optional API key"}
+                        disabled={isLoading}
+                      />
+                    )}
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleTestConnection("anthropic")}
+                      disabled={isLoading || isTestingAnthropicConnection || !customAnthropicEndpoint.trim()}
+                      className="flex items-center gap-2 cursor-pointer h-9 px-4 rounded-full text-sm font-medium
+                        transition-colors bg-neutral-100 dark:bg-zinc-800 border border-neutral-300 dark:border-zinc-700
+                        hover:bg-neutral-200 dark:hover:bg-zinc-700 text-neutral-700 dark:text-zinc-300
+                        focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isTestingAnthropicConnection ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          >
+                            <RefreshCw className="size-4" />
+                          </motion.div>
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          <Server className="size-4" />
+                          Test Anthropic Connection & Fetch Models
                         </>
                       )}
                     </button>

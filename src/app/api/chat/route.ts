@@ -1752,6 +1752,334 @@ async function handleAnthropicRequest(
   });
 }
 
+async function handleCustomAnthropicRequest(
+  model: string,
+  newMessageAppParts: MessagePart[],
+  clientHistoryWithAppParts: Array<{ role: string; parts: MessagePart[] }>,
+  systemPromptText: string | null,
+  userId: number,
+  thinkingBudget: number | undefined,
+  temperature: number | null,
+  topP: number | null,
+  topK: number | null,
+): Promise<Response> {
+  const settingsResult = await pool.query(
+    "SELECT custom_anthropic_endpoint, custom_anthropic_key FROM user_settings WHERE user_id = $1",
+    [userId],
+  );
+
+  const settings = settingsResult.rows[0];
+  const baseURL = settings?.custom_anthropic_endpoint;
+  const apiKey = settings?.custom_anthropic_key || "no-key";
+
+  if (!baseURL) {
+    return NextResponse.json({ error: "Custom Anthropic endpoint not configured in settings." }, { status: 400 });
+  }
+
+  const anthropic = new Anthropic({ apiKey, baseURL });
+  const actualModelId = getOriginalModelId(model);
+
+  const messages: AnthropicMessage[] = [];
+
+  // Build history messages
+  if (clientHistoryWithAppParts) {
+    for (const prevMsg of clientHistoryWithAppParts) {
+      const contentBlocks: AnthropicContentBlock[] = [];
+
+      if (prevMsg.parts && Array.isArray(prevMsg.parts)) {
+        for (const appPart of prevMsg.parts) {
+          if (appPart.type === "text" && appPart.text) {
+            contentBlocks.push({ type: "text", text: appPart.text });
+          } else if (appPart.type === "scraped_url" && appPart.text) {
+            contentBlocks.push({ type: "text", text: appPart.text });
+          } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
+            if (prevMsg.role !== "user") continue;
+
+            const mimeType = appPart.mimeType.toLowerCase();
+
+            if (SUPPORTED_ANTHROPIC_IMAGE_TYPES.includes(mimeType)) {
+              try {
+                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const chunks: Buffer[] = [];
+                for await (const chunk of fileStream) {
+                  chunks.push(chunk as Buffer);
+                }
+                const fileBuffer = Buffer.concat(chunks);
+                contentBlocks.push({
+                  type: "image",
+                  source: {
+                    type: "base64",
+                    media_type: mimeType,
+                    data: fileBuffer.toString("base64"),
+                  },
+                });
+              } catch (fileError) {
+                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
+                return NextResponse.json(
+                  { error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}` },
+                  { status: 500 },
+                );
+              }
+            } else if (SUPPORTED_ANTHROPIC_DOCUMENT_TYPES.includes(mimeType)) {
+              try {
+                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const chunks: Buffer[] = [];
+                for await (const chunk of fileStream) {
+                  chunks.push(chunk as Buffer);
+                }
+                const fileBuffer = Buffer.concat(chunks);
+                contentBlocks.push({
+                  type: "document",
+                  source: {
+                    type: "base64",
+                    media_type: "application/pdf",
+                    data: fileBuffer.toString("base64"),
+                  },
+                });
+              } catch (fileError) {
+                console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
+                return NextResponse.json(
+                  { error: `Failed to process historical file: ${appPart.fileName || appPart.objectName}` },
+                  { status: 500 },
+                );
+              }
+            } else {
+              const extension = getFileExtension(appPart.fileName);
+              const isTextFile =
+                SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
+                mimeType.startsWith("text/") ||
+                mimeType === "application/json";
+
+              if (isTextFile) {
+                try {
+                  const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                  const chunks: Buffer[] = [];
+                  for await (const chunk of fileStream) {
+                    chunks.push(chunk as Buffer);
+                  }
+                  const fileBuffer = Buffer.concat(chunks);
+                  const textContent = fileBuffer.toString("utf-8");
+                  const fileHeader = appPart.fileName ? `--- File: ${appPart.fileName} ---\n` : "";
+                  contentBlocks.push({ type: "text", text: fileHeader + textContent });
+                } catch (fileError) {
+                  console.error(`Failed to retrieve historical file ${appPart.objectName} from MinIO:`, fileError);
+                }
+              } else {
+                console.warn(
+                  `Skipping historical file ${appPart.fileName || appPart.objectName} for Anthropic due to unsupported MIME type: ${appPart.mimeType}`,
+                );
+              }
+            }
+          }
+        }
+      }
+
+      if (contentBlocks.length > 0) {
+        const role = prevMsg.role === "model" ? "assistant" : "user";
+        if (role === "assistant") {
+          const textContent = contentBlocks
+            .filter((b): b is { type: "text"; text: string } => b.type === "text")
+            .map((b) => b.text)
+            .join("\n");
+          if (textContent) {
+            messages.push({ role: "assistant", content: textContent });
+          }
+        } else {
+          messages.push({ role: "user", content: contentBlocks });
+        }
+      }
+    }
+  }
+
+  // Build new message content blocks
+  const newMessageBlocks: AnthropicContentBlock[] = [];
+
+  for (const appPart of newMessageAppParts) {
+    if (appPart.type === "text" && appPart.text) {
+      newMessageBlocks.push({ type: "text", text: appPart.text });
+    } else if (appPart.type === "scraped_url" && appPart.text) {
+      newMessageBlocks.push({ type: "text", text: appPart.text });
+    } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
+      const mimeType = appPart.mimeType.toLowerCase();
+
+      if (SUPPORTED_ANTHROPIC_IMAGE_TYPES.includes(mimeType)) {
+        try {
+          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+          const chunks: Buffer[] = [];
+          for await (const chunk of fileStream) {
+            chunks.push(chunk as Buffer);
+          }
+          const fileBuffer = Buffer.concat(chunks);
+          newMessageBlocks.push({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: mimeType,
+              data: fileBuffer.toString("base64"),
+            },
+          });
+        } catch (fileError) {
+          console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
+          return NextResponse.json(
+            { error: `Failed to process file: ${appPart.fileName || appPart.objectName}` },
+            { status: 500 },
+          );
+        }
+      } else if (SUPPORTED_ANTHROPIC_DOCUMENT_TYPES.includes(mimeType)) {
+        try {
+          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+          const chunks: Buffer[] = [];
+          for await (const chunk of fileStream) {
+            chunks.push(chunk as Buffer);
+          }
+          const fileBuffer = Buffer.concat(chunks);
+          newMessageBlocks.push({
+            type: "document",
+            source: {
+              type: "base64",
+              media_type: "application/pdf",
+              data: fileBuffer.toString("base64"),
+            },
+          });
+        } catch (fileError) {
+          console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
+          return NextResponse.json(
+            { error: `Failed to process file: ${appPart.fileName || appPart.objectName}` },
+            { status: 500 },
+          );
+        }
+      } else {
+        const extension = getFileExtension(appPart.fileName);
+        const isTextFile =
+          SOURCE_CODE_EXTENSIONS.includes(`.${extension}`) ||
+          mimeType.startsWith("text/") ||
+          mimeType === "application/json";
+
+        if (isTextFile) {
+          try {
+            const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+            const chunks: Buffer[] = [];
+            for await (const chunk of fileStream) {
+              chunks.push(chunk as Buffer);
+            }
+            const fileBuffer = Buffer.concat(chunks);
+            const textContent = fileBuffer.toString("utf-8");
+            const fileHeader = appPart.fileName ? `--- File: ${appPart.fileName} ---\n` : "";
+            newMessageBlocks.push({ type: "text", text: fileHeader + textContent });
+          } catch (fileError) {
+            console.error(`Failed to retrieve or process file ${appPart.objectName} from MinIO:`, fileError);
+            return NextResponse.json(
+              { error: `Failed to process file: ${appPart.fileName || appPart.objectName}` },
+              { status: 500 },
+            );
+          }
+        } else {
+          console.warn(
+            `Skipping new file ${appPart.fileName || appPart.objectName} for Anthropic due to unsupported MIME type: ${appPart.mimeType}`,
+          );
+        }
+      }
+    }
+  }
+
+  if (newMessageBlocks.length === 0) {
+    return NextResponse.json(
+      { error: "No valid content to send to Anthropic (message empty or all files unsupported/unprocessed)." },
+      { status: 400 },
+    );
+  }
+
+  messages.push({ role: "user", content: newMessageBlocks });
+
+  const effort = mapBudgetToAnthropicEffort(model, thinkingBudget);
+
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const requestParams: any = {
+    model: actualModelId,
+    max_tokens: getModelTokenLimits(model).outputTokenLimit,
+    messages,
+    thinking: {
+      type: "adaptive",
+    },
+    output_config: {
+      effort,
+    },
+  };
+
+  if (temperature !== null) requestParams.temperature = temperature;
+  if (topP !== null) requestParams.top_p = topP;
+  if (topK !== null) requestParams.top_k = topK;
+
+  if (systemPromptText && systemPromptText.trim() !== "") {
+    requestParams.system = systemPromptText;
+  }
+
+  const stream = anthropic.messages.stream(requestParams);
+
+  const encoder = new TextEncoder();
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      let modelOutput = "";
+      let thoughtSummaryOutput = "";
+
+      try {
+        stream.on("text", (text) => {
+          modelOutput += text;
+          const jsonChunk = { type: "text", value: text };
+          controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+        });
+
+        stream.on("streamEvent", (event) => {
+          if (event.type === "content_block_delta" && event.delta.type === "thinking_delta") {
+            const thinkingText = (event.delta as { type: "thinking_delta"; thinking: string }).thinking;
+            thoughtSummaryOutput += thinkingText;
+            const jsonChunk = { type: "thought", value: thinkingText };
+            controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+          }
+        });
+
+        const finalMessage = await stream.finalMessage();
+
+        if (finalMessage.usage) {
+          const usageChunk = {
+            type: "usage",
+            usage: {
+              input_tokens: finalMessage.usage.input_tokens,
+              output_tokens: finalMessage.usage.output_tokens,
+              total_tokens: finalMessage.usage.input_tokens + finalMessage.usage.output_tokens,
+            },
+          };
+          controller.enqueue(encoder.encode(JSON.stringify(usageChunk) + "\n"));
+        }
+
+        if (modelOutput.trim() === "") {
+          console.warn("Custom Anthropic model returned an empty message. Not saving to DB.");
+          const emptyMessageError = { type: "error", value: "Model returned an empty message. Please try again." };
+          controller.enqueue(encoder.encode(JSON.stringify(emptyMessageError) + "\n"));
+        }
+      } catch (streamError) {
+        console.error("Error during Custom Anthropic stream processing:", streamError);
+        const errorMessage = { type: "error", value: "An error occurred during stream processing. Please try again." };
+        controller.enqueue(encoder.encode(JSON.stringify(errorMessage) + "\n"));
+      } finally {
+        controller.close();
+      }
+    },
+    cancel() {
+      stream.abort();
+      console.log("Custom Anthropic stream cancelled for chat session");
+    },
+  });
+
+  return new Response(readableStream, {
+    headers: {
+      "Content-Type": "application/jsonl; charset=utf-8",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const userIdHeader = request.headers.get("x-user-id");
   if (!userIdHeader) {
@@ -1832,6 +2160,18 @@ export async function POST(request: NextRequest) {
         clientHistoryWithAppParts,
         systemPromptText,
         userId,
+        temperature,
+        topP,
+        topK,
+      );
+    } else if (provider === "custom-anthropic") {
+      return await handleCustomAnthropicRequest(
+        model,
+        newMessageAppParts,
+        clientHistoryWithAppParts,
+        systemPromptText,
+        userId,
+        thinkingBudget,
         temperature,
         topP,
         topK,

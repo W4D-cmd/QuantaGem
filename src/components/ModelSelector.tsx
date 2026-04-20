@@ -15,7 +15,7 @@ export interface Props {
   models: ModelWithProvider[];
   selected: Model | null;
   onChangeAction: (model: Model) => void;
-  customModelsList?: { id: string; displayName: string }[];
+  customModelsList?: { id: string; displayName: string; apiType?: "openai" | "anthropic" }[];
   isLoadingCustomModels?: boolean;
 }
 
@@ -79,14 +79,15 @@ export default function ModelSelector({
     // Process custom models from the custom provider
     if (customModelsList.length > 0) {
       result.custom = customModelsList.map((cm) => {
-        const customModelId = createCustomModelId(cm.id);
+        const apiType = cm.apiType || "openai";
+        const customModelId = createCustomModelId(cm.id, apiType);
         return {
           name: customModelId,
           displayName: cm.displayName || cm.id,
           description: `Custom model from local provider`,
           inputTokenLimit: 128000, // Default for custom models
           outputTokenLimit: 4096,
-          provider: "custom-openai" as ModelProvider,
+          provider: apiType === "anthropic" ? "custom-anthropic" : "custom-openai",
         } as ModelWithProvider;
       });
     }
@@ -125,7 +126,7 @@ export default function ModelSelector({
             >
               {m.displayName}
             </span>
-            {m.provider !== "custom-openai" && (
+            {m.provider !== "custom-openai" && m.provider !== "custom-anthropic" && (
               <div
                 className={`text-xs flex items-center gap-2 mt-1 transition-colors duration-300 ease-in-out ${
                   isSelected
@@ -149,14 +150,14 @@ export default function ModelSelector({
   };
 
   const getProviderLabel = (): string => {
-    if (selectedProvider === "custom-openai") return "Custom";
+    if (selectedProvider === "custom-openai" || selectedProvider === "custom-anthropic") return "Custom";
     if (selectedProvider === "openai") return "OpenAI";
     if (selectedProvider === "anthropic") return "Anthropic";
     return "Google";
   };
 
   const getProviderColorClasses = (): string => {
-    if (selectedProvider === "custom-openai") {
+    if (selectedProvider === "custom-openai" || selectedProvider === "custom-anthropic") {
       return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
     }
     if (selectedProvider === "openai") {

@@ -259,7 +259,7 @@ export default function Home() {
   const [suggestionsVersion, setSuggestionsVersion] = useState(0);
   const [isTemporaryChat, setIsTemporaryChat] = useState(false);
 
-  const [fetchedCustomModels, setFetchedCustomModels] = useState<{ id: string; displayName: string }[]>([]);
+  const [fetchedCustomModels, setFetchedCustomModels] = useState<{ id: string; displayName: string; apiType?: "openai" | "anthropic" }[]>([]);
   const [isLoadingCustomModels, setIsLoadingCustomModels] = useState<boolean>(true);
   const dragCounter = useRef(0);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -327,9 +327,10 @@ export default function Home() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.models && Array.isArray(data.models)) {
-        const formattedModels = data.models.map((m: { id: string; displayName?: string }) => ({
+        const formattedModels = data.models.map((m: { id: string; displayName?: string; apiType?: "openai" | "anthropic" }) => ({
           id: m.id,
           displayName: m.displayName || m.id,
+          apiType: m.apiType || "openai",
         }));
         setFetchedCustomModels(formattedModels);
       }
@@ -1218,13 +1219,14 @@ export default function Home() {
             const originalId = getOriginalModelId(chat.lastModel);
             const fetchedModel = fetchedCustomModels.find((m) => m.id === originalId);
             if (fetchedModel) {
+              const apiType = fetchedModel.apiType || "openai";
               modelForThisChat = {
                 name: chat.lastModel,
                 displayName: fetchedModel.displayName || originalId,
                 description: "Custom model from local provider",
                 inputTokenLimit: 128000,
                 outputTokenLimit: 4096,
-                provider: "custom-openai",
+                provider: apiType === "anthropic" ? "custom-anthropic" : "custom-openai",
               };
             }
           }
@@ -1259,7 +1261,7 @@ export default function Home() {
                     description: "Custom model from local provider",
                     inputTokenLimit: 128000,
                     outputTokenLimit: 4096,
-                    provider: "custom-openai" as const,
+                    provider: (m.apiType === "anthropic" ? "custom-anthropic" : "custom-openai") as ModelProvider,
                   }))[0] ||
                 selectedModel;
               if (modelForTokenCount && result.totalTokens === null) {

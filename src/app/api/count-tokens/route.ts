@@ -579,7 +579,7 @@ export async function POST(request: NextRequest) {
 
     if (provider === "anthropic") {
       totalTokens = await countTokensForAnthropic(history ?? [], model, systemPromptText);
-    } else if (provider === "openai" || provider === "custom-openai") {
+    } else if (provider === "openai" || provider === "custom-openai" || provider === "custom-anthropic") {
       // Use tiktoken for both OpenAI and custom OpenAI-compatible providers
       totalTokens = await countTokensForOpenAI(history ?? [], systemPromptText);
     } else {

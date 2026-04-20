@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS user_settings (
   system_prompt TEXT,
   custom_openai_endpoint TEXT DEFAULT NULL,
   custom_openai_key TEXT DEFAULT NULL,
+  custom_anthropic_endpoint TEXT DEFAULT NULL,
+  custom_anthropic_key TEXT DEFAULT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

@@ -159,8 +159,8 @@ export function getModelPricing(modelId: string): {
  */
 export const STATIC_CUSTOM_PROVIDERS: Record<string, FetchedCustomModel[]> = {
   "minimax.io": [
-    { id: "MiniMax-M2.7", displayName: "MiniMax-M2.7", apiType: "openai" },
-    { id: "MiniMax-M2.5", displayName: "MiniMax-M2.5", apiType: "openai" },
+    { id: "MiniMax-M2.7", displayName: "MiniMax-M2.7", apiType: "anthropic" },
+    { id: "MiniMax-M2.5", displayName: "MiniMax-M2.5", apiType: "anthropic" },
   ],
 };
 

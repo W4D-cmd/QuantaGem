@@ -291,7 +291,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <Modal isOpen={isOpen} onClose={handleCancel} title={modalTitle} size="lg">
+        <Modal isOpen={isOpen} onClose={handleCancel} title={modalTitle} size="xl">
           <div className="flex flex-col h-full">
             {/* Tab Navigation */}
             {chatId === null && (
@@ -315,7 +315,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-y-auto px-1">
+            <div className="flex-1 overflow-y-auto min-h-0 px-1 pr-2 scrollbar-thin scrollbar-thumb-neutral-300 dark:scrollbar-thumb-zinc-700">
               {activeTab === "general" && (
                 <div className="space-y-6">
                   <div>

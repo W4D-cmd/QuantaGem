@@ -50,7 +50,9 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
     sm: "max-w-sm",
     md: "max-w-md",
     lg: "max-w-lg",
-    xl: "max-w-xl",
+    xl: "max-w-2xl",
+    "2xl": "max-w-2xl",
+    "3xl": "max-w-3xl",
   };
 
   const backdropVariants: Variants = {
@@ -102,7 +104,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
             ref={modalRef}
             variants={modalVariants}
             className={`focus:outline-none bg-white dark:bg-zinc-900 rounded-2xl shadow-xl flex flex-col
-            overflow-hidden w-full ${sizeClasses[size]} transition-colors duration-300 ease-in-out`}
+            overflow-hidden w-full ${sizeClasses[size]} max-h-[calc(100vh-2rem)] md:max-h-[calc(100vh-4rem)] transition-colors duration-300 ease-in-out`}
             onClick={(e) => e.stopPropagation()}
             tabIndex={-1}
             role="document"
@@ -136,7 +138,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
                 <X className="size-5" />
               </button>
             )}
-            <div className="p-6 flex-grow overflow-y-auto">{children}</div>
+            <div className="p-6 flex-grow overflow-y-auto min-h-0 flex flex-col">{children}</div>
           </motion.div>
         </motion.div>
       )}

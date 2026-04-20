@@ -136,6 +136,36 @@ export function getModelPricing(modelId: string): {
   return null;
 }
 
+/**
+ * Static models for specific custom providers that don't implement the /models endpoint.
+ */
+export const STATIC_CUSTOM_PROVIDERS: Record<string, FetchedCustomModel[]> = {
+  "minimax.io": [
+    { id: "MiniMax-M2.7", displayName: "MiniMax-M2.7" },
+    { id: "MiniMax-M2.5", displayName: "MiniMax-M2.5" },
+  ],
+};
+
+/**
+ * Returns hardcoded models for a given endpoint if it's a known static provider.
+ */
+export function getStaticModelsForEndpoint(endpoint: string): FetchedCustomModel[] | null {
+  try {
+    const url = new URL(endpoint);
+    const host = url.hostname;
+    
+    // Check for exact match or subdomain match
+    for (const [providerHost, models] of Object.entries(STATIC_CUSTOM_PROVIDERS)) {
+      if (host === providerHost || host.endsWith(`.${providerHost}`)) {
+        return models;
+      }
+    }
+  } catch (e) {
+    // Invalid URL, ignore
+  }
+  return null;
+}
+
 export const customModels: CustomModelEntry[] = [
   {
     displayName: "Gemini 3.1 Pro Preview",

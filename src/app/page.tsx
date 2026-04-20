@@ -327,9 +327,9 @@ export default function Home() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.models && Array.isArray(data.models)) {
-        const formattedModels = data.models.map((m: { id: string }) => ({
+        const formattedModels = data.models.map((m: { id: string; displayName?: string }) => ({
           id: m.id,
-          displayName: m.id,
+          displayName: m.displayName || m.id,
         }));
         setFetchedCustomModels(formattedModels);
       }

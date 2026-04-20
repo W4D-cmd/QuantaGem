@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import { getStaticModelsForEndpoint } from "@/lib/custom-models";
 
 interface OpenAIModel {
   id: string;
@@ -41,6 +42,20 @@ export async function GET(request: NextRequest) {
 
     const endpoint = rows[0].custom_openai_endpoint;
     const apiKey = rows[0].custom_openai_key;
+
+    // Check for hardcoded models first
+    const staticModels = getStaticModelsForEndpoint(endpoint);
+    if (staticModels) {
+      return NextResponse.json({ 
+        models: staticModels.map(m => ({ 
+          id: m.id, 
+          displayName: m.displayName,
+          object: "model", 
+          owned_by: "static" 
+        })), 
+        endpoint 
+      }, { status: 200 });
+    }
 
     // Construct the models URL
     const modelsUrl = endpoint.endsWith("/")
@@ -134,6 +149,23 @@ export async function POST(request: NextRequest) {
       new URL(trimmedEndpoint);
     } catch {
       return NextResponse.json({ error: "Invalid URL format" }, { status: 400 });
+    }
+
+    // Check for hardcoded models first
+    const staticModels = getStaticModelsForEndpoint(trimmedEndpoint);
+    if (staticModels) {
+      const models = staticModels.map(m => ({ 
+        id: m.id, 
+        displayName: m.displayName,
+        object: "model", 
+        owned_by: "static" 
+      }));
+      return NextResponse.json({
+        success: true,
+        models,
+        endpoint: trimmedEndpoint,
+        count: models.length,
+      }, { status: 200 });
     }
 
     // Construct the models URL

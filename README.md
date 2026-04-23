@@ -11,7 +11,7 @@ QuantaGem is a high-performance, production-grade WebUI for Google's Gemini AI, 
 - **Object Storage:** [MinIO](https://min.io/) (S3-compatible) for handling chat attachments and project files.
 - **Cache/Rate Limiting:** [Redis 8](https://redis.io/) for secure authentication limiting.
 - **AI Integration:** [Google Vertex AI SDK](https://cloud.google.com/vertex-ai) (Gemini 2.0/2.5/3 and more).
-- **Speech-to-Text:** Local Python microservice using [ONNX ASR](https://github.com/thewh1teagle/onnx-asr) with NVIDIA NeMo Parakeet TDT model.
+- **Speech-to-Text:** Local Python microservice using Hugging Face Optimum with the 2B parameter Cohere Transcribe model (INT8 quantized).
 - **Deployment:** [Docker Compose](https://www.docker.com/) with Distroless (non-root) production images for maximum security.
 
 ## 🚀 Core Features
@@ -121,7 +121,7 @@ Restart the application using `docker compose up --build --force-recreate -d`.
 
 ## 🎤 Speech-to-Text (STT) Customization
 
-The `stt-service` uses NVIDIA's `nemo-parakeet-tdt-0.6b-v3` ONNX model by default for fast, accurate transcription. The model runs on CPU using ONNX Runtime.
+The `stt-service` uses the `cohere-transcribe-03-2026-ONNX` model by default (INT8 quantized) for state-of-the-art multilingual transcription. The model runs efficiently on CPU using ONNX Runtime via Hugging Face Optimum.
 
 ### Environment Variables
 
@@ -130,15 +130,15 @@ Configure the STT service via environment variables in `docker-compose.yml`:
 ```yaml
 stt-service:
   environment:
-    MODEL_NAME: "nemo-parakeet-tdt-0.6b-v3"  # Built-in model name or HF repo ID
+    MODEL_NAME: "cohere-transcribe-03-2026-ONNX"  # Local folder name in models volume or HF repo ID
     STT_THREADS: 4  # Number of CPU threads (default: auto-detect)
 ```
 
 ### Available Models
 
-`nemo-parakeet-tdt-0.6b-v3` (default) - Best balance of speed and accuracy
+`cohere-transcribe-03-2026-ONNX` (default) - 2B parameter encoder-decoder model optimized for INT8 CPU inference. Supports 14 languages.
 
-Or use any HuggingFace model compatible with `onnx-asr` by specifying the repository ID.
+Or use any Hugging Face Seq2Seq speech model compatible with `ORTModelForSpeechSeq2Seq` by specifying the repository ID. Note that the container requires at least 8GB of RAM for this model.
 
 ### Rebuild After Changes
 

@@ -7,38 +7,55 @@ import threading
 import time
 from typing import Any, Optional
 
-import onnxruntime as ort
-
-import onnx_asr
+import soundfile as sf
+import numpy as np
+from optimum.onnxruntime import ORTModelForSpeechSeq2Seq
+from transformers import AutoProcessor
 from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
 
 # Use built-in model name or custom HF repo ID
-MODEL_NAME = os.getenv("MODEL_NAME", "nemo-parakeet-tdt-0.6b-v3")
+MODEL_NAME = os.getenv("MODEL_NAME", "cohere-transcribe-03-2026-ONNX")
 # Number of CPU threads for ONNX inference (default: auto-detect)
 STT_THREADS = int(os.getenv("STT_THREADS", "0")) or None
 SAMPLE_RATE = 16000
 
 model: Optional[Any] = None
+processor: Optional[Any] = None
 model_loaded_event = threading.Event()
 
 
 def load_asr_model():
     """Load the ONNX ASR model."""
-    global model
+    global model, processor
     start_time = time.time()
-    print(f"STT: Loading model '{MODEL_NAME}'...")
+    print(f"STT: Loading model '{MODEL_NAME}' (INT8 Quantized)...")
     try:
+        model_path = os.path.join(os.getenv("HF_HOME", "/app/models"), MODEL_NAME)
+        # Fallback to current directory or MODEL_NAME if it's an absolute path/repo ID
+        if not os.path.exists(model_path):
+            model_path = MODEL_NAME
+
         # Configure ONNX Runtime session options
+        import onnxruntime as ort
         sess_options = ort.SessionOptions()
         if STT_THREADS:
             sess_options.intra_op_num_threads = STT_THREADS
             sess_options.inter_op_num_threads = 1
             print(f"STT: Using {STT_THREADS} CPU thread(s)")
         
-        model = onnx_asr.load_model(MODEL_NAME, sess_options=sess_options)
+        processor = AutoProcessor.from_pretrained(model_path)
+        
+        # Load the INT8 quantized model
+        model = ORTModelForSpeechSeq2Seq.from_pretrained(
+            model_path,
+            encoder_file_name="onnx/encoder_model_quantized.onnx",
+            decoder_file_name="onnx/decoder_model_merged_quantized.onnx",
+            session_options=sess_options
+        )
+        
         load_duration = time.time() - start_time
         print(f"STT: Model loaded in {load_duration:.2f}s.")
         model_loaded_event.set()
@@ -80,7 +97,7 @@ def convert_audio_to_wav(input_path: str, output_path: str) -> None:
 
 @app.post("/transcribe", response_class=PlainTextResponse)
 async def transcribe_audio(audio_file: UploadFile = File(...)):
-    if not model_loaded_event.is_set() or model is None:
+    if not model_loaded_event.is_set() or model is None or processor is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Model loading."
@@ -99,20 +116,23 @@ async def transcribe_audio(audio_file: UploadFile = File(...)):
         # Convert to 16kHz mono WAV
         convert_audio_to_wav(temp_input_path, temp_wav_path)
 
-        # Transcribe using onnx-asr
-        result = model.recognize(temp_wav_path)
+        # Read audio array using soundfile
+        audio_data, sr = sf.read(temp_wav_path)
+        if sr != SAMPLE_RATE:
+            raise ValueError(f"Unexpected sample rate: {sr}")
 
-        # Handle both string and list results
-        if isinstance(result, list):
-            if len(result) > 0:
-                if hasattr(result[0], 'text'):
-                    transcription = " ".join(r.text for r in result)
-                else:
-                    transcription = result[0] if isinstance(result[0], str) else str(result[0])
-            else:
-                transcription = ""
-        else:
-            transcription = result
+        # Process audio inputs
+        inputs = processor(audio_data, sampling_rate=SAMPLE_RATE, return_tensors="pt")
+
+        # Generate transcription (defaulting to English for this model)
+        generated_ids = model.generate(
+            inputs.input_features, 
+            max_new_tokens=1024,
+            language="en"
+        )
+        
+        # Decode tokens
+        transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
         return transcription.strip() if transcription else ""
 

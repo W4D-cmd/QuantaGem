@@ -1,4 +1,7 @@
 # Runtime dependencies for ONNX-based STT service
 fastapi[all]
-onnx-asr[cpu,hub]
+optimum[onnxruntime]
+transformers
+torch
 soundfile
+numpy

@@ -56,6 +56,9 @@ services:
       context: ./stt-service
       dockerfile: Dockerfile
     restart: unless-stopped
+    env_file:
+      - .env
+      - .env.local
     command: uvicorn main:app --host 0.0.0.0 --port 8000
     environment:
       HF_HOME: /app/models

@@ -1,5 +1,6 @@
 # Runtime dependencies for ONNX-based STT service
 fastapi[all]
+huggingface-hub
 optimum[onnxruntime]
 transformers
 torch

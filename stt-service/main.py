@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 import soundfile as sf
 import numpy as np
+from huggingface_hub import snapshot_download
 from optimum.onnxruntime import ORTModelForSpeechSeq2Seq
 from transformers import AutoProcessor
 from fastapi import FastAPI, File, HTTPException, UploadFile, status
@@ -17,7 +18,7 @@ from fastapi.responses import PlainTextResponse
 app = FastAPI()
 
 # Use built-in model name or custom HF repo ID
-MODEL_NAME = os.getenv("MODEL_NAME", "cohere-transcribe-03-2026-ONNX")
+MODEL_NAME = os.getenv("MODEL_NAME", "onnx-community/cohere-transcribe-03-2026-ONNX")
 # Number of CPU threads for ONNX inference (default: auto-detect)
 STT_THREADS = int(os.getenv("STT_THREADS", "0")) or None
 SAMPLE_RATE = 16000
@@ -33,10 +34,23 @@ def load_asr_model():
     start_time = time.time()
     print(f"STT: Loading model '{MODEL_NAME}' (INT8 Quantized)...")
     try:
-        model_path = os.path.join(os.getenv("HF_HOME", "/app/models"), MODEL_NAME)
-        # Fallback to current directory or MODEL_NAME if it's an absolute path/repo ID
-        if not os.path.exists(model_path):
+        cache_dir = os.getenv("HF_HOME", "/app/models")
+        
+        # Smart Download: Only fetch the config files and the INT8 quantized weights
+        print("STT: Checking/downloading required model files...")
+        
+        # Check if MODEL_NAME is a local path or HF repo ID
+        if os.path.exists(MODEL_NAME):
             model_path = MODEL_NAME
+        else:
+            model_path = snapshot_download(
+                repo_id=MODEL_NAME,
+                cache_dir=cache_dir,
+                allow_patterns=[
+                    "*.json", # Gets config.json, tokenizer.json, preprocessor_config.json, etc.
+                    "onnx/*_quantized.onnx*", # Gets only the INT8 model and data files
+                ]
+            )
 
         # Configure ONNX Runtime session options
         import onnxruntime as ort

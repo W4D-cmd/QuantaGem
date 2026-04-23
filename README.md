@@ -121,7 +121,7 @@ Restart the application using `docker compose up --build --force-recreate -d`.
 
 ## 🎤 Speech-to-Text (STT) Customization
 
-The `stt-service` uses the `cohere-transcribe-03-2026-ONNX` model by default (INT8 quantized) for state-of-the-art multilingual transcription. The model runs efficiently on CPU using ONNX Runtime via Hugging Face Optimum.
+The `stt-service` uses the `onnx-community/cohere-transcribe-03-2026-ONNX` model by default (INT8 quantized) for state-of-the-art multilingual transcription. The model runs efficiently on CPU using ONNX Runtime via Hugging Face Optimum.
 
 ### Environment Variables
 
@@ -130,13 +130,13 @@ Configure the STT service via environment variables in `docker-compose.yml`:
 ```yaml
 stt-service:
   environment:
-    MODEL_NAME: "cohere-transcribe-03-2026-ONNX"  # Local folder name in models volume or HF repo ID
+    MODEL_NAME: "onnx-community/cohere-transcribe-03-2026-ONNX"  # Hugging Face repo ID or local path
     STT_THREADS: 4  # Number of CPU threads (default: auto-detect)
 ```
 
 ### Available Models
 
-`cohere-transcribe-03-2026-ONNX` (default) - 2B parameter encoder-decoder model optimized for INT8 CPU inference. Supports 14 languages.
+`onnx-community/cohere-transcribe-03-2026-ONNX` (default) - 2B parameter encoder-decoder model optimized for INT8 CPU inference. Supports 14 languages. The container automatically downloads only the required files to save bandwidth.
 
 Or use any Hugging Face Seq2Seq speech model compatible with `ORTModelForSpeechSeq2Seq` by specifying the repository ID. Note that the container requires at least 8GB of RAM for this model.
 

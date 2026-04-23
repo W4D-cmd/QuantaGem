@@ -61,6 +61,8 @@ POSTGRES_DB=quantagemdb
 MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=minioadminsecret
 MINIO_DEFAULT_BUCKET=chat-files
+
+HF_TOKEN="your-huggingface-token"
 ```
 
 ### 3. GCP Authentication
@@ -138,7 +140,7 @@ stt-service:
 
 `onnx-community/cohere-transcribe-03-2026-ONNX` (default) - 2B parameter encoder-decoder model optimized for INT8 CPU inference. Supports 14 languages. The container automatically downloads only the required files to save bandwidth.
 
-Or use any Hugging Face Seq2Seq speech model compatible with `ORTModelForSpeechSeq2Seq` by specifying the repository ID. Note that the container requires at least 8GB of RAM for this model.
+**Note:** This model requires a Hugging Face Access Token (`HF_TOKEN`) and manual acceptance of the Cohere Terms of Use on their [model page](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026).
 
 ### Rebuild After Changes
 

@@ -19,6 +19,8 @@ app = FastAPI()
 
 # Use built-in model name or custom HF repo ID
 MODEL_NAME = os.getenv("MODEL_NAME", "onnx-community/cohere-transcribe-03-2026-ONNX")
+# Hugging Face Access Token for gated repositories
+HF_TOKEN = os.getenv("HF_TOKEN")
 # Number of CPU threads for ONNX inference (default: auto-detect)
 STT_THREADS = int(os.getenv("STT_THREADS", "0")) or None
 SAMPLE_RATE = 16000
@@ -46,6 +48,7 @@ def load_asr_model():
             model_path = snapshot_download(
                 repo_id=MODEL_NAME,
                 cache_dir=cache_dir,
+                token=HF_TOKEN,
                 allow_patterns=[
                     "*.json", # Gets config.json, tokenizer.json, preprocessor_config.json, etc.
                     "onnx/*_quantized.onnx*", # Gets only the INT8 model and data files
@@ -57,6 +60,7 @@ def load_asr_model():
             base_model_path = snapshot_download(
                 repo_id="CohereLabs/cohere-transcribe-03-2026",
                 cache_dir=cache_dir,
+                token=HF_TOKEN,
                 allow_patterns=["*.py"]
             )
             # Copy Python files to the ONNX model path so AutoProcessor can find them

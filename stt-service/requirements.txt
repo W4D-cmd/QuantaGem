@@ -6,3 +6,5 @@ transformers
 torch
 soundfile
 numpy
+sentencepiece
+protobuf

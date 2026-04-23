@@ -19,6 +19,7 @@ app = FastAPI()
 
 # Use built-in model name or custom HF repo ID
 MODEL_NAME = os.getenv("MODEL_NAME", "onnx-community/cohere-transcribe-03-2026-ONNX")
+BASE_MODEL_NAME = "CohereLabs/cohere-transcribe-03-2026"
 # Hugging Face Access Token for gated repositories
 HF_TOKEN = os.getenv("HF_TOKEN")
 # Number of CPU threads for ONNX inference (default: auto-detect)
@@ -38,10 +39,17 @@ def load_asr_model():
     try:
         cache_dir = os.getenv("HF_HOME", "/app/models")
         
-        # Smart Download: Only fetch the config files and the INT8 quantized weights
-        print("STT: Checking/downloading required model files...")
-        
-        # Check if MODEL_NAME is a local path or HF repo ID
+        # 1. Download custom processing code from the gated base model
+        print("STT: Fetching custom processing code from gated base model...")
+        base_model_path = snapshot_download(
+            repo_id=BASE_MODEL_NAME,
+            cache_dir=cache_dir,
+            token=HF_TOKEN,
+            allow_patterns=["*.py", "*.json", "tokenizer.model"]
+        )
+
+        # 2. Smart Download ONNX weights: Only fetch the INT8 quantized weights
+        print("STT: Fetching INT8 quantized ONNX weights...")
         if os.path.exists(MODEL_NAME):
             model_path = MODEL_NAME
         else:
@@ -50,23 +58,9 @@ def load_asr_model():
                 cache_dir=cache_dir,
                 token=HF_TOKEN,
                 allow_patterns=[
-                    "*.json", # Gets config.json, tokenizer.json, preprocessor_config.json, etc.
-                    "onnx/*_quantized.onnx*", # Gets only the INT8 model and data files
+                    "onnx/*_quantized.onnx*", 
                 ]
             )
-            
-            # Download the required custom processing classes from the base model
-            print("STT: Downloading custom processing classes from base model...")
-            base_model_path = snapshot_download(
-                repo_id="CohereLabs/cohere-transcribe-03-2026",
-                cache_dir=cache_dir,
-                token=HF_TOKEN,
-                allow_patterns=["*.py"]
-            )
-            # Copy Python files to the ONNX model path so AutoProcessor can find them
-            for filename in os.listdir(base_model_path):
-                if filename.endswith(".py"):
-                    shutil.copy2(os.path.join(base_model_path, filename), model_path)
 
         # Configure ONNX Runtime session options
         import onnxruntime as ort
@@ -76,15 +70,21 @@ def load_asr_model():
             sess_options.inter_op_num_threads = 1
             print(f"STT: Using {STT_THREADS} CPU thread(s)")
         
-        processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
+        # 3. Load Processor from the base model directory (contains the .py files)
+        processor = AutoProcessor.from_pretrained(
+            base_model_path, 
+            trust_remote_code=True
+        )
         
-        # Load the INT8 quantized model
+        # 4. Load the INT8 quantized model using weights from model_path but config from base_model_path
+        # We point to the ONNX files specifically
         model = ORTModelForSpeechSeq2Seq.from_pretrained(
             model_path,
             encoder_file_name="onnx/encoder_model_quantized.onnx",
             decoder_file_name="onnx/decoder_model_merged_quantized.onnx",
             session_options=sess_options,
-            trust_remote_code=True
+            trust_remote_code=True,
+            config=base_model_path # Ensure it uses the validated config from the base repo
         )
         
         load_duration = time.time() - start_time
@@ -92,6 +92,8 @@ def load_asr_model():
         model_loaded_event.set()
     except Exception as e:
         print(f"STT: Error loading model: {e}")
+        import traceback
+        traceback.print_exc()
         raise
 
 

@@ -51,6 +51,18 @@ def load_asr_model():
                     "onnx/*_quantized.onnx*", # Gets only the INT8 model and data files
                 ]
             )
+            
+            # Download the required custom processing classes from the base model
+            print("STT: Downloading custom processing classes from base model...")
+            base_model_path = snapshot_download(
+                repo_id="CohereLabs/cohere-transcribe-03-2026",
+                cache_dir=cache_dir,
+                allow_patterns=["*.py"]
+            )
+            # Copy Python files to the ONNX model path so AutoProcessor can find them
+            for filename in os.listdir(base_model_path):
+                if filename.endswith(".py"):
+                    shutil.copy2(os.path.join(base_model_path, filename), model_path)
 
         # Configure ONNX Runtime session options
         import onnxruntime as ort
@@ -60,14 +72,15 @@ def load_asr_model():
             sess_options.inter_op_num_threads = 1
             print(f"STT: Using {STT_THREADS} CPU thread(s)")
         
-        processor = AutoProcessor.from_pretrained(model_path)
+        processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
         
         # Load the INT8 quantized model
         model = ORTModelForSpeechSeq2Seq.from_pretrained(
             model_path,
             encoder_file_name="onnx/encoder_model_quantized.onnx",
             decoder_file_name="onnx/decoder_model_merged_quantized.onnx",
-            session_options=sess_options
+            session_options=sess_options,
+            trust_remote_code=True
         )
         
         load_duration = time.time() - start_time

@@ -1,4 +1,8 @@
-# Runtime dependencies for ONNX-based STT service
+# Runtime dependencies for CPU-based STT service
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi[all]
-onnx-asr[cpu,hub]
+torch
+qwen-asr
+transformers
+accelerate
 soundfile

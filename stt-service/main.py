@@ -7,17 +7,16 @@ import threading
 import time
 from typing import Any, Optional
 
-import onnxruntime as ort
-
-import onnx_asr
+import torch
+from qwen_asr import Qwen3ASRModel
 from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
 
-# Use built-in model name or custom HF repo ID
-MODEL_NAME = os.getenv("MODEL_NAME", "nemo-parakeet-tdt-0.6b-v3")
-# Number of CPU threads for ONNX inference (default: auto-detect)
+# Use Qwen3-ASR-1.7B as default
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3-ASR-1.7B")
+# Number of CPU threads for PyTorch inference (default: auto-detect)
 STT_THREADS = int(os.getenv("STT_THREADS", "0")) or None
 SAMPLE_RATE = 16000
 
@@ -26,19 +25,22 @@ model_loaded_event = threading.Event()
 
 
 def load_asr_model():
-    """Load the ONNX ASR model."""
+    """Load the PyTorch ASR model."""
     global model
     start_time = time.time()
-    print(f"STT: Loading model '{MODEL_NAME}'...")
+    print(f"STT: Loading model '{MODEL_NAME}' on CPU...")
     try:
-        # Configure ONNX Runtime session options
-        sess_options = ort.SessionOptions()
+        # Configure PyTorch CPU threads
         if STT_THREADS:
-            sess_options.intra_op_num_threads = STT_THREADS
-            sess_options.inter_op_num_threads = 1
+            torch.set_num_threads(STT_THREADS)
             print(f"STT: Using {STT_THREADS} CPU thread(s)")
         
-        model = onnx_asr.load_model(MODEL_NAME, sess_options=sess_options)
+        # Load the Qwen3-ASR model onto CPU
+        model = Qwen3ASRModel.from_pretrained(
+            MODEL_NAME,
+            dtype=torch.float32,
+            device_map="cpu"
+        )
         load_duration = time.time() - start_time
         print(f"STT: Model loaded in {load_duration:.2f}s.")
         model_loaded_event.set()
@@ -99,20 +101,16 @@ async def transcribe_audio(audio_file: UploadFile = File(...)):
         # Convert to 16kHz mono WAV
         convert_audio_to_wav(temp_input_path, temp_wav_path)
 
-        # Transcribe using onnx-asr
-        result = model.recognize(temp_wav_path)
+        # Transcribe using qwen-asr
+        results = model.transcribe(audio=temp_wav_path)
 
-        # Handle both string and list results
-        if isinstance(result, list):
-            if len(result) > 0:
-                if hasattr(result[0], 'text'):
-                    transcription = " ".join(r.text for r in result)
-                else:
-                    transcription = result[0] if isinstance(result[0], str) else str(result[0])
+        # Extract transcription from results list
+        transcription = ""
+        if results and len(results) > 0:
+            if hasattr(results[0], 'text'):
+                transcription = results[0].text
             else:
-                transcription = ""
-        else:
-            transcription = result
+                transcription = str(results[0])
 
         return transcription.strip() if transcription else ""
 

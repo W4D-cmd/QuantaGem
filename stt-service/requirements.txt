@@ -1,4 +1,0 @@
-# Runtime dependencies for ONNX-based STT service
-fastapi[all]
-onnx-asr[cpu,hub]
-soundfile

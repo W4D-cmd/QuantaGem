@@ -76,10 +76,9 @@ QuantaGem/
 │   │   ├── useLiveSession.ts   # Real-time streaming
 │   │   └── useWebR.ts          # R code execution
 │   └── types/                  # TypeScript declarations
-├── stt-service/                # Python STT microservice
-│   ├── main.py                 # ONNX ASR transcription (NeMo Parakeet)
-│   ├── Dockerfile
-│   └── requirements.txt
+├── stt-service/                # whisper.cpp STT microservice
+│   ├── entrypoint.sh          # Model download + whisper-server startup
+│   └── Dockerfile
 ├── public/                     # Static assets
 │   └── fonts/                  # JetBrains Mono, Roboto
 ├── docker-compose.yml          # Production orchestration
@@ -190,10 +189,13 @@ All chat endpoints return JSONL with these event types:
 
 ### STT Service (`stt-service/`)
 
-- FastAPI with ONNX ASR (NeMo Parakeet TDT 0.6B by default)
-- Endpoint: `POST /transcribe` (multipart audio)
-- Health: `GET /ping`
+- whisper.cpp server based on `ghcr.io/ggml-org/whisper.cpp:main` Docker image
+- Model: `large-v3-turbo-q8_0` (quantized Whisper, CPU-only inference)
+- Model downloaded from Hugging Face on first start, persisted via Docker volume
+- Endpoint: `POST /inference` (multipart audio, field name `file`)
+- Health: `GET /health`
 - Configurable via `MODEL_NAME` and `STT_THREADS` environment variables
+- Supports `--convert` flag for automatic ffmpeg audio conversion (webm, mp3, etc.)
 
 ## Authentication Flow
 

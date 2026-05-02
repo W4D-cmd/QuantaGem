@@ -56,16 +56,15 @@ services:
       context: ./stt-service
       dockerfile: Dockerfile
     restart: unless-stopped
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
     environment:
-      HF_HOME: /app/models
-      # STT_THREADS: 4  # Number of CPU threads for transcription (default: auto)
+      MODEL_NAME: large-v3-turbo-q8_0
+      # STT_THREADS: 4  # Number of CPU threads for transcription (default: 4)
     volumes:
-      - stt_models:/app/models
+      - stt_models:/models
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/ping"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
       timeout: 5s
       retries: 30

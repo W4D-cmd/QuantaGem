@@ -1,4 +1,5 @@
-# Runtime dependencies for ONNX-based STT service
+# Runtime dependencies for Qwen3-ASR STT service
 fastapi[all]
-onnx-asr[cpu,hub]
+torch
+qwen-asr
 soundfile

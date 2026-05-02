@@ -19,8 +19,9 @@ export async function POST(request: NextRequest) {
 
     const sttFormData = new FormData();
     sttFormData.append("file", new Blob([buffer], { type: audioFile.type }), "recording.webm");
+    sttFormData.append("response_format", "text");
 
-    const sttResponse = await fetch("http://stt-service:8000/inference?response_format=text", {
+    const sttResponse = await fetch("http://stt-service:8000/inference", {
       method: "POST",
       body: sttFormData,
     });
@@ -36,7 +37,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: errorMessage }, { status: sttResponse.status });
     }
 
-    const transcription = (await sttResponse.text()).trim();
+    const responseText = (await sttResponse.text()).trim();
+    let transcription = responseText;
+    try {
+      const json = JSON.parse(responseText);
+      if (json.text) transcription = json.text.trim();
+    } catch {}
     return new NextResponse(transcription, { status: 200, headers: { "Content-Type": "text/plain" } });
   } catch (error) {
     console.error("Error in STT API route:", error);

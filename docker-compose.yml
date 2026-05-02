@@ -58,7 +58,7 @@ services:
     restart: unless-stopped
     environment:
       MODEL_NAME: large-v3-turbo-q8_0
-      # STT_THREADS: 4  # Number of CPU threads for transcription (default: 4)
+      STT_THREADS: 8
     volumes:
       - stt_models:/models
     networks:

@@ -58,7 +58,7 @@ services:
     restart: unless-stopped
     environment:
       MODEL_NAME: large-v3-turbo-q8_0
-      STT_THREADS: 8
+      STT_THREADS: 10
     volumes:
       - stt_models:/models
     networks:

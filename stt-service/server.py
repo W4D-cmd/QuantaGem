@@ -49,37 +49,44 @@ async def inference(file: UploadFile = File(...), response_format: str = Form("j
 async def stream(request: Request):
     transcriber = StreamingTranscriber(app.state.model)
     
-    async def process_audio():
-        buffer = b''
-        try:
-            async for chunk in request.stream():
-                if not chunk:
-                    continue
-                buffer += chunk
-                
-                # Process chunks that are multiples of 4 bytes
-                valid_len = (len(buffer) // 4) * 4
-                if valid_len > 0:
-                    pcm_chunk = np.frombuffer(buffer[:valid_len], dtype=np.float32)
-                    await transcriber.add_audio_chunk(pcm_chunk)
-                    buffer = buffer[valid_len:]
-        except Exception as e:
-            print(f"Error reading stream: {e}")
-        finally:
-            transcriber.stop()
-            
     async def process_updates():
+        # Start the audio processing as a task within the generator scope
+        async def process_audio():
+            buffer = b''
+            try:
+                async for chunk in request.stream():
+                    if not chunk:
+                        continue
+                    buffer += chunk
+                    
+                    # Process chunks that are multiples of 4 bytes (float32)
+                    valid_len = (len(buffer) // 4) * 4
+                    if valid_len > 0:
+                        pcm_chunk = np.frombuffer(buffer[:valid_len], dtype=np.float32)
+                        await transcriber.add_audio_chunk(pcm_chunk)
+                        buffer = buffer[valid_len:]
+            except Exception as e:
+                print(f"STT Service: Error reading stream: {e}")
+            finally:
+                transcriber.stop()
+
+        audio_task = asyncio.create_task(process_audio())
+        
         try:
             async for text_update in transcriber.get_transcription_updates():
+                print(f"STT Service: Yielding token: {text_update}")
                 yield f'data: {json.dumps({"type": "text", "value": text_update})}\n\n'
             
             final_text = transcriber.tokenizer.decode(transcriber.token_cache, skip_special_tokens=True)
             yield f'data: {json.dumps({"type": "done", "text": final_text})}\n\n'
         except Exception as e:
+            print(f"STT Service: Error in updates: {e}")
             yield f'data: {json.dumps({"type": "error", "value": str(e)})}\n\n'
             transcriber.stop()
+        finally:
+            if not audio_task.done():
+                audio_task.cancel()
             
-    asyncio.create_task(process_audio())
     return StreamingResponse(process_updates(), media_type="text/event-stream")
 
 @app.post("/transcribe")

@@ -95,7 +95,11 @@ class StreamingTranscriber:
         await self._encode_chunk(mel_features)
         
         prompt_ids = get_text_prompt_ids()
-        input_ids = np.array([prompt_ids], dtype=np.int64)
+        num_audio_tokens = len(self.audio_embed_queue)
+        if num_audio_tokens > len(prompt_ids):
+            prompt_ids += [32] * (num_audio_tokens - len(prompt_ids))
+        
+        input_ids = np.array([prompt_ids[:num_audio_tokens]], dtype=np.int64)
         inputs_embeds = self.model.embed_tokens.run(None, {"input_ids": input_ids})[0] # [1, seq_len, 3072]
         seq_len = inputs_embeds.shape[1]
         
@@ -154,35 +158,39 @@ class StreamingTranscriber:
             if len(self.audio_embed_queue) == 0:
                 continue
 
-            # Run 1 decode step
-            next_input_ids = np.array([[next_token_id]], dtype=np.int64)
-            next_inputs_embeds = self.model.embed_tokens.run(None, {"input_ids": next_input_ids})[0]
-            
-            next_inputs_embeds[0, 0, :] += self.audio_embed_queue[0]
-            self.audio_embed_queue = self.audio_embed_queue[1:]
-            
-            dec_inputs = {
-                "inputs_embeds": next_inputs_embeds,
-                "attention_mask": np.ones((self.batch_size, self.dec_past_seq_len + 1), dtype=np.int64),
-                **self.dec_kv_cache
-            }
-            
-            outputs = self.model.decoder.run(None, dec_inputs)
-            logits = outputs[0]
-            for i in range(26):
-                self.dec_kv_cache[f"past_key_values.{i}.key"] = outputs[i * 2 + 1]
-                self.dec_kv_cache[f"past_key_values.{i}.value"] = outputs[i * 2 + 2]
+            # Run decode steps for all pending audio embeds
+            while len(self.audio_embed_queue) > 0:
+                next_input_ids = np.array([[next_token_id]], dtype=np.int64)
+                next_inputs_embeds = self.model.embed_tokens.run(None, {"input_ids": next_input_ids})[0]
                 
-            self.dec_past_seq_len += 1
-            next_token_id = int(np.argmax(logits[0, -1, :]))
+                next_inputs_embeds[0, 0, :] += self.audio_embed_queue[0]
+                self.audio_embed_queue = self.audio_embed_queue[1:]
+                
+                dec_inputs = {
+                    "inputs_embeds": next_inputs_embeds,
+                    "attention_mask": np.ones((self.batch_size, self.dec_past_seq_len + 1), dtype=np.int64),
+                    **self.dec_kv_cache
+                }
+                
+                outputs = self.model.decoder.run(None, dec_inputs)
+                logits = outputs[0]
+                for i in range(26):
+                    self.dec_kv_cache[f"past_key_values.{i}.key"] = outputs[i * 2 + 1]
+                    self.dec_kv_cache[f"past_key_values.{i}.value"] = outputs[i * 2 + 2]
+                    
+                self.dec_past_seq_len += 1
+                next_token_id = int(np.argmax(logits[0, -1, :]))
+                
+                if next_token_id == 2:
+                    break
+                    
+                self.token_cache.append(next_token_id)
+                new_text = self._flush_decoded_text()
+                if new_text:
+                    yield new_text
+                
+                if self.is_stopped and len(self.audio_embed_queue) == 0:
+                    break
             
             if next_token_id == 2:
                 break
-                
-            if next_token_id not in self.model.tokenizer.get_vocab().values():
-                pass
-                
-            self.token_cache.append(next_token_id)
-            new_text = self._flush_decoded_text()
-            if new_text:
-                yield new_text

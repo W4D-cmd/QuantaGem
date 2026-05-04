@@ -1,3 +1,6 @@
+import asyncio
+import numpy as np
+import json
 from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from contextlib import asynccontextmanager
@@ -66,7 +69,6 @@ async def stream(request: Request):
             transcriber.stop()
             
     async def process_updates():
-        import json
         try:
             async for text_update in transcriber.get_transcription_updates():
                 yield f'data: {json.dumps({"type": "text", "value": text_update})}\n\n'

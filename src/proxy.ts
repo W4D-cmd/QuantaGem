@@ -33,7 +33,7 @@ export async function proxy(request: NextRequest) {
   const cspHeader = `
     default-src 'self';
     script-src 'self' 'unsafe-inline' 'unsafe-eval' https://webr.r-wasm.org blob:;
-    script-src-elem 'self' 'unsafe-inline' https://webr.r-wasm.org;
+    script-src-elem 'self' 'unsafe-inline' https://webr.r-wasm.org blob:;
     worker-src 'self' blob: https://webr.r-wasm.org;
     connect-src 'self' https://webr.r-wasm.org https://repo.r-wasm.org https://*.r-wasm.org;
     style-src 'self' 'unsafe-inline';
@@ -106,8 +106,6 @@ export async function proxy(request: NextRequest) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-user-id", payload.userId.toString());
     requestHeaders.set("x-user-email", payload.email);
-    
-    requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
 
     const response = NextResponse.next({
       request: {

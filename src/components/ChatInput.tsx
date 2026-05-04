@@ -639,7 +639,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       textareaRef.current?.focus();
     };
 
-    const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         if (showFileSuggestions && highlightedSuggestionIndex !== -1) {

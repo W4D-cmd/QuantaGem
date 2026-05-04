@@ -60,6 +60,7 @@ import { ToastProps } from "./Toast";
 import { Model } from "@google/genai";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useStreamingSTT } from "@/hooks/useStreamingSTT";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -225,6 +226,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [isTranscribing, setIsTranscribing] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
+
+    const [sttMode, setSttMode] = useState<"batch" | "streaming">("streaming");
+    const streamingSTT = useStreamingSTT({ getHeaders: getAuthHeaders as any });
 
     const [isScanning, setIsScanning] = useState(false);
     const [scanStatusMessage, setScanStatusMessage] = useState<string | null>(null);
@@ -721,7 +725,11 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     };
 
     const submitRecordingForTranscription = () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      if (sttMode === "streaming" && streamingSTT.isStreaming) {
+        setInput((prev) => (prev ? prev + " " : "") + streamingSTT.transcript);
+        streamingSTT.stopStream();
+        textareaRef.current?.focus();
+      } else if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
         mediaRecorderRef.current.stop();
       }
     };
@@ -948,7 +956,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const getMainButtonAction = () => {
       if (isLoading) return onCancelAction;
-      if (isRecording) return submitRecordingForTranscription;
+      if (isRecording || (sttMode === "streaming" && streamingSTT.isStreaming)) return submitRecordingForTranscription;
       return undefined;
     };
 
@@ -1042,18 +1050,24 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               }`}
           >
             <div className="p-4 bg-white dark:bg-zinc-900 transition-colors duration-300 ease-in-out">
+              {sttMode === "streaming" && streamingSTT.isStreaming && (
+                <div className="w-full mb-2 text-neutral-600 dark:text-zinc-400 italic">
+                  {streamingSTT.transcript}
+                  <span className="animate-pulse">|</span>
+                </div>
+              )}
               <textarea
                 ref={textareaRef}
                 value={input}
                 onChange={handleInputChange}
-                onKeyDown={onKeyDown}
+                onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 placeholder={
                   isRefining
                     ? "Refining your prompt..."
                     : isGeneratingSystemPrompt
                       ? "Creating system prompt..."
-                      : "Send a message..."
+                      : (sttMode === "streaming" && streamingSTT.isStreaming) ? "Listening..." : "Send a message..."
                 }
                 rows={1}
                 className="w-full resize-none border-none p-0 focus:outline-none bg-white dark:bg-zinc-900
@@ -1064,10 +1078,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   scrollbarGutter: "stable",
                 }}
                 disabled={
-                  isLoading || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt
+                  isLoading || isRecording || (sttMode === "streaming" && streamingSTT.isStreaming) || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt
                 }
-              />
-            </div>
+              />            </div>
 
             <div
               className="border-t bg-white dark:bg-zinc-900 border-neutral-200 dark:border-zinc-800 p-2 ps-3 flex
@@ -1280,10 +1293,10 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           )}
                         </button>
                       </Tooltip>
-                      <Tooltip text={isRecording ? "Cancel recording" : "Dictate message"}>
+                      <Tooltip text={(isRecording || (sttMode === "streaming" && streamingSTT.isStreaming)) ? "Cancel recording" : "Dictate message"}>
                         <button
                           type="button"
-                          onClick={isRecording ? cancelRecording : startRecording}
+                          onClick={(sttMode === "streaming") ? (streamingSTT.isStreaming ? streamingSTT.stopStream : streamingSTT.startStream) : (isRecording ? cancelRecording : startRecording)}
                           disabled={
                             isLoading ||
                             isTranscribing ||
@@ -1297,7 +1310,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                             hover:bg-neutral-100 dark:bg-zinc-900 dark:border-zinc-800 dark:hover:bg-zinc-700
                             disabled:opacity-50"
                         >
-                          {isRecording ? (
+                          {((sttMode === "streaming" ? streamingSTT.isStreaming : isRecording)) ? (
                             <X className="size-5 text-red-500" />
                           ) : (
                             <Mic className="size-5 text-neutral-500 dark:text-zinc-400" />
@@ -1316,7 +1329,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       ? false
                       : isTranscribing
                         ? true
-                        : isRecording
+                        : (isRecording || (sttMode === "streaming" && streamingSTT.isStreaming))
                           ? false
                           : isScanning ||
                             uploadingFiles.length > 0 ||
@@ -1326,7 +1339,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   }
                   className={`cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full flex
                     items-center justify-center transition-colors duration-300 ease-in-out ${
-                      isRecording
+                      (isRecording || (sttMode === "streaming" && streamingSTT.isStreaming))
                         ? `size-9 border bg-white border-neutral-300 hover:bg-neutral-100 dark:bg-zinc-900
                           dark:border-zinc-800 dark:hover:bg-zinc-700`
                         : `size-9 bg-black text-white hover:bg-neutral-600 dark:bg-white dark:text-zinc-900
@@ -1352,7 +1365,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       >
                         <RefreshCw className="size-5 animate-spin" />
                       </motion.div>
-                    ) : isRecording ? (
+                    ) : (isRecording || (sttMode === "streaming" && streamingSTT.isStreaming)) ? (
                       <motion.div
                         key="check"
                         initial={{ opacity: 0, scale: 0.5 }}

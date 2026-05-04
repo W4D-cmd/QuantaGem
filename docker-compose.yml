@@ -57,8 +57,9 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      MODEL_NAME: large-v3-turbo-q8_0
+      VARIANT: q4
       STT_THREADS: 10
+      JWT_SECRET: ${JWT_SECRET}
     volumes:
       - stt_models:/models
     networks:
@@ -68,7 +69,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30
-      start_period: 300s
+      start_period: 600s
 
   redis:
     image: redis:8-alpine@sha256:c5e375abb885e6b2021c0377879e4890bf76f9065b8922ffc113f2b226b9fc17

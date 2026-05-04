@@ -189,13 +189,15 @@ All chat endpoints return JSONL with these event types:
 
 ### STT Service (`stt-service/`)
 
-- whisper.cpp server based on `ghcr.io/ggml-org/whisper.cpp:main` Docker image
-- Model: `large-v3-turbo-q8_0` (quantized Whisper, CPU-only inference)
+- FastAPI Python server running Voxtral-Mini-4B ONNX models
+- Model: `onnx-community/Voxtral-Mini-4B-Realtime-2602-ONNX` (q4 variant, CPU-only inference via `onnxruntime`)
 - Model downloaded from Hugging Face on first start, persisted via Docker volume
-- Endpoint: `POST /inference` (multipart audio, field name `file`)
-- Health: `GET /health`
-- Configurable via `MODEL_NAME` and `STT_THREADS` environment variables
-- Supports `--convert` flag for automatic ffmpeg audio conversion (webm, mp3, etc.)
+- Endpoints:
+  - `POST /inference` (multipart audio, field name `file` or raw POST body)
+  - `POST /stream` (chunked HTTP stream for real-time audio input and SSE text output)
+  - `GET /health`
+- Configurable via `VARIANT` and `STT_THREADS` environment variables
+- Uses ffmpeg (subprocess) for audio conversion (webm, mp3, etc.) when needed
 
 ## Authentication Flow
 

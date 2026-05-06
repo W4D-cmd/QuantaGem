@@ -56,23 +56,23 @@ services:
       context: ./stt-service
       dockerfile: Dockerfile
     restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
     environment:
-      VARIANT: q4
-      STT_THREADS: 10
-      JWT_SECRET: ${JWT_SECRET}
+      HF_HOME: /app/models
+      # STT_THREADS: 4  # Number of CPU threads for transcription (default: auto)
     volumes:
-      - stt_models:/models
+      - stt_models:/app/models
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ping"]
       interval: 10s
       timeout: 5s
       retries: 30
-      start_period: 600s
+      start_period: 300s
 
   redis:
-    image: redis:8-alpine@sha256:69f2c586c8a7e9cce4ae1ee9bbaf60bc4bb5f4bb3880e4ed022b1fd758a7cab9
+    image: redis:8-alpine@sha256:c5e375abb885e6b2021c0377879e4890bf76f9065b8922ffc113f2b226b9fc17
     restart: unless-stopped
     networks:
       - app-network

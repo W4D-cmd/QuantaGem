@@ -18,10 +18,9 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await audioFile.arrayBuffer());
 
     const sttFormData = new FormData();
-    sttFormData.append("file", new Blob([buffer], { type: audioFile.type }), "recording.webm");
-    sttFormData.append("response_format", "text");
+    sttFormData.append("audio_file", new Blob([buffer], { type: audioFile.type }), "recording.webm");
 
-    const sttResponse = await fetch("http://stt-service:8000/inference", {
+    const sttResponse = await fetch("http://stt-service:8000/transcribe", {
       method: "POST",
       body: sttFormData,
     });
@@ -32,17 +31,12 @@ export async function POST(request: NextRequest) {
       let errorMessage = "Failed to transcribe audio via STT service.";
       try {
         const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error || errorMessage;
+        errorMessage = errorJson.detail || errorMessage;
       } catch {}
       return NextResponse.json({ error: errorMessage }, { status: sttResponse.status });
     }
 
-    const responseText = (await sttResponse.text()).trim();
-    let transcription = responseText;
-    try {
-      const json = JSON.parse(responseText);
-      if (json.text) transcription = json.text.trim();
-    } catch {}
+    const transcription = await sttResponse.text();
     return new NextResponse(transcription, { status: 200, headers: { "Content-Type": "text/plain" } });
   } catch (error) {
     console.error("Error in STT API route:", error);

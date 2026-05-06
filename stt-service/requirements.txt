@@ -1,11 +1,4 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.34.0
-onnxruntime>=1.22.0
-numpy>=2.0
-librosa>=0.11.0
-soundfile>=0.13.0
-tokenizers>=0.21.0
-huggingface-hub>=0.30.0
-python-multipart>=0.0.18
-websockets>=14.0
-pydantic>=2.0
+# Runtime dependencies for ONNX-based STT service
+fastapi[all]
+onnx-asr[cpu,hub]
+soundfile

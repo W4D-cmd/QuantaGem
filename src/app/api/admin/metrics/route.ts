@@ -21,10 +21,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const u = filterUserId !== null ? "AND u.id = $1" : "";
-  const cs = filterUserId !== null ? "AND cs.user_id = $1" : "";
-  const csOuter = filterUserId !== null ? "WHERE user_id = $1" : "";
-  const params = filterUserId !== null ? [filterUserId] : [];
+    const u = filterUserId !== null ? "AND id = $1" : "";
+    const cs = filterUserId !== null ? "AND cs.user_id = $1" : "";
+    const csOuter = filterUserId !== null ? "WHERE user_id = $1" : "";  const params = filterUserId !== null ? [filterUserId] : [];
 
   try {
     const [
@@ -71,13 +70,13 @@ export async function GET(request: NextRequest) {
       ),
       pool.query(`SELECT COALESCE(SUM(accumulated_cost), 0) as value FROM chat_sessions ${csOuter}`, params),
       pool.query(`SELECT COALESCE(SUM(total_tokens), 0) as value FROM chat_sessions ${csOuter}`, params),
-      pool.query(`SELECT COUNT(*) as value FROM projects p JOIN users u ON p.user_id = u.id WHERE 1=1 ${u}`, params),
+      pool.query(`SELECT COUNT(*) as value FROM projects p WHERE 1=1 ${filterUserId !== null ? "AND p.user_id = $1" : ""}`, params),
       pool.query(
-        `SELECT COUNT(*) as value FROM project_files pf JOIN projects p ON pf.project_id = p.id JOIN users u ON p.user_id = u.id WHERE 1=1 ${u}`,
+        `SELECT COUNT(*) as value FROM project_files pf JOIN projects p ON pf.project_id = p.id WHERE 1=1 ${filterUserId !== null ? "AND p.user_id = $1" : ""}`,
         params
       ),
       pool.query(
-        `SELECT COALESCE(SUM(pf.size), 0) as value FROM project_files pf JOIN projects p ON pf.project_id = p.id JOIN users u ON p.user_id = u.id WHERE 1=1 ${u}`,
+        `SELECT COALESCE(SUM(pf.size), 0) as value FROM project_files pf JOIN projects p ON pf.project_id = p.id WHERE 1=1 ${filterUserId !== null ? "AND p.user_id = $1" : ""}`,
         params
       ),
       pool.query(`SELECT COUNT(*) as value FROM temporary_files WHERE 1=1 ${filterUserId !== null ? "AND user_id = $1" : ""}`, params),
@@ -93,11 +92,11 @@ export async function GET(request: NextRequest) {
       pool.query(`SELECT COUNT(*) as value FROM users WHERE created_at >= NOW() - INTERVAL '7 days' ${u}`, params),
       pool.query(`SELECT COUNT(*) as value FROM users WHERE created_at >= NOW() - INTERVAL '30 days' ${u}`, params),
       pool.query(
-        `SELECT COUNT(DISTINCT cs.user_id) as value FROM chat_sessions cs JOIN messages m ON m.chat_session_id = cs.id WHERE m.created_at >= NOW() - INTERVAL '7 days' ${cs.replace("cs.", "AND cs.")}`,
+        `SELECT COUNT(DISTINCT cs.user_id) as value FROM chat_sessions cs JOIN messages m ON m.chat_session_id = cs.id WHERE m.created_at >= NOW() - INTERVAL '7 days' ${cs}`,
         params
       ),
       pool.query(
-        `SELECT COUNT(DISTINCT cs.user_id) as value FROM chat_sessions cs JOIN messages m ON m.chat_session_id = cs.id WHERE m.created_at >= NOW() - INTERVAL '30 days' ${cs.replace("cs.", "AND cs.")}`,
+        `SELECT COUNT(DISTINCT cs.user_id) as value FROM chat_sessions cs JOIN messages m ON m.chat_session_id = cs.id WHERE m.created_at >= NOW() - INTERVAL '30 days' ${cs}`,
         params
       ),
       pool.query(`SELECT COUNT(*) as value FROM chat_sessions WHERE created_at >= NOW() - INTERVAL '7 days' ${csOuter ? "AND user_id = $1" : ""}`, filterUserId !== null ? [filterUserId] : []),

@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutDashboard, Users, ArrowLeft } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import ThemeToggleButton from "@/components/ThemeToggleButton";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AdminUsers from "@/components/admin/AdminUsers";
 
@@ -57,79 +56,84 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white dark:bg-zinc-800">
+    <div className="flex h-screen overflow-hidden bg-white dark:bg-zinc-800 transition-colors duration-500">
       <div
-        className="w-[13%] min-w-[200px] h-full bg-neutral-100 dark:bg-zinc-900 border-r border-neutral-200
-          dark:border-zinc-800 flex flex-col transition-colors duration-300 ease-in-out"
+        className="w-[240px] h-full bg-neutral-50 dark:bg-zinc-900 border-r border-neutral-100
+          dark:border-zinc-800 flex flex-col transition-all duration-300 ease-in-out shadow-xl z-20"
       >
-        <div className="flex-none px-4 py-4 border-b border-neutral-200 dark:border-zinc-800">
-          <h1 className="text-xs font-semibold text-neutral-500 dark:text-zinc-500 uppercase tracking-wider">
-            QuantaGem Admin
+        <div className="flex-none px-6 py-8">
+          <h1 className="text-[10px] font-bold text-neutral-400 dark:text-zinc-500 uppercase tracking-[0.2em]">
+            QuantaGem Control
           </h1>
+          <div className="text-xl font-black text-neutral-900 dark:text-zinc-100 mt-1 tracking-tighter">
+            Admin <span className="text-blue-500">Panel</span>
+          </div>
         </div>
 
-        <nav className="flex-1 px-2 py-3 space-y-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`cursor-pointer w-full text-sm text-left p-2 py-1.5 rounded-lg flex items-center gap-2
-                transition-colors duration-200 ease-in-out
-                ${
-                  activeTab === tab.id
-                    ? "font-semibold bg-neutral-300 dark:bg-zinc-700 text-neutral-900 dark:text-zinc-50"
-                    : "text-neutral-700 dark:text-zinc-300 hover:bg-neutral-200 dark:hover:bg-zinc-800"
-                }`}
-            >
-              <tab.icon className="size-4" />
-              {tab.label}
-            </button>
-          ))}
+        <nav className="flex-1 px-3 space-y-1.5 mt-2">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`cursor-pointer w-full text-sm font-medium text-left px-4 py-2.5 rounded-2xl flex items-center gap-3
+                  transition-all duration-200 group
+                  ${
+                    isActive
+                      ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-sm border border-neutral-100 dark:border-zinc-700/50"
+                      : "text-neutral-500 dark:text-zinc-400 hover:bg-neutral-100 dark:hover:bg-zinc-800/50 hover:text-neutral-900 dark:hover:text-zinc-100"
+                  }`}
+              >
+                <tab.icon className={`size-4.5 transition-colors ${isActive ? "text-blue-500" : "text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-zinc-300"}`} />
+                {tab.label}
+              </button>
+            );
+          })}
         </nav>
 
-        <div className="flex-none px-2 pb-4 space-y-2">
-          <div className="px-2">
-            <ThemeToggleButton />
-          </div>
+        <div className="flex-none px-3 pb-6">
           <button
             onClick={() => router.push("/")}
-            className="cursor-pointer w-full text-sm text-left p-2 py-1.5 rounded-lg flex items-center gap-2
-              text-neutral-500 dark:text-zinc-400 hover:bg-neutral-200 dark:hover:bg-zinc-800
-              transition-colors duration-200 ease-in-out"
+            className="cursor-pointer w-full text-sm font-semibold text-left px-4 py-2.5 rounded-2xl flex items-center gap-3
+              text-neutral-400 dark:text-zinc-500 hover:bg-neutral-100 dark:hover:bg-zinc-800/50 
+              hover:text-red-500 transition-all group"
           >
-            <ArrowLeft className="size-4" />
-            Exit to Chat
+            <ArrowLeft className="size-4.5 group-hover:-translate-x-1 transition-transform" />
+            Exit Admin
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <AnimatePresence mode="wait">
-          {activeTab === "dashboard" && (
-            <motion.div
-              key="dashboard"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className="p-6"
-            >
-              <AdminDashboard getAuthHeaders={getAuthHeaders} />
-            </motion.div>
-          )}
-          {activeTab === "users" && (
-            <motion.div
-              key="users"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className="p-6"
-            >
-              <AdminUsers getAuthHeaders={getAuthHeaders} currentUserId={currentUserId} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <div className="flex-1 overflow-y-auto custom-scrollbar bg-neutral-50/30 dark:bg-zinc-800/50">
+        <main className="max-w-7xl mx-auto">
+          <AnimatePresence mode="wait">
+            {activeTab === "dashboard" && (
+              <motion.div
+                key="dashboard"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3, ease: "circOut" }}
+                className="p-8 lg:p-12"
+              >
+                <AdminDashboard getAuthHeaders={getAuthHeaders} />
+              </motion.div>
+            )}
+            {activeTab === "users" && (
+              <motion.div
+                key="users"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3, ease: "circOut" }}
+                className="p-8 lg:p-12"
+              >
+                <AdminUsers getAuthHeaders={getAuthHeaders} currentUserId={currentUserId} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </main>
       </div>
     </div>
   );

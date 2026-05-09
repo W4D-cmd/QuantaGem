@@ -100,10 +100,7 @@ function MetricCard({
           {subtitle}
         </div>
       )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
 
@@ -180,7 +177,7 @@ export default function AdminDashboard({ getAuthHeaders }: AdminDashboardProps) 
     setShowResults(false);
   };
 
-  const maxModelCount = Math.max(...metrics.modelUsage.map((m) => m.count), 1);
+  const maxModelCount = metrics ? Math.max(...metrics.modelUsage.map((m) => m.count), 1) : 1;
 
   return (
     <div className="space-y-8">
@@ -290,153 +287,108 @@ export default function AdminDashboard({ getAuthHeaders }: AdminDashboardProps) 
             exit={{ opacity: 0 }}
             className="space-y-8"
           >
-      <AnimatePresence mode="wait">
-        {isLoading || !metrics ? (
-          <motion.div 
-            key="skeleton"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="space-y-8"
-          >
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="h-24 bg-neutral-100 dark:bg-zinc-900 rounded-3xl animate-pulse" />
-              ))}
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div 
-            key="content"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="space-y-8"
-          >
             <section>
-              <h3 className="text-lg font-semibold text-neutral-700 dark:text-zinc-300 mb-3">Users</h3>        <motion.div
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <MetricCard
-            label="Total Users"
-            value={metrics.totalUsers.toLocaleString()}
-            subtitle={`${metrics.newUsers7d} new in last 7 days`}
-          />
-          <MetricCard label="Admin Users" value={metrics.totalAdmins.toLocaleString()} />
-          <MetricCard
-            label="Active Users (7d)"
-            value={metrics.activeUsers7d.toLocaleString()}
-            subtitle={`${metrics.activeUsers30d} in last 30 days`}
-          />
-          <MetricCard
-            label="New Users (30d)"
-            value={metrics.newUsers30d.toLocaleString()}
-            subtitle={`${metrics.newUsers7d} in last 7 days`}
-          />
-        </motion.div>
-      </section>
-
-      <section>
-        <h3 className="text-lg font-semibold text-neutral-700 dark:text-zinc-300 mb-3">Activity</h3>
-        <motion.div
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <MetricCard
-            label="Total Chats"
-            value={metrics.totalChats.toLocaleString()}
-            subtitle={`${metrics.chats7d} in last 7 days`}
-          />
-          <MetricCard
-            label="Total Messages"
-            value={metrics.totalMessages.toLocaleString()}
-            subtitle={`${metrics.messages7d} in last 7 days`}
-          />
-          <Tooltip text={`${metrics.totalUserMessages} user / ${metrics.totalModelMessages} model`}>
-            <div>
-              <MetricCard
-                label="User / Model Messages"
-                value={`${metrics.totalUserMessages.toLocaleString()} / ${metrics.totalModelMessages.toLocaleString()}`}
-              />
-            </div>
-          </Tooltip>
-          <MetricCard
-            label="Avg Messages / Chat"
-            value={metrics.avgMessagesPerChat.toFixed(1)}
-          />
-        </motion.div>
-      </section>
-
-      <section>
-        <h3 className="text-lg font-semibold text-neutral-700 dark:text-zinc-300 mb-3">
-          Costs &amp; Resources
-        </h3>
-        <motion.div
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <MetricCard
-            label="Estimated Total Cost"
-            value={formatCost(metrics.totalCost)}
-            subtitle={`Last 7 days: ${formatCost(metrics.cost7d)}`}
-          />
-          <MetricCard
-            label="Total Tokens"
-            value={metrics.totalTokens.toLocaleString()}
-            subtitle="Latest snapshot per session"
-          />
-          <MetricCard
-            label="Total Projects"
-            value={metrics.totalProjects.toLocaleString()}
-          />
-          <MetricCard
-            label="Storage Used"
-            value={formatBytes(metrics.totalStorageBytes)}
-            subtitle={`${metrics.totalProjectFiles} project files, ${metrics.totalTempFiles} temp files`}
-          />
-        </motion.div>
-      </section>
-
-      {metrics.modelUsage.length > 0 && (
-        <section>
-          <h3 className="text-lg font-semibold text-neutral-700 dark:text-zinc-300 mb-3">Model Usage</h3>
-          <motion.div
-            className="p-6 rounded-2xl border border-neutral-100 dark:border-zinc-800 bg-white dark:bg-zinc-900
-              space-y-4 shadow-sm"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            {metrics.modelUsage.map((m) => (
-              <motion.div key={m.model} variants={itemVariants} className="flex items-center gap-4">
-                <Tooltip text={m.model}>
-                  <div className="w-56 lg:w-64 text-sm text-neutral-600 dark:text-zinc-400 truncate font-medium">
-                    {m.model}
-                  </div>
-                </Tooltip>
-                <div className="flex-1 h-2.5 bg-neutral-50 dark:bg-zinc-800/50 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(m.count / maxModelCount) * 100}%` }}
-                    transition={{ duration: 1, ease: "easeOut" }}
-                    className="h-full bg-blue-500 dark:bg-blue-600 rounded-full"
-                  />
-                </div>
-                <div className="w-20 text-xs font-bold text-neutral-700 dark:text-zinc-300 text-right tabular-nums">
-                  {m.count.toLocaleString()}
-                </div>
+              <h3 className="text-lg font-semibold text-neutral-700 dark:text-zinc-300 mb-3">Users</h3>
+              <motion.div
+                className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <MetricCard
+                  label="Total Users"
+                  value={metrics.totalUsers.toLocaleString()}
+                  subtitle={`${metrics.newUsers7d} new in last 7 days`}
+                />
+                <MetricCard label="Admin Users" value={metrics.totalAdmins.toLocaleString()} />
+                <MetricCard
+                  label="Active Users (7d)"
+                  value={metrics.activeUsers7d.toLocaleString()}
+                  subtitle={`${metrics.activeUsers30d} in last 30 days`}
+                />
+                <MetricCard
+                  label="New Users (30d)"
+                  value={metrics.newUsers30d.toLocaleString()}
+                  subtitle={`${metrics.newUsers7d} in last 7 days`}
+                />
               </motion.div>
-            ))}
-          </motion.div>
-        </section>
-      )}
+            </section>
+
+            <section>
+              <h3 className="text-lg font-semibold text-neutral-700 dark:text-zinc-300 mb-3">Activity</h3>
+              <motion.div
+                className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <MetricCard
+                  label="Total Chats"
+                  value={metrics.totalChats.toLocaleString()}
+                  subtitle={`${metrics.chats7d} in last 7 days`}
+                />
+                <MetricCard
+                  label="Total Messages"
+                  value={metrics.totalMessages.toLocaleString()}
+                  subtitle={`${metrics.messages7d} in last 7 days`}
+                />
+                <MetricCard
+                  label="Total Cost"
+                  value={formatCost(metrics.totalCost)}
+                  subtitle={`${formatCost(metrics.cost7d)} in last 7 days`}
+                />
+                <MetricCard label="Total Tokens" value={metrics.totalTokens.toLocaleString()} />
+              </motion.div>
+            </section>
+
+            <section>
+              <h3 className="text-lg font-semibold text-neutral-700 dark:text-zinc-300 mb-3">Storage & Resources</h3>
+              <motion.div
+                className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <MetricCard label="Projects" value={metrics.totalProjects.toLocaleString()} />
+                <MetricCard label="Files" value={metrics.totalProjectFiles.toLocaleString()} />
+                <MetricCard label="Storage" value={formatBytes(metrics.totalStorageBytes)} />
+                <MetricCard label="Temp Files" value={metrics.totalTempFiles.toLocaleString()} />
+              </motion.div>
+            </section>
+
+            {metrics.modelUsage.length > 0 && (
+              <section>
+                <h3 className="text-lg font-semibold text-neutral-700 dark:text-zinc-300 mb-3">Model Usage</h3>
+                <motion.div
+                  className="p-6 rounded-2xl border border-neutral-100 dark:border-zinc-800 bg-white dark:bg-zinc-900
+                    space-y-4 shadow-sm"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {metrics.modelUsage.map((m) => (
+                    <motion.div key={m.model} variants={itemVariants} className="flex items-center gap-4">
+                      <Tooltip text={m.model}>
+                        <div className="w-56 lg:w-64 text-sm text-neutral-600 dark:text-zinc-400 truncate font-medium">
+                          {m.model}
+                        </div>
+                      </Tooltip>
+                      <div className="flex-1 h-2.5 bg-neutral-50 dark:bg-zinc-800/50 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(m.count / maxModelCount) * 100}%` }}
+                          transition={{ duration: 1, ease: "easeOut" }}
+                          className="h-full bg-blue-500 dark:bg-blue-600 rounded-full"
+                        />
+                      </div>
+                      <div className="w-20 text-xs font-bold text-neutral-700 dark:text-zinc-300 text-right tabular-nums">
+                        {m.count.toLocaleString()}
+                      </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </section>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

@@ -216,98 +216,121 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
                 <th className="px-6 py-4 text-center">Actions</th>
               </tr>
             </thead>
-            <motion.tbody 
-              variants={containerVariants} 
-              initial="hidden" 
-              animate="visible"
-              className="divide-y divide-neutral-100 dark:divide-zinc-800"
-            >
-              <AnimatePresence mode="popLayout">
-                {users.map((user) => {
-                  const isSelf = user.id === currentUserId;
-                  return (
-                    <motion.tr
-                      key={user.id}
-                      layout
-                      variants={rowVariants}
-                      className="hover:bg-neutral-50/50 dark:hover:bg-zinc-800/50 transition-colors group"
-                    >
-                    <td className="px-6 py-4">
-                      <div className="text-neutral-900 dark:text-zinc-100 font-medium">{user.email}</div>
-                      <div className="text-[10px] text-neutral-400 dark:text-zinc-500 mt-0.5">ID: {user.id}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                          user.role === "admin"
-                            ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
-                            : "bg-neutral-100 text-neutral-600 dark:bg-zinc-800 dark:text-zinc-400"
-                        }`}
+            <AnimatePresence mode="wait">
+              {isLoading ? (
+                <motion.tbody
+                  key="skeleton"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="px-6 py-4"><div className="h-4 w-32 bg-neutral-100 dark:bg-zinc-800 rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-4 w-12 bg-neutral-100 dark:bg-zinc-800 rounded-full" /></td>
+                      <td className="px-6 py-4"><div className="h-4 w-20 bg-neutral-100 dark:bg-zinc-800 rounded" /></td>
+                      <td className="px-6 py-4 text-right"><div className="h-4 w-16 bg-neutral-100 dark:bg-zinc-800 rounded ml-auto" /></td>
+                      <td className="px-6 py-4 text-right"><div className="h-4 w-16 bg-neutral-100 dark:bg-zinc-800 rounded ml-auto" /></td>
+                      <td className="px-6 py-4"><div className="h-4 w-4 bg-neutral-100 dark:bg-zinc-800 rounded mx-auto" /></td>
+                      <td className="px-6 py-4"><div className="h-4 w-4 bg-neutral-100 dark:bg-zinc-800 rounded mx-auto" /></td>
+                    </tr>
+                  ))}
+                </motion.tbody>
+              ) : (
+                <motion.tbody 
+                  key="content"
+                  variants={containerVariants} 
+                  initial="hidden" 
+                  animate="visible"
+                  exit={{ opacity: 0 }}
+                  className="divide-y divide-neutral-100 dark:divide-zinc-800"
+                >
+                  {users.map((user) => {
+                    const isSelf = user.id === currentUserId;
+                    return (
+                      <motion.tr
+                        key={user.id}
+                        layout
+                        variants={rowVariants}
+                        className="hover:bg-neutral-50/50 dark:hover:bg-zinc-800/50 transition-colors group"
                       >
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-neutral-500 dark:text-zinc-400 whitespace-nowrap">
-                      {formatDate(user.created_at)}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="text-neutral-700 dark:text-zinc-300 font-medium">
-                        {Number(user.chat_count).toLocaleString()} chats
-                      </div>
-                      <div className="text-xs text-neutral-400 dark:text-zinc-500">
-                        {formatRelative(user.last_message_at || user.last_chat_activity)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="text-blue-600 dark:text-blue-400 font-bold">
-                        {"$" + Number(user.total_cost).toFixed(2)}
-                      </div>
-                      <div className="text-[10px] text-neutral-400 dark:text-zinc-500">
-                        {Number(user.total_tokens).toLocaleString()} tokens
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <Tooltip text={isSelf ? "Cannot remove your own admin role" : "Toggle admin role"}>
-                        <div className="flex justify-center">
-                          {togglingId === user.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                          ) : (
-                            <input
-                              type="checkbox"
-                              checked={user.role === "admin"}
-                              onChange={() => handleToggleAdmin(user)}
-                              disabled={isSelf || togglingId === user.id}
-                              className={`size-4 rounded border-neutral-300 dark:border-zinc-700 text-blue-600
-                                cursor-pointer
-                                ${isSelf ? "opacity-30 cursor-not-allowed" : ""}`}
-                            />
-                          )}
-                        </div>
-                      </Tooltip>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <div className="flex justify-center">
-                        <Tooltip text={isSelf ? "Cannot delete yourself" : "Delete user"}>
-                          <button
-                            onClick={() => handleDeleteUser(user)}
-                            disabled={isSelf || isDeletingId === user.id}
-                            className={`p-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 
-                              rounded-xl transition-all cursor-pointer ${isSelf ? 'opacity-30 cursor-not-allowed' : 'opacity-0 group-hover:opacity-100'}`}
+                        <td className="px-6 py-4">
+                          <div className="text-neutral-900 dark:text-zinc-100 font-medium">{user.email}</div>
+                          <div className="text-[10px] text-neutral-400 dark:text-zinc-500 mt-0.5">ID: {user.id}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                              user.role === "admin"
+                                ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+                                : "bg-neutral-100 text-neutral-600 dark:bg-zinc-800 dark:text-zinc-400"
+                            }`}
                           >
-                            {isDeletingId === user.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </button>
-                        </Tooltip>
-                      </div>
-                    </td>
-                    </motion.tr>
-                  );
-                })}
-              </AnimatePresence>
-            </motion.tbody>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-neutral-500 dark:text-zinc-400 whitespace-nowrap">
+                          {formatDate(user.created_at)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="text-neutral-700 dark:text-zinc-300 font-medium">
+                            {Number(user.chat_count).toLocaleString()} chats
+                          </div>
+                          <div className="text-xs text-neutral-400 dark:text-zinc-500">
+                            {formatRelative(user.last_message_at || user.last_chat_activity)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="text-blue-600 dark:text-blue-400 font-bold">
+                            {"$" + Number(user.total_cost).toFixed(2)}
+                          </div>
+                          <div className="text-[10px] text-neutral-400 dark:text-zinc-500">
+                            {Number(user.total_tokens).toLocaleString()} tokens
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <Tooltip text={isSelf ? "Cannot remove your own admin role" : "Toggle admin role"}>
+                            <div className="flex justify-center">
+                              {togglingId === user.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                              ) : (
+                                <input
+                                  type="checkbox"
+                                  checked={user.role === "admin"}
+                                  onChange={() => handleToggleAdmin(user)}
+                                  disabled={isSelf || togglingId === user.id}
+                                  className={`size-4 rounded border-neutral-300 dark:border-zinc-700 text-blue-600
+                                    cursor-pointer
+                                    ${isSelf ? "opacity-30 cursor-not-allowed" : ""}`}
+                                />
+                              )}
+                            </div>
+                          </Tooltip>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex justify-center">
+                            <Tooltip text={isSelf ? "Cannot delete yourself" : "Delete user"}>
+                              <button
+                                onClick={() => handleDeleteUser(user)}
+                                disabled={isSelf || isDeletingId === user.id}
+                                className={`p-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 
+                                  rounded-xl transition-all cursor-pointer ${isSelf ? 'opacity-30 cursor-not-allowed' : 'opacity-0 group-hover:opacity-100'}`}
+                              >
+                                {isDeletingId === user.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </button>
+                            </Tooltip>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </motion.tbody>
+              )}
+            </AnimatePresence>
           </table>
         </div>
       </div>

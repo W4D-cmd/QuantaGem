@@ -5,15 +5,14 @@ import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+  context: { params: Promise<{ userId: string }> }
+): Promise<Response> {
   const adminCheck = await requireAdmin(request);
   if (adminCheck instanceof NextResponse) return adminCheck;
 
-  // Extract adminId from adminCheck (which is the decoded token)
-  // requireAdmin returns the decoded payload if successful
+  const { userId } = await context.params;
   const adminId = (adminCheck as any).id;
-  const targetUserId = parseInt(params.userId, 10);
+  const targetUserId = parseInt(userId, 10);
 
   if (isNaN(targetUserId)) {
     return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });

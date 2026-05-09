@@ -4,12 +4,12 @@ import { pool } from "@/lib/db";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
+  context: { params: Promise<{ userId: string }> }
+): Promise<Response> {
   const adminCheck = await requireAdmin(request);
   if (adminCheck instanceof NextResponse) return adminCheck;
 
-  const { userId } = await params;
+  const { userId } = await context.params;
   const targetUserId = parseInt(userId, 10);
   if (isNaN(targetUserId)) {
     return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });

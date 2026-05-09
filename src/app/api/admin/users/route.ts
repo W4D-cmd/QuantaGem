@@ -25,19 +25,15 @@ export async function GET(request: NextRequest) {
       `
       SELECT
         u.id, u.email, u.role, u.created_at,
-        COUNT(DISTINCT cs.id) as chat_count,
-        COUNT(DISTINCT m.id) as message_count,
-        COALESCE(SUM(cs.accumulated_cost), 0) as total_cost,
-        COALESCE(SUM(cs.total_tokens), 0) as total_tokens,
-        COUNT(DISTINCT p.id) as project_count,
-        MAX(m.created_at) as last_message_at,
-        MAX(cs.updated_at) as last_chat_activity
+        (SELECT COUNT(*) FROM chat_sessions WHERE user_id = u.id) as chat_count,
+        (SELECT COUNT(*) FROM messages m JOIN chat_sessions cs ON m.chat_session_id = cs.id WHERE cs.user_id = u.id) as message_count,
+        (SELECT COALESCE(SUM(accumulated_cost), 0) FROM chat_sessions WHERE user_id = u.id) as total_cost,
+        (SELECT COALESCE(SUM(total_tokens), 0) FROM chat_sessions WHERE user_id = u.id) as total_tokens,
+        (SELECT COUNT(*) FROM projects WHERE user_id = u.id) as project_count,
+        (SELECT MAX(m.created_at) FROM messages m JOIN chat_sessions cs ON m.chat_session_id = cs.id WHERE cs.user_id = u.id) as last_message_at,
+        (SELECT MAX(updated_at) FROM chat_sessions WHERE user_id = u.id) as last_chat_activity
       FROM users u
-      LEFT JOIN chat_sessions cs ON cs.user_id = u.id
-      LEFT JOIN messages m ON m.chat_session_id = cs.id
-      LEFT JOIN projects p ON p.user_id = u.id
       ${whereClause}
-      GROUP BY u.id, u.email, u.role, u.created_at
       ORDER BY ${orderBy}
     `,
       params

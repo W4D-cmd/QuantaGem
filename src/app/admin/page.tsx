@@ -56,10 +56,10 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white dark:bg-zinc-800 transition-colors duration-500">
+    <div className="flex h-screen overflow-hidden bg-white dark:bg-zinc-800">
       <div
-        className="w-[240px] h-full bg-neutral-50 dark:bg-zinc-900 border-r border-neutral-100
-          dark:border-zinc-800 flex flex-col transition-all duration-300 ease-in-out shadow-xl z-20"
+        className="w-70 h-full bg-neutral-100 dark:bg-zinc-900 border-r border-neutral-200
+          dark:border-zinc-800 flex flex-col shadow-xl z-20"
       >
         <div className="flex-none px-6 py-8">
           <h1 className="text-[10px] font-bold text-neutral-400 dark:text-zinc-500 uppercase tracking-[0.2em]">
@@ -77,7 +77,7 @@ export default function AdminPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`cursor-pointer w-full text-sm font-medium text-left px-4 py-2.5 rounded-2xl flex items-center gap-3
+                className={`cursor-pointer w-full text-sm font-medium text-left px-4 py-2.5 rounded-lg flex items-center gap-3
                   transition-all duration-200 group
                   ${
                     isActive
@@ -95,7 +95,7 @@ export default function AdminPage() {
         <div className="flex-none px-3 pb-6">
           <button
             onClick={() => router.push("/")}
-            className="cursor-pointer w-full text-sm font-semibold text-left px-4 py-2.5 rounded-2xl flex items-center gap-3
+            className="cursor-pointer w-full text-sm font-semibold text-left px-4 py-2.5 rounded-lg flex items-center gap-3
               text-neutral-400 dark:text-zinc-500 hover:bg-neutral-100 dark:hover:bg-zinc-800/50 
               hover:text-red-500 transition-all group"
           >
@@ -107,32 +107,16 @@ export default function AdminPage() {
 
       <div className="flex-1 overflow-y-auto custom-scrollbar bg-neutral-50/30 dark:bg-zinc-800/50">
         <main className="max-w-7xl mx-auto">
-          <AnimatePresence mode="wait">
-            {activeTab === "dashboard" && (
-              <motion.div
-                key="dashboard"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3, ease: "circOut" }}
-                className="p-8 lg:p-12"
-              >
-                <AdminDashboard getAuthHeaders={getAuthHeaders} />
-              </motion.div>
-            )}
-            {activeTab === "users" && (
-              <motion.div
-                key="users"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3, ease: "circOut" }}
-                className="p-8 lg:p-12"
-              >
-                <AdminUsers getAuthHeaders={getAuthHeaders} currentUserId={currentUserId} />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {activeTab === "dashboard" && (
+            <div className="p-8 lg:p-12">
+              <AdminDashboard getAuthHeaders={getAuthHeaders} />
+            </div>
+          )}
+          {activeTab === "users" && (
+            <div className="p-8 lg:p-12">
+              <AdminUsers getAuthHeaders={getAuthHeaders} currentUserId={currentUserId} />
+            </div>
+          )}
         </main>
       </div>
     </div>

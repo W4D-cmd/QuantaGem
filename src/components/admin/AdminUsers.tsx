@@ -166,12 +166,12 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
           <div className="relative flex-1 md:w-80">
             <input
               type="text"
-              placeholder="Search by email (fuzzy)..."
+              placeholder="Search by email..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-950 border border-neutral-200 
-                dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:ring-2 
-                focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-950 border border-neutral-300 
+                dark:border-zinc-800 rounded-2xl text-sm focus:border-blue-500 focus:ring-2 
+                focus:ring-blue-500 focus:ring-opacity-50 transition-all"
             />
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
           </div>
@@ -179,7 +179,7 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white 
-              text-sm font-medium rounded-2xl transition-colors shadow-lg shadow-blue-500/20"
+              text-sm font-medium rounded-2xl transition-colors shadow-lg shadow-blue-500/20 cursor-pointer"
           >
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Add User</span>
@@ -261,7 +261,7 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
                               onChange={() => handleToggleAdmin(user)}
                               disabled={isSelf || togglingId === user.id}
                               className={`size-4 rounded border-neutral-300 dark:border-zinc-700 text-blue-600
-                                focus:ring-blue-500 focus:ring-offset-0 cursor-pointer
+                                cursor-pointer
                                 ${isSelf ? "opacity-30 cursor-not-allowed" : ""}`}
                             />
                           )}
@@ -275,7 +275,7 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
                             onClick={() => handleDeleteUser(user)}
                             disabled={isSelf || isDeletingId === user.id}
                             className={`p-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 
-                              rounded-xl transition-all ${isSelf ? 'opacity-30 cursor-not-allowed' : 'opacity-0 group-hover:opacity-100'}`}
+                              rounded-xl transition-all cursor-pointer ${isSelf ? 'opacity-30 cursor-not-allowed' : 'opacity-0 group-hover:opacity-100'}`}
                           >
                             {isDeletingId === user.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -336,9 +336,9 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
                     required
                     value={newUserData.email}
                     onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
-                    className="w-full pl-9 pr-4 py-2 bg-neutral-50 dark:bg-zinc-950 border border-neutral-200 
-                      dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:ring-2 
-                      focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full pl-9 pr-4 py-2 bg-neutral-50 dark:bg-zinc-950 border border-neutral-300 
+                      dark:border-zinc-800 rounded-2xl text-sm focus:border-blue-500 focus:ring-2 
+                      focus:ring-blue-500 focus:ring-opacity-50 transition-all"
                     placeholder="user@example.com"
                   />
                 </div>
@@ -356,9 +356,9 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
                     minLength={8}
                     value={newUserData.password}
                     onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
-                    className="w-full pl-9 pr-4 py-2 bg-neutral-50 dark:bg-zinc-950 border border-neutral-200 
-                      dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:ring-2 
-                      focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full pl-9 pr-4 py-2 bg-neutral-50 dark:bg-zinc-950 border border-neutral-300 
+                      dark:border-zinc-800 rounded-2xl text-sm focus:border-blue-500 focus:ring-2 
+                      focus:ring-blue-500 focus:ring-opacity-50 transition-all"
                     placeholder="At least 8 characters"
                   />
                 </div>
@@ -372,7 +372,7 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
                   <button
                     type="button"
                     onClick={() => setNewUserData({ ...newUserData, role: "user" })}
-                    className={`flex-1 py-2 rounded-2xl text-xs font-bold border transition-all
+                    className={`flex-1 py-2 rounded-2xl text-xs font-bold border transition-all cursor-pointer
                       ${newUserData.role === "user" 
                         ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800' 
                         : 'border-neutral-200 dark:border-zinc-800 text-neutral-500 hover:bg-neutral-50 dark:hover:bg-zinc-800'}`}
@@ -382,7 +382,7 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
                   <button
                     type="button"
                     onClick={() => setNewUserData({ ...newUserData, role: "admin" })}
-                    className={`flex-1 py-2 rounded-2xl text-xs font-bold border transition-all flex items-center justify-center gap-1
+                    className={`flex-1 py-2 rounded-2xl text-xs font-bold border transition-all flex items-center justify-center gap-1 cursor-pointer
                       ${newUserData.role === "admin" 
                         ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800' 
                         : 'border-neutral-200 dark:border-zinc-800 text-neutral-500 hover:bg-neutral-50 dark:hover:bg-zinc-800'}`}

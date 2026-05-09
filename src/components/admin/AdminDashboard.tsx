@@ -200,9 +200,9 @@ export default function AdminDashboard({ getAuthHeaders }: AdminDashboardProps) 
                 setShowResults(true);
               }}
               onFocus={() => setShowResults(true)}
-              className="w-full pl-9 pr-10 py-2 bg-white dark:bg-zinc-950 border border-neutral-200 
-                dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:ring-2 
-                focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-neutral-400"
+              className="w-full pl-9 pr-10 py-2 bg-white dark:bg-zinc-950 border border-neutral-300 
+                dark:border-zinc-800 rounded-2xl text-sm focus:border-blue-500 focus:ring-2 
+                focus:ring-blue-500 focus:ring-opacity-50 transition-all placeholder:text-neutral-400"
             />
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
             
@@ -213,7 +213,7 @@ export default function AdminDashboard({ getAuthHeaders }: AdminDashboardProps) 
               {searchQuery && (
                 <button 
                   onClick={() => handleSelectUser(null)}
-                  className="p-0.5 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded-full text-neutral-400 transition-colors"
+                  className="p-0.5 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded-full text-neutral-400 transition-colors cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -239,7 +239,7 @@ export default function AdminDashboard({ getAuthHeaders }: AdminDashboardProps) 
                   <div className="max-h-60 overflow-y-auto p-1.5 custom-scrollbar">
                     <button
                       onClick={() => handleSelectUser(null)}
-                      className={`w-full flex items-center px-3 py-2 text-sm rounded-xl transition-colors
+                      className={`w-full flex items-center px-3 py-2 text-sm rounded-xl transition-colors cursor-pointer
                         ${!selectedUserId ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600' : 'hover:bg-neutral-50 dark:hover:bg-zinc-800 text-neutral-700 dark:text-zinc-300'}`}
                     >
                       <User className="h-4 w-4 mr-2 opacity-50" />
@@ -249,7 +249,7 @@ export default function AdminDashboard({ getAuthHeaders }: AdminDashboardProps) 
                       <button
                         key={u.id}
                         onClick={() => handleSelectUser(u)}
-                        className={`w-full flex items-center px-3 py-2 text-sm rounded-xl transition-colors
+                        className={`w-full flex items-center px-3 py-2 text-sm rounded-xl transition-colors cursor-pointer
                           ${selectedUserId === u.id.toString() ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600' : 'hover:bg-neutral-50 dark:hover:bg-zinc-800 text-neutral-700 dark:text-zinc-300'}`}
                       >
                         <User className="h-4 w-4 mr-2 opacity-50" />

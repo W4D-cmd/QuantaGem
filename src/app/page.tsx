@@ -11,7 +11,7 @@ import Toast, { ToastProps } from "@/components/Toast";
 import DropdownMenu, { DropdownItem } from "@/components/DropdownMenu";
 import SettingsModal from "@/components/SettingsModal";
 import { useRouter } from "next/navigation";
-import { ArrowDown, LogOut, Settings, EllipsisVertical, Paperclip } from "lucide-react";
+import { ArrowDown, LogOut, Settings, EllipsisVertical, Paperclip, Shield } from "lucide-react";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import TemporaryChatToggle from "@/components/TemporaryChatToggle";
 import ProjectManagement from "@/components/ProjectManagement";
@@ -227,6 +227,7 @@ export default function Home() {
   const [isThreeDotMenuOpen, setIsThreeDotMenuOpen] = useState(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [allProjects, setAllProjects] = useState<ProjectListItem[]>([]);
   const [displayingProjectManagementId, setDisplayingProjectManagementId] = useState<number | null>(null);
   const [currentChatProjectId, setCurrentChatProjectId] = useState<number | null>(null);
@@ -498,6 +499,16 @@ export default function Home() {
         }
         const data = await res.json();
         setUserEmail(data.email);
+
+        try {
+          const adminRes = await fetch("/api/admin/check", { headers: getAuthHeaders(), cache: "no-store" });
+          if (adminRes.ok) {
+            const adminData = await adminRes.json();
+            setIsAdmin(adminData.isAdmin === true);
+          }
+        } catch {
+          // Non-critical — admin check failed silently
+        }
       } catch (err: unknown) {
         showToast(extractErrorMessage(err), "error");
         router.replace("/login");
@@ -2083,6 +2094,17 @@ export default function Home() {
   };
 
   const threeDotMenuItems: DropdownItem[] = [
+    ...(isAdmin
+      ? [
+          {
+            id: "admin",
+            label: "Admin Dashboard",
+            icon: <Shield className="size-4" />,
+            onClick: () => router.push("/admin"),
+          },
+          { id: "admin-separator", label: "", icon: <span />, onClick: () => {}, isSeparator: true },
+        ]
+      : []),
     {
       id: "settings",
       label: "Settings",

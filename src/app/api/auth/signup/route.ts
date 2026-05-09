@@ -31,9 +31,12 @@ export async function POST(request: Request) {
 
       const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
+      const userCountResult = await client.query("SELECT COUNT(*) as count FROM users FOR UPDATE");
+      const role = Number(userCountResult.rows[0].count) === 0 ? "admin" : "user";
+
       const newUserResult = await client.query(
-        "INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email",
-        [email, passwordHash],
+        "INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email",
+        [email, passwordHash, role],
       );
 
       const newUser = newUserResult.rows[0];

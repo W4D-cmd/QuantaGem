@@ -78,7 +78,7 @@ export default function AdminPage() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`cursor-pointer w-full text-sm font-medium text-left px-4 py-2.5 rounded-lg flex items-center gap-3
-                  transition-all duration-200 group
+                  transition-all duration-200 group focus:outline-none
                   ${
                     isActive
                       ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-sm border border-neutral-100 dark:border-zinc-700/50"
@@ -97,7 +97,7 @@ export default function AdminPage() {
             onClick={() => router.push("/")}
             className="cursor-pointer w-full text-sm font-semibold text-left px-4 py-2.5 rounded-lg flex items-center gap-3
               text-neutral-400 dark:text-zinc-500 hover:bg-neutral-100 dark:hover:bg-zinc-800/50 
-              hover:text-red-500 transition-all group"
+              hover:text-red-500 transition-all group focus:outline-none"
           >
             <ArrowLeft className="size-4.5 group-hover:-translate-x-1 transition-transform" />
             Exit Admin

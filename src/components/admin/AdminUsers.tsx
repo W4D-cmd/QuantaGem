@@ -48,12 +48,27 @@ function formatRelative(dateStr: string | null): string {
 
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.03 } },
+  visible: { 
+    opacity: 1, 
+    transition: { 
+      staggerChildren: 0.04,
+      delayChildren: 0.05
+    } 
+  },
 };
 
 const rowVariants = {
-  hidden: { opacity: 0, y: 5 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
+  hidden: { opacity: 0, y: 10, height: 0 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    height: "auto",
+    transition: { 
+      opacity: { duration: 0.3 },
+      y: { type: "spring", stiffness: 100, damping: 15 },
+      height: { duration: 0.3 }
+    } 
+  },
 };
 
 export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsersProps) {
@@ -158,7 +173,13 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
   };
 
   return (
-    <div className="space-y-6">
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="space-y-6"
+    >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-xl font-bold text-neutral-900 dark:text-zinc-100 tracking-tight">User Management</h2>
         
@@ -170,8 +191,8 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-950 border border-neutral-300 
-                dark:border-zinc-800 rounded-2xl text-sm focus:border-blue-500 focus:ring-2 
-                focus:ring-blue-500 focus:ring-opacity-50 transition-all"
+                dark:border-zinc-900 rounded-3xl text-sm focus:border-blue-500 focus:ring-2 
+                focus:ring-blue-500 focus:ring-opacity-50 transition-all shadow-lg focus:outline-none"
             />
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
           </div>
@@ -187,7 +208,13 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
         </div>
       </div>
 
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-neutral-100 dark:border-zinc-800 shadow-sm overflow-hidden">
+      <motion.div 
+        layout
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="bg-white dark:bg-zinc-900 rounded-3xl border border-neutral-100 dark:border-zinc-800 shadow-sm overflow-hidden"
+      >
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-sm">
             <thead>
@@ -207,14 +234,16 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
               animate="visible"
               className="divide-y divide-neutral-100 dark:divide-zinc-800"
             >
-              {users.map((user) => {
-                const isSelf = user.id === currentUserId;
-                return (
-                  <motion.tr
-                    key={user.id}
-                    variants={rowVariants}
-                    className="hover:bg-neutral-50/50 dark:hover:bg-zinc-800/50 transition-colors group"
-                  >
+              <AnimatePresence mode="popLayout">
+                {users.map((user) => {
+                  const isSelf = user.id === currentUserId;
+                  return (
+                    <motion.tr
+                      key={user.id}
+                      layout
+                      variants={rowVariants}
+                      className="hover:bg-neutral-50/50 dark:hover:bg-zinc-800/50 transition-colors group"
+                    >
                     <td className="px-6 py-4">
                       <div className="text-neutral-900 dark:text-zinc-100 font-medium">{user.email}</div>
                       <div className="text-[10px] text-neutral-400 dark:text-zinc-500 mt-0.5">ID: {user.id}</div>
@@ -286,11 +315,11 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
                         </Tooltip>
                       </div>
                     </td>
-                  </motion.tr>
-                );
-              })}
-            </motion.tbody>
-          </table>
+                    </motion.tr>
+                  );
+                })}
+              </AnimatePresence>
+            </motion.tbody>          </table>
         </div>
       </div>
 
@@ -337,8 +366,8 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
                     value={newUserData.email}
                     onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
                     className="w-full pl-9 pr-4 py-2 bg-neutral-50 dark:bg-zinc-950 border border-neutral-300 
-                      dark:border-zinc-800 rounded-2xl text-sm focus:border-blue-500 focus:ring-2 
-                      focus:ring-blue-500 focus:ring-opacity-50 transition-all"
+                      dark:border-zinc-900 rounded-3xl text-sm focus:border-blue-500 focus:ring-2 
+                      focus:ring-blue-500 focus:ring-opacity-50 transition-all shadow-lg focus:outline-none"
                     placeholder="user@example.com"
                   />
                 </div>
@@ -357,8 +386,8 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
                     value={newUserData.password}
                     onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
                     className="w-full pl-9 pr-4 py-2 bg-neutral-50 dark:bg-zinc-950 border border-neutral-300 
-                      dark:border-zinc-800 rounded-2xl text-sm focus:border-blue-500 focus:ring-2 
-                      focus:ring-blue-500 focus:ring-opacity-50 transition-all"
+                      dark:border-zinc-900 rounded-3xl text-sm focus:border-blue-500 focus:ring-2 
+                      focus:ring-blue-500 focus:ring-opacity-50 transition-all shadow-lg focus:outline-none"
                     placeholder="At least 8 characters"
                   />
                 </div>
@@ -416,6 +445,6 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
           </motion.div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

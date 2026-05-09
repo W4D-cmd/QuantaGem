@@ -58,13 +58,21 @@ const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.05 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.05 },
   },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+  hidden: { opacity: 0, y: 15 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { 
+      type: "spring",
+      stiffness: 100,
+      damping: 15
+    } 
+  },
 };
 
 function MetricCard({
@@ -171,21 +179,31 @@ export default function AdminDashboard({ getAuthHeaders }: AdminDashboardProps) 
 
   if (isLoading || !metrics) {
     return (
-      <div className="space-y-6">
-        <div className="h-10 w-64 bg-neutral-100 dark:bg-zinc-900 rounded-xl animate-pulse" />
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="space-y-6"
+      >
+        <div className="h-10 w-64 bg-neutral-100 dark:bg-zinc-900 rounded-3xl animate-pulse" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-24 bg-neutral-100 dark:bg-zinc-900 rounded-xl animate-pulse" />
+            <div key={i} className="h-24 bg-neutral-100 dark:bg-zinc-900 rounded-3xl animate-pulse" />
           ))}
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   const maxModelCount = Math.max(...metrics.modelUsage.map((m) => m.count), 1);
 
   return (
-    <div className="space-y-8">
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="space-y-8"
+    >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-xl font-bold text-neutral-900 dark:text-zinc-100">Dashboard Overview</h2>
         
@@ -201,8 +219,8 @@ export default function AdminDashboard({ getAuthHeaders }: AdminDashboardProps) 
               }}
               onFocus={() => setShowResults(true)}
               className="w-full pl-9 pr-10 py-2 bg-white dark:bg-zinc-950 border border-neutral-300 
-                dark:border-zinc-800 rounded-2xl text-sm focus:border-blue-500 focus:ring-2 
-                focus:ring-blue-500 focus:ring-opacity-50 transition-all placeholder:text-neutral-400"
+                dark:border-zinc-900 rounded-3xl text-sm focus:border-blue-500 focus:ring-2 
+                focus:ring-blue-500 focus:ring-opacity-50 transition-all placeholder:text-neutral-400 shadow-lg focus:outline-none"
             />
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
             
@@ -394,6 +412,6 @@ export default function AdminDashboard({ getAuthHeaders }: AdminDashboardProps) 
           </motion.div>
         </section>
       )}
-    </div>
+    </motion.div>
   );
 }

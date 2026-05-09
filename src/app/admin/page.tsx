@@ -76,14 +76,14 @@ export default function AdminPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none transition-colors duration-200 ease-in-out flex items-center gap-3
+                className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none transition-colors duration-200 ease-in-out flex items-center gap-2
                   ${
                     isActive
                       ? "font-semibold bg-neutral-300 dark:bg-zinc-700 text-blue-600 dark:text-blue-400"
                       : "text-neutral-900 dark:text-zinc-50 hover:bg-neutral-200 dark:hover:bg-zinc-800"
                   }`}
               >
-                <tab.icon className={`size-4.5 transition-colors ${isActive ? "text-blue-500" : "text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-zinc-300"}`} />
+                <tab.icon className={`size-5 transition-colors ${isActive ? "text-blue-500" : "text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-zinc-300"}`} />
                 {tab.label}
               </button>
             );
@@ -93,10 +93,10 @@ export default function AdminPage() {
         <div className="flex-none px-4 pb-6">
           <button
             onClick={() => router.push("/")}
-            className="cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none transition-colors duration-200 ease-in-out flex items-center gap-3
+            className="cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none transition-colors duration-200 ease-in-out flex items-center gap-2
               text-neutral-400 dark:text-zinc-500 hover:bg-neutral-200 dark:hover:bg-zinc-800 hover:text-red-500 group"
           >
-            <ArrowLeft className="size-4.5 group-hover:-translate-x-1 transition-transform" />
+            <ArrowLeft className="size-5 group-hover:-translate-x-1 transition-transform" />
             Exit Admin
           </button>
         </div>

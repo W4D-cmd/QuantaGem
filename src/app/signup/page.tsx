@@ -34,6 +34,7 @@ export default function SignupPage() {
 
       const data = await response.json();
       localStorage.setItem("__session", data.token);
+      document.cookie = "__session=" + data.token + "; path=/; max-age=604800; SameSite=Lax";
 
       router.push("/");
     } catch (err: unknown) {

@@ -2087,6 +2087,7 @@ export default function Home() {
         return;
       }
       localStorage.removeItem("__session");
+      document.cookie = "__session=; path=/; max-age=0";
       router.push("/login");
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");

@@ -34,8 +34,10 @@ export default function LoginPage() {
 
       const data = await response.json();
       localStorage.setItem("__session", data.token);
+      document.cookie = "__session=" + data.token + "; path=/; max-age=604800; SameSite=Lax";
 
-      router.push("/");
+      const redirectTo = new URLSearchParams(window.location.search).get("redirectedFrom") || "/";
+      router.push(redirectTo);
     } catch (err: unknown) {
       let errorMessage = "An unexpected error occurred.";
       if (err instanceof Error) {

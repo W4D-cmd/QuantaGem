@@ -173,13 +173,7 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
   };
 
   return (
-    <motion.div 
-      layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-      className="space-y-6"
-    >
+    <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-xl font-bold text-neutral-900 dark:text-zinc-100 tracking-tight">User Management</h2>
         
@@ -208,13 +202,7 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
         </div>
       </div>
 
-      <motion.div 
-        layout
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="bg-white dark:bg-zinc-900 rounded-3xl border border-neutral-100 dark:border-zinc-800 shadow-sm overflow-hidden"
-      >
+      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-neutral-100 dark:border-zinc-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-sm">
             <thead>
@@ -322,7 +310,7 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
             </motion.tbody>
           </table>
         </div>
-      </motion.div>
+      </div>
 
       <div className="flex items-center justify-between text-xs font-medium text-neutral-400 dark:text-zinc-600 px-2">
         <div>{users.length} users found</div>
@@ -446,6 +434,6 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
           </motion.div>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }

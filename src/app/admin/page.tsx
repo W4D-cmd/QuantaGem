@@ -69,19 +69,18 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <nav className="flex-1 px-3 space-y-1.5 mt-2">
+        <nav className="flex-1 px-4 space-y-0.5 mt-2">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`cursor-pointer w-full text-sm font-medium text-left px-4 py-2.5 rounded-lg flex items-center gap-3
-                  transition-all duration-200 group focus:outline-none
+                className={`cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none transition-colors duration-200 ease-in-out flex items-center gap-3
                   ${
                     isActive
-                      ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-sm border border-neutral-100 dark:border-zinc-700/50"
-                      : "text-neutral-500 dark:text-zinc-400 hover:bg-neutral-100 dark:hover:bg-zinc-800/50 hover:text-neutral-900 dark:hover:text-zinc-100"
+                      ? "font-semibold bg-neutral-300 dark:bg-zinc-700 text-blue-600 dark:text-blue-400"
+                      : "text-neutral-900 dark:text-zinc-50 hover:bg-neutral-200 dark:hover:bg-zinc-800"
                   }`}
               >
                 <tab.icon className={`size-4.5 transition-colors ${isActive ? "text-blue-500" : "text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-zinc-300"}`} />
@@ -91,12 +90,11 @@ export default function AdminPage() {
           })}
         </nav>
 
-        <div className="flex-none px-3 pb-6">
+        <div className="flex-none px-4 pb-6">
           <button
             onClick={() => router.push("/")}
-            className="cursor-pointer w-full text-sm font-semibold text-left px-4 py-2.5 rounded-lg flex items-center gap-3
-              text-neutral-400 dark:text-zinc-500 hover:bg-neutral-100 dark:hover:bg-zinc-800/50 
-              hover:text-red-500 transition-all group focus:outline-none"
+            className="cursor-pointer w-full text-sm text-left p-2 py-1 rounded-lg focus:outline-none transition-colors duration-200 ease-in-out flex items-center gap-3
+              text-neutral-400 dark:text-zinc-500 hover:bg-neutral-200 dark:hover:bg-zinc-800 hover:text-red-500 group"
           >
             <ArrowLeft className="size-4.5 group-hover:-translate-x-1 transition-transform" />
             Exit Admin

@@ -319,9 +319,10 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
                   );
                 })}
               </AnimatePresence>
-            </motion.tbody>          </table>
+            </motion.tbody>
+          </table>
         </div>
-      </div>
+      </motion.div>
 
       <div className="flex items-center justify-between text-xs font-medium text-neutral-400 dark:text-zinc-600 px-2">
         <div>{users.length} users found</div>

@@ -419,5 +419,3 @@ export default function AdminUsers({ getAuthHeaders, currentUserId }: AdminUsers
     </div>
   );
 }
-  );
-}

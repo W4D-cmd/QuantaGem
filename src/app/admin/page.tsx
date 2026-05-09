@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutDashboard, Users, ArrowLeft } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AdminUsers from "@/components/admin/AdminUsers";
 

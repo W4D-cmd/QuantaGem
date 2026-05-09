@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import Tooltip from "@/components/Tooltip";
 
 import { Plus, Trash2, Loader2, Search, UserPlus, Shield, Mail, Lock } from "lucide-react";
@@ -46,7 +46,7 @@ function formatRelative(dateStr: string | null): string {
   return formatDate(dateStr);
 }
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { 
     opacity: 1, 
@@ -57,7 +57,7 @@ const containerVariants = {
   },
 };
 
-const rowVariants = {
+const rowVariants: Variants = {
   hidden: { opacity: 0, y: 10, height: 0 },
   visible: { 
     opacity: 1, 

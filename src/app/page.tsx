@@ -2221,8 +2221,8 @@ export default function Home() {
                             className="text-xs font-bold ml-3"
                             style={{ color: getCostColor(estimatedNextCost, selectedModel?.name) }}
                           >
-                            (${(Number(accumulatedCost) || 0).toFixed(2)}
-                            {estimatedNextCost > 0 ? ` + ~$${estimatedNextCost.toFixed(2)}` : ""})
+                            (${(Number(accumulatedCost) || 0).toFixed(4)}
+                            {estimatedNextCost > 0 ? ` + ~$${estimatedNextCost.toFixed(4)}` : ""})
                           </span>
                         )}
                       </div>

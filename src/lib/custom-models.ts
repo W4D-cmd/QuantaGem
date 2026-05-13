@@ -198,8 +198,8 @@ export const customModels: CustomModelEntry[] = [
     secondaryPricePer1MInputTokens: 4.00,
   },
   {
-    displayName: "Gemini 3.1 Flash-Lite Preview",
-    modelId: "gemini-3.1-flash-lite-preview",
+    displayName: "Gemini 3.1 Flash-Lite",
+    modelId: "gemini-3.1-flash-lite",
     inputTokenLimit: 1048576,
     outputTokenLimit: 65536,
     provider: "gemini",
@@ -228,16 +228,6 @@ export const customModels: CustomModelEntry[] = [
     pricePer1MOutputTokens: 10.00,
     inputTokenThreshold: 200000,
     secondaryPricePer1MInputTokens: 2.50,
-  },
-  {
-    displayName: "Gemini 2.5 Flash",
-    modelId: "gemini-2.5-flash",
-    inputTokenLimit: 1048576,
-    outputTokenLimit: 65536,
-    provider: "gemini",
-    supportsReasoning: true,
-    pricePer1MInputTokens: 0.30,
-    pricePer1MOutputTokens: 2.50,
   },
   {
     displayName: "GPT-5.4",

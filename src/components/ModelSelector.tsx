@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Model } from "@google/genai";
 import Tooltip from "@/components/Tooltip";
 import { Download, Upload, ChevronDown, CircleCheck } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import {
   ModelProvider,
   getProviderForModel,

@@ -2,7 +2,7 @@
 
 import { FC, useCallback, useEffect, useRef } from "react";
 import { X, CheckCircle, AlertTriangle } from "lucide-react";
-import { motion, useAnimation } from "framer-motion";
+import { motion, useAnimation } from "motion/react";
 
 export interface ToastProps {
   message: string;

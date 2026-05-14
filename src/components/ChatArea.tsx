@@ -69,7 +69,7 @@ const KATEX_OPTIONS: KatexOptions = { macros: { "\\dollar": "\\$" } };
 import Tooltip from "@/components/Tooltip";
 import MessageSkeleton from "./MessageSkeleton";
 import LazyMarkdownRenderer from "./LazyMarkdownRenderer";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { preprocessMarkdown } from "@/lib/markdown-utils";
 
 type GetAuthHeaders = () => HeadersInit;

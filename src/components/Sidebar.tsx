@@ -16,7 +16,7 @@ import {
   Pin,
   PinOff,
 } from "lucide-react";
-import { motion, AnimatePresence, Variants } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "motion/react";
 import TruncatedTooltip from "./TruncatedTooltip";
 
 interface SidebarProps {

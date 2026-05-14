@@ -18,7 +18,7 @@ import ProjectManagement from "@/components/ProjectManagement";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import SearchModal from "@/components/SearchModal";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import {
   ThinkingOption,
   VerbosityOption,

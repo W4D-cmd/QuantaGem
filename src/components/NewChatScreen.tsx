@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { ProjectListItem } from "@/app/page";
 import { Sparkles, Plus, Trash2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import {
   DndContext,
   closestCenter,

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { motion, AnimatePresence, Variants } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "motion/react";
 import Tooltip from "@/components/Tooltip";
 
 import { Plus, Trash2, Loader2, Search, UserPlus, Shield, Mail, Lock } from "lucide-react";

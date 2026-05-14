@@ -3,7 +3,7 @@
 import React, { useEffect, ReactNode, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { motion, AnimatePresence, Variants } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "motion/react";
 
 interface ModalProps {
   isOpen: boolean;

@@ -59,7 +59,7 @@ import DropdownMenu, { DropdownItem } from "./DropdownMenu";
 import { ToastProps } from "./Toast";
 import { Model } from "@google/genai";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 
 export interface UploadedFileInfo {
   objectName: string;

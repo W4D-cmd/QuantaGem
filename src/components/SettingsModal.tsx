@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Modal from "./Modal";
 import { ToastProps } from "./Toast";
 import { Server, RefreshCw, Settings, ShieldCheck, Eye, EyeOff } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 
 type SettingsTab = "general" | "providers" | "security";
 

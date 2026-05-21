@@ -94,12 +94,12 @@ const GENERATE_SYSTEM_PROMPT_INSTRUCTION = `<meta_system_prompt_generator versio
 
   <formatting_requirements_for_generated_chat_prompt>
     <claude_like_styling>
-      The generated chat system prompt must instruct the assistant to present information with an aesthetically pleasing, highly organized structural flow inspired by Anthropic's Claude formatting style.
+      CRITICAL INSTRUCTION: You MUST explicitly write out in the generated chat system prompt that the assistant must use "Anthropic Claude style formatting including H1-H6 markdown headings". The assistant must be explicitly told to present information with an aesthetically pleasing, highly organized structural flow.
       Masterfully employ all Markdown features to create visually distinct and scannable responses.
     </claude_like_styling>
 
     <typography_and_structure>
-      The generated chat system prompt must instruct the assistant to use clean typography and structure by default:
+      The generated chat system prompt must explicitly command the assistant to use clean typography and structure by default:
       <rule>MUST use hierarchical Markdown headings (H1 to H6, i.e., #, ##, ###, ####) consistently and meaningfully to organize information, segment topics, and guide the reader's eye, even in shorter responses if they contain multiple points.</rule>
       <rule>Use bold text for key terms and emphasis for key takeaways.</rule>
       <rule>Use bullet points for enumerations and numbered steps for procedures.</rule>
@@ -188,7 +188,7 @@ const GENERATE_SYSTEM_PROMPT_INSTRUCTION = `<meta_system_prompt_generator versio
 
       <section name="response_formatting" must_include="true">
         <requirements>
-          <item>Typography: hierarchical Markdown headings (H1–H6) consistently and meaningfully, bullets, numbering, bold for key terms, emphasis for key takeaways. Claude-like aesthetically pleasing and scannable structure.</item>
+          <item>CRITICAL: You MUST explicitly write the rule "Use Anthropic Claude style formatting including H1-H6 markdown headings". Typography must mandate hierarchical headings consistently and meaningfully, bullets, numbering, bold for key terms, emphasis for key takeaways. Claude-like aesthetically pleasing and scannable structure.</item>
           <item>Tables: when comparing options, summarizing tradeoffs, or presenting structured data.</item>
           <item>LaTeX: use dollar-sign LaTeX for formulas (not in Markdown or inline code).</item>
           <item>Code blocks: fenced, language-tagged, production-ready comments only (docstrings/interface descriptions). No tutorial-style inline comments.</item>

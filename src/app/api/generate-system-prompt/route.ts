@@ -93,21 +93,52 @@ const GENERATE_SYSTEM_PROMPT_INSTRUCTION = `<meta_system_prompt_generator versio
   </quality_and_truthfulness_requirements>
 
   <formatting_requirements_for_generated_chat_prompt>
+    <claude_like_styling>
+      The generated chat system prompt must instruct the assistant to present information with an aesthetically pleasing, highly organized structural flow inspired by Anthropic's Claude formatting style.
+      Masterfully employ all Markdown features to create visually distinct and scannable responses.
+    </claude_like_styling>
+
     <typography_and_structure>
       The generated chat system prompt must instruct the assistant to use clean typography and structure by default:
-      clear headings, short sections, bullet points for lists, numbered steps for procedures, and emphasis (bold) for key takeaways.
+      <rule>MUST use hierarchical Markdown headings (H1 to H6, i.e., #, ##, ###, ####) consistently and meaningfully to organize information, segment topics, and guide the reader's eye, even in shorter responses if they contain multiple points.</rule>
+      <rule>Use bold text for key terms and emphasis for key takeaways.</rule>
+      <rule>Use bullet points for enumerations and numbered steps for procedures.</rule>
+      <rule>Keep sections short and well-separated.</rule>
     </typography_and_structure>
+
     <tables>
       The generated chat system prompt must encourage tables when comparing options, summarizing tradeoffs, or presenting structured data.
       Tables should be readable and not excessively wide; include units and assumptions where relevant.
     </tables>
+
     <latex>
       The generated chat system prompt must instruct: use LaTeX enclosed in dollar signs for mathematical/technical formulas (inline and display when appropriate), and keep it readable.
+      LaTeX code should not be written in Markdown or inline code unless the user explicitly requests it.
     </latex>
+
     <code_and_outputs>
-      When providing code, the assistant should use fenced code blocks with an appropriate language tag and keep code correct and runnable.
-      Explanations should be outside code blocks unless the user explicitly requests otherwise.
+      <rule>Use fenced code blocks with an appropriate language tag; keep code correct and runnable.</rule>
+      <rule>Explanations should be outside code blocks unless the user explicitly requests otherwise.</rule>
+      <rule>Only include code comments that meet high-quality, production-ready standards (e.g., formal docstrings for classes/methods, essential interface descriptions). Strictly avoid using inline code comments as a medium to explain logic, step-by-step functionality, or design choices. All tutorial-style explanations and conversational descriptive text must be placed entirely outside the Markdown source code blocks.</rule>
     </code_and_outputs>
+
+    <emoji_and_icons>
+      The generated chat system prompt must instruct the assistant to integrate emojis purposefully to enhance visual structure, readability, and formatting.
+      <rule>Application must be strictly professional, functional, and sophisticated.</rule>
+      <rule>Avoid childish or excessive emotional expressions; prefer structural indicators and professional symbols (e.g., but not limited to: ✔️, ❌, ℹ️, ⚠️, ⚙️, 📊).</rule>
+    </emoji_and_icons>
+
+    <nerd_font_icons>
+      The generated chat system prompt must instruct the assistant to utilize Nerd Font ligatures and icons purposefully to enhance technical visual structure, readability, and formatting.
+      <rule>Application must be strictly professional, functional, and sophisticated.</rule>
+      <rule>Avoid visual clutter; prefer structural indicators, directional arrows, file-type representations, and technical UI symbols (e.g., but not limited to: ➔, ➜, ❯, ➤, 󰒋). Do NOT use these symbols as mere decorations at the end of conversational sentences or to simulate a command-line prompt at the end of a reply.</rule>
+      <rule>Use arrow symbols instead of "->" for example.</rule>
+    </nerd_font_icons>
+
+    <blockquotes>
+      The generated chat system prompt must instruct the assistant to employ Markdown blockquotes (>) to visually distinguish and format important callouts, warning notices, strategic hints, or specialized informational blocks.
+      <rule>Combine blockquotes with appropriate emojis or Nerd Font icons (e.g., > ⚠️ **Warning:**) to effectively direct the user's attention.</rule>
+    </blockquotes>
   </formatting_requirements_for_generated_chat_prompt>
 
   <output_specification>
@@ -157,10 +188,13 @@ const GENERATE_SYSTEM_PROMPT_INSTRUCTION = `<meta_system_prompt_generator versio
 
       <section name="response_formatting" must_include="true">
         <requirements>
-          <item>Typography: headings, bullets, numbering, emphasis for key points.</item>
-          <item>Tables: when beneficial.</item>
-          <item>LaTeX: use dollar-sign LaTeX for formulas.</item>
-          <item>Code blocks: fenced, language-tagged.</item>
+          <item>Typography: hierarchical Markdown headings (H1–H6) consistently and meaningfully, bullets, numbering, bold for key terms, emphasis for key takeaways. Claude-like aesthetically pleasing and scannable structure.</item>
+          <item>Tables: when comparing options, summarizing tradeoffs, or presenting structured data.</item>
+          <item>LaTeX: use dollar-sign LaTeX for formulas (not in Markdown or inline code).</item>
+          <item>Code blocks: fenced, language-tagged, production-ready comments only (docstrings/interface descriptions). No tutorial-style inline comments.</item>
+          <item>Emojis: professional structural indicators only (e.g., ✔️, ❌, ℹ️, ⚠️, ⚙️, 📊). No childish or excessive use.</item>
+          <item>Nerd Font icons: structural indicators and directional arrows (e.g., ➔, ➜, ❯, ➤). Use arrows instead of "->". No decorative use at sentence endings.</item>
+          <item>Blockquotes: for callouts, warnings, and hints, combined with emojis or icons (e.g., > ⚠️ **Warning:**).</item>
         </requirements>
       </section>
 

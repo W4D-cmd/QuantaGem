@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { ProjectListItem } from "@/app/page";
-import { Sparkles, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import {
   DndContext,
@@ -245,13 +245,6 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({
             className="bg-white dark:bg-zinc-900 border border-neutral-200 dark:border-zinc-800 rounded-2xl
             shadow-lg p-8 text-center"
           >
-            <div
-              className="mx-auto flex items-center justify-center size-16 rounded-full bg-blue-100 dark:bg-blue-900/50
-              mb-6"
-            >
-              <Sparkles className="size-8 text-blue-600/80 dark:text-blue-400/90" />
-            </div>
-
             <h1 className="text-3xl font-bold text-neutral-800 dark:text-zinc-300 mb-2">
               Start a new conversation
             </h1>

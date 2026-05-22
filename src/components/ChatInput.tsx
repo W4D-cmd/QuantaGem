@@ -45,6 +45,8 @@ import {
   getThinkingConfigForModel,
   isOpenAIReasoningModel,
   getOpenAIReasoningConfig,
+  modelUsesGeminiThinkingLevel,
+  getGeminiSupportedLevels,
 } from "@/lib/thinking";
 import {
   GenerationParameters,
@@ -443,8 +445,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         if (efforts.includes("medium")) options.push("medium");
         if (efforts.includes("high")) options.push("high");
         if (efforts.includes("xhigh")) options.push("xhigh");
+      } else if (modelUsesGeminiThinkingLevel(modelName)) {
+        const supportedLevels = getGeminiSupportedLevels(modelName);
+        options = ["dynamic", ...supportedLevels];
       } else {
         options = ["dynamic", "low", "medium", "high"];
+        if (config.minimal !== undefined && config.minimal > 0) {
+          options.splice(1, 0, "minimal");
+        }
         if (config.canBeOff) {
           options.splice(1, 0, "off");
         }
@@ -453,6 +461,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       const labelMap: Record<ThinkingOption, string> = {
         dynamic: "Dynamic",
         off: "Off",
+        minimal: "Minimal",
         low: "Low",
         medium: "Medium",
         high: "High",

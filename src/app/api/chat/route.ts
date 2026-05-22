@@ -1,4 +1,4 @@
-import { Content, GoogleGenAI, GroundingMetadata, Part, HarmCategory, HarmBlockThreshold } from "@google/genai";
+import { Content, GoogleGenAI, GroundingMetadata, Part, HarmCategory, HarmBlockThreshold, ThinkingLevel } from "@google/genai";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { ChatCompletionMessageParam, ChatCompletionContentPart } from "openai/resources/chat/completions";
@@ -20,6 +20,8 @@ import {
   isGPT5FamilyModel,
   mapBudgetToOpenAIReasoningEffort,
   mapBudgetToAnthropicEffort,
+  modelUsesGeminiThinkingLevel,
+  mapBudgetToGeminiThinkingLevel,
   VerbosityOption,
   supportsVerbosity,
 } from "@/lib/thinking";
@@ -421,7 +423,7 @@ async function handleGeminiRequest(
   const generationConfig: {
     systemInstruction?: string;
     tools?: Array<{ googleSearch: Record<string, never> }>;
-    thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
+    thinkingConfig?: { thinkingBudget?: number; thinkingLevel?: ThinkingLevel; includeThoughts?: boolean };
     safetySettings?: typeof safetySettings;
     temperature?: number;
     topP?: number;
@@ -445,15 +447,19 @@ async function handleGeminiRequest(
   }
 
   if (modelSupportsReasoning(baseModelId)) {
-    const effectiveThinkingConfig: { thinkingBudget?: number; includeThoughts?: boolean } = {};
+    const effectiveThinkingConfig: { thinkingBudget?: number; thinkingLevel?: ThinkingLevel; includeThoughts?: boolean } = {};
 
     // For reasoning-capable models, we default includeThoughts to true unless budget is 0
     if (thinkingBudget !== 0) {
       effectiveThinkingConfig.includeThoughts = true;
     }
 
-    if (thinkingBudget !== undefined) {
-      // 0 is DISABLED, -1 is AUTOMATIC in the SDK
+    if (modelUsesGeminiThinkingLevel(baseModelId)) {
+      // Gemini 3.x models use named thinkingLevel instead of numeric thinkingBudget
+      const level = mapBudgetToGeminiThinkingLevel(baseModelId, thinkingBudget);
+      effectiveThinkingConfig.thinkingLevel = level as ThinkingLevel;
+    } else if (thinkingBudget !== undefined) {
+      // Legacy Gemini 2.x models: 0 is DISABLED, -1 is AUTOMATIC in the SDK
       effectiveThinkingConfig.thinkingBudget = thinkingBudget;
     }
 

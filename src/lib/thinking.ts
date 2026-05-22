@@ -1,6 +1,6 @@
 import { isCustomModel } from "./custom-models";
 
-export type ThinkingOption = "dynamic" | "off" | "low" | "medium" | "high" | "xhigh";
+export type ThinkingOption = "dynamic" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 export type OpenAIReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh";
 
@@ -13,6 +13,10 @@ interface ThinkingModelConfig {
   max: number;
   canBeOff: boolean;
   medium: number;
+  minimal?: number;
+  useThinkingLevel?: boolean;
+  supportedLevels?: ThinkingOption[];
+  defaultLevel?: ThinkingOption;
 }
 
 interface OpenAIReasoningModelConfig {
@@ -24,6 +28,30 @@ interface OpenAIReasoningModelConfig {
 const modelConfigs: Record<string, ThinkingModelConfig> = {
   "2.5-pro": { min: 2048, max: 32768, canBeOff: false, medium: 8192 },
   "2.5-flash": { min: 2048, max: 24576, canBeOff: true, medium: 8192 },
+  "3.5-flash": {
+    min: 0, max: 0, canBeOff: false, medium: 0,
+    useThinkingLevel: true,
+    supportedLevels: ["minimal", "low", "medium", "high"],
+    defaultLevel: "medium",
+  },
+  "3.1-pro": {
+    min: 0, max: 0, canBeOff: false, medium: 0,
+    useThinkingLevel: true,
+    supportedLevels: ["low", "medium", "high"],
+    defaultLevel: "high",
+  },
+  "3.1-flash": {
+    min: 0, max: 0, canBeOff: false, medium: 0,
+    useThinkingLevel: true,
+    supportedLevels: ["minimal", "low", "medium", "high"],
+    defaultLevel: "minimal",
+  },
+  "3-flash": {
+    min: 0, max: 0, canBeOff: false, medium: 0,
+    useThinkingLevel: true,
+    supportedLevels: ["minimal", "low", "medium", "high"],
+    defaultLevel: "high",
+  },
 };
 
 const openAIReasoningModelConfigs: Record<string, OpenAIReasoningModelConfig> = {
@@ -87,7 +115,6 @@ export function mapBudgetToAnthropicEffort(
     return config.defaultEffort;
   }
 
-  // Map budget values: 0/1=low, 2=medium, 3/4=high
   if (budget <= 1) return "low";
   if (budget === 2) return "medium";
   return "high";
@@ -102,7 +129,6 @@ function getOpenAIModelBase(modelName: string): string | null {
 
 export function isOpenAIReasoningModel(modelName: string | null | undefined): boolean {
   if (!modelName) return false;
-  // Custom models should not show reasoning controls in the UI
   if (isCustomModel(modelName)) return false;
   const baseModel = getOpenAIModelBase(modelName);
   return baseModel !== null && baseModel in openAIReasoningModelConfigs;
@@ -117,7 +143,6 @@ export function isGPT5FamilyModel(modelName: string | null | undefined): boolean
 
 export function getOpenAIReasoningConfig(modelName: string | null | undefined): OpenAIReasoningModelConfig | null {
   if (!modelName) return null;
-  // Custom models should not show reasoning controls in the UI
   if (isCustomModel(modelName)) return null;
   const baseModel = getOpenAIModelBase(modelName);
   if (!baseModel) return null;
@@ -126,7 +151,6 @@ export function getOpenAIReasoningConfig(modelName: string | null | undefined): 
 
 export function supportsVerbosity(modelName: string | null | undefined): boolean {
   if (!modelName) return false;
-  // Custom models don't support verbosity control in the UI
   if (isCustomModel(modelName)) return false;
   const baseModel = getOpenAIModelBase(modelName);
   if (!baseModel) return false;
@@ -152,9 +176,12 @@ export function getDefaultReasoningEffort(modelName: string | null | undefined):
 
 export function getThinkingConfigForModel(modelName: string | null | undefined): ThinkingModelConfig | null {
   if (!modelName) return null;
-  if (modelName.includes("2.5-pro") || modelName.includes("3.1-pro")) return modelConfigs["2.5-pro"];
-  if (modelName.includes("2.5-flash") || modelName.includes("3.1-flash") || modelName.includes("gemini-3-flash"))
-    return modelConfigs["2.5-flash"];
+  if (modelName.includes("2.5-pro")) return modelConfigs["2.5-pro"];
+  if (modelName.includes("3.1-pro")) return modelConfigs["3.1-pro"];
+  if (modelName.includes("3.5-flash")) return modelConfigs["3.5-flash"];
+  if (modelName.includes("3.1-flash")) return modelConfigs["3.1-flash"];
+  if (modelName.includes("gemini-3-flash")) return modelConfigs["3-flash"];
+  if (modelName.includes("2.5-flash")) return modelConfigs["2.5-flash"];
   if (isOpenAIReasoningModel(modelName)) {
     const config = getOpenAIReasoningConfig(modelName);
     const canBeOff = config?.supportedEfforts.includes("none") ?? false;
@@ -173,6 +200,7 @@ export function getThinkingBudgetMap(modelName: string | null | undefined): Reco
     return {
       dynamic: -1,
       off: -1,
+      minimal: -1,
       low: 1,
       medium: 2,
       high: 3,
@@ -186,6 +214,7 @@ export function getThinkingBudgetMap(modelName: string | null | undefined): Reco
     return {
       dynamic: -1,
       off: efforts.includes("none") ? 0 : -1,
+      minimal: -1,
       low: efforts.includes("low") ? 1 : -1,
       medium: efforts.includes("medium") ? 2 : -1,
       high: efforts.includes("high") ? 3 : -1,
@@ -196,9 +225,29 @@ export function getThinkingBudgetMap(modelName: string | null | undefined): Reco
   const config = getThinkingConfigForModel(modelName);
   if (!config) return null;
 
+  if (config.useThinkingLevel && config.supportedLevels) {
+    const budgetMap: Record<ThinkingOption, number> = {
+      dynamic: -1,
+      off: -1,
+      minimal: -1,
+      low: 1,
+      medium: 2,
+      high: 3,
+      xhigh: -1,
+    };
+    for (const level of config.supportedLevels) {
+      if (level === "minimal") budgetMap.minimal = 0;
+      else if (level === "low") budgetMap.low = 1;
+      else if (level === "medium") budgetMap.medium = 2;
+      else if (level === "high") budgetMap.high = 3;
+    }
+    return budgetMap;
+  }
+
   return {
     dynamic: -1,
     off: config.canBeOff ? 0 : -1,
+    minimal: config.minimal ?? -1,
     low: config.min,
     medium: config.medium,
     high: config.max,
@@ -235,6 +284,19 @@ export function getThinkingValueMap(modelName: string | null | undefined): { [ke
   const config = getThinkingConfigForModel(modelName);
   if (!config) return null;
 
+  if (config.useThinkingLevel && config.supportedLevels) {
+    const valueMap: { [key: number]: ThinkingOption } = {
+      [-1]: "dynamic",
+    };
+    for (const level of config.supportedLevels) {
+      if (level === "minimal") valueMap[0] = "minimal";
+      else if (level === "low") valueMap[1] = "low";
+      else if (level === "medium") valueMap[2] = "medium";
+      else if (level === "high") valueMap[3] = "high";
+    }
+    return valueMap;
+  }
+
   const valueMap: { [key: number]: ThinkingOption } = {
     [-1]: "dynamic",
     [config.min]: "low",
@@ -244,8 +306,49 @@ export function getThinkingValueMap(modelName: string | null | undefined): { [ke
   if (config.canBeOff) {
     valueMap[0] = "off";
   }
+  if (config.minimal !== undefined && config.minimal > 0) {
+    valueMap[config.minimal] = "minimal";
+  }
 
   return valueMap;
+}
+
+export function modelUsesGeminiThinkingLevel(modelName: string | null | undefined): boolean {
+  const config = getThinkingConfigForModel(modelName);
+  return config?.useThinkingLevel === true;
+}
+
+export function getDefaultGeminiThinkingLevel(modelName: string | null | undefined): ThinkingOption {
+  const config = getThinkingConfigForModel(modelName);
+  return config?.defaultLevel ?? "medium";
+}
+
+export function getGeminiSupportedLevels(modelName: string | null | undefined): ThinkingOption[] {
+  const config = getThinkingConfigForModel(modelName);
+  return config?.supportedLevels ?? [];
+}
+
+export function mapBudgetToGeminiThinkingLevel(
+  modelName: string | null | undefined,
+  budget: number | undefined,
+): "MINIMAL" | "LOW" | "MEDIUM" | "HIGH" {
+  const config = getThinkingConfigForModel(modelName);
+
+  if (budget === undefined || budget === -1) {
+    const defaultLevel = config?.defaultLevel ?? "medium";
+    switch (defaultLevel) {
+      case "minimal": return "MINIMAL" as const;
+      case "low": return "LOW" as const;
+      case "high": return "HIGH" as const;
+      default: return "MEDIUM" as const;
+    }
+  }
+
+  if (budget === 0) return "MINIMAL" as const;
+  if (budget === 1) return "LOW" as const;
+  if (budget === 2) return "MEDIUM" as const;
+  if (budget === 3) return "HIGH" as const;
+  return "MEDIUM" as const;
 }
 
 export function mapBudgetToOpenAIReasoningEffort(

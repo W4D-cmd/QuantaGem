@@ -72,7 +72,7 @@ services:
       start_period: 300s
 
   redis:
-    image: redis:8-alpine@sha256:ad0a6eff0a40304ab1ab4f50f0dc192d82b071e1094eac961bcb6106092f8a4e
+    image: redis:8-alpine@sha256:09160599abd229764c0fb44cb6be640294e1d360a54b19985ab4843dcf2d90f1
     restart: unless-stopped
     networks:
       - app-network

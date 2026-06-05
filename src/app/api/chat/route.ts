@@ -1670,6 +1670,7 @@ async function handleAnthropicRequest(
     messages,
     thinking: {
       type: "adaptive",
+      display: "summarized",
     },
     output_config: {
       effort,
@@ -2002,6 +2003,7 @@ async function handleCustomAnthropicRequest(
     messages,
     thinking: {
       type: "adaptive",
+      display: "summarized",
     },
     output_config: {
       effort,

@@ -44,6 +44,8 @@ import {
   VerbosityOption,
   getThinkingConfigForModel,
   isOpenAIReasoningModel,
+  isAnthropicReasoningModel,
+  getAnthropicReasoningConfig,
   getOpenAIReasoningConfig,
   modelUsesGeminiThinkingLevel,
   getGeminiSupportedLevels,
@@ -441,6 +443,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const efforts = openaiConfig?.supportedEfforts ?? [];
         options = ["dynamic"];
         if (efforts.includes("none")) options.push("off");
+        if (efforts.includes("low")) options.push("low");
+        if (efforts.includes("medium")) options.push("medium");
+        if (efforts.includes("high")) options.push("high");
+        if (efforts.includes("xhigh")) options.push("xhigh");
+      } else if (isAnthropicReasoningModel(modelName)) {
+        const anthropicConfig = getAnthropicReasoningConfig(modelName);
+        const efforts = anthropicConfig?.supportedEfforts ?? [];
+        options = ["dynamic"];
         if (efforts.includes("low")) options.push("low");
         if (efforts.includes("medium")) options.push("medium");
         if (efforts.includes("high")) options.push("high");

@@ -1676,10 +1676,6 @@ async function handleAnthropicRequest(
     },
   };
 
-  if (temperature !== null) requestParams.temperature = temperature;
-  if (topP !== null) requestParams.top_p = topP;
-  if (topK !== null) requestParams.top_k = topK;
-
   if (systemPromptText && systemPromptText.trim() !== "") {
     requestParams.system = systemPromptText;
   }
@@ -2011,10 +2007,6 @@ async function handleCustomAnthropicRequest(
       effort,
     },
   };
-
-  if (temperature !== null) requestParams.temperature = temperature;
-  if (topP !== null) requestParams.top_p = topP;
-  if (topK !== null) requestParams.top_k = topK;
 
   if (systemPromptText && systemPromptText.trim() !== "") {
     requestParams.system = systemPromptText;

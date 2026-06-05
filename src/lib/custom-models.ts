@@ -159,6 +159,7 @@ export function getModelPricing(modelId: string): {
  */
 export const STATIC_CUSTOM_PROVIDERS: Record<string, FetchedCustomModel[]> = {
   "minimax.io": [
+    { id: "MiniMax-M3", displayName: "MiniMax-M3", apiType: "anthropic" },
     { id: "MiniMax-M2.7", displayName: "MiniMax-M2.7", apiType: "anthropic" },
     { id: "MiniMax-M2.5", displayName: "MiniMax-M2.5", apiType: "anthropic" },
   ],
@@ -251,9 +252,9 @@ export const customModels: CustomModelEntry[] = [
     pricePer1MOutputTokens: 15.00,
   },
   {
-    displayName: "Claude Opus 4.6",
-    modelId: "claude-opus-4-6",
-    inputTokenLimit: 200000,
+    displayName: "Claude Opus 4.8",
+    modelId: "claude-opus-4-8",
+    inputTokenLimit: 1000000,
     outputTokenLimit: 128000,
     provider: "anthropic",
     supportsReasoning: true,

@@ -4,7 +4,7 @@ export type ThinkingOption = "dynamic" | "off" | "minimal" | "low" | "medium" | 
 
 export type OpenAIReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh";
 
-export type AnthropicEffort = "low" | "medium" | "high";
+export type AnthropicEffort = "low" | "medium" | "high" | "xhigh";
 
 export type VerbosityOption = "low" | "medium" | "high";
 
@@ -78,6 +78,10 @@ interface AnthropicReasoningModelConfig {
 }
 
 const anthropicReasoningModelConfigs: Record<string, AnthropicReasoningModelConfig> = {
+  "claude-opus-4-8": {
+    supportedEfforts: ["low", "medium", "high", "xhigh"],
+    defaultEffort: "high",
+  },
   "claude-opus-4-6": {
     supportedEfforts: ["low", "medium", "high"],
     defaultEffort: "high",
@@ -85,6 +89,7 @@ const anthropicReasoningModelConfigs: Record<string, AnthropicReasoningModelConf
 };
 
 function getAnthropicModelBase(modelName: string): string | null {
+  if (modelName.startsWith("claude-opus-4-8")) return "claude-opus-4-8";
   if (modelName.startsWith("claude-opus-4-6")) return "claude-opus-4-6";
   return null;
 }
@@ -117,7 +122,8 @@ export function mapBudgetToAnthropicEffort(
 
   if (budget <= 1) return "low";
   if (budget === 2) return "medium";
-  return "high";
+  if (budget === 3) return "high";
+  return "xhigh";
 }
 
 function getOpenAIModelBase(modelName: string): string | null {
@@ -204,7 +210,7 @@ export function getThinkingBudgetMap(modelName: string | null | undefined): Reco
       low: 1,
       medium: 2,
       high: 3,
-      xhigh: -1,
+      xhigh: 4,
     };
   }
 
@@ -264,6 +270,7 @@ export function getThinkingValueMap(modelName: string | null | undefined): { [ke
       1: "low",
       2: "medium",
       3: "high",
+      4: "xhigh",
     };
   }
 

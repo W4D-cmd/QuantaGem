@@ -75,7 +75,8 @@ def convert_audio_to_wav(input_path: str, output_path: str) -> None:
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg conversion failed: {result.stderr}")
+        stderr_output = result.stderr[:500] if result.stderr else ""
+        raise RuntimeError(f"FFmpeg conversion failed: {stderr_output}")
 
 
 @app.post("/transcribe", response_class=PlainTextResponse)
@@ -96,9 +97,12 @@ async def transcribe_audio(audio_file: UploadFile = File(...)):
     temp_wav_path = tempfile.mktemp(suffix=".wav")
 
     try:
+        input_size = os.path.getsize(temp_input_path)
+        if input_size < 100:
+            raise HTTPException(status_code=400, detail="Audio file too small or empty")
+
         # Convert to 16kHz mono WAV
         convert_audio_to_wav(temp_input_path, temp_wav_path)
-
         # Transcribe using onnx-asr
         result = model.recognize(temp_wav_path)
 

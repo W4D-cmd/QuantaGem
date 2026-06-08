@@ -9,16 +9,21 @@ export async function POST(request: NextRequest) {
 
   try {
     const formData = await request.formData();
-    const audioFile = formData.get("audio_file") as Blob | null;
+    const audioFile = formData.get("audio_file") as File | null;
 
     if (!audioFile) {
       return NextResponse.json({ error: "Audio file not provided" }, { status: 400 });
     }
 
+    if (audioFile.size < 100) {
+      return NextResponse.json({ error: "Audio file too small to transcribe" }, { status: 400 });
+    }
+
     const buffer = Buffer.from(await audioFile.arrayBuffer());
+    const filename = audioFile.name || "recording.webm";
 
     const sttFormData = new FormData();
-    sttFormData.append("audio_file", new Blob([buffer], { type: audioFile.type }), "recording.webm");
+    sttFormData.append("audio_file", new Blob([buffer], { type: audioFile.type }), filename);
 
     const sttResponse = await fetch("http://stt-service:8000/transcribe", {
       method: "POST",

@@ -700,7 +700,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       if (isLoading) return;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: "audio/webm" });
+        const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+            ? "audio/webm;codecs=opus"
+            : MediaRecorder.isTypeSupported("audio/ogg")
+              ? "audio/ogg"
+              : "";
+        mediaRecorderRef.current = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
         audioChunksRef.current = [];
 
         mediaRecorderRef.current.ondataavailable = (event) => {
@@ -712,14 +719,19 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         mediaRecorderRef.current.onstop = async () => {
           setIsRecording(false);
           stream.getTracks().forEach((track) => track.stop());
+          await new Promise((resolve) => setTimeout(resolve, 0));
           if (audioChunksRef.current.length > 0) {
-            const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+            const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType || "audio/webm" });
+            if (audioBlob.size < 100) {
+              showToast("Recording too short, please try again.", "warning");
+              return;
+            }
             await transcribeAudio(audioBlob);
           }
           audioChunksRef.current = [];
         };
 
-        mediaRecorderRef.current.start();
+        mediaRecorderRef.current.start(100);
         setIsRecording(true);
       } catch (err) {
         showToast(`Microphone access denied or error: ${err instanceof Error ? err.message : String(err)}`, "error");
@@ -743,8 +755,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       setIsTranscribing(true);
 
       try {
+        const ext = audioBlob.type.includes("ogg") ? ".ogg" : ".webm";
         const formData = new FormData();
-        formData.append("audio_file", audioBlob, "recording.webm");
+        formData.append("audio_file", audioBlob, `recording${ext}`);
 
         const response = await fetch("/api/stt/transcribe", {
           method: "POST",

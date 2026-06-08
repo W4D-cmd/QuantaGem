@@ -723,7 +723,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           if (audioChunksRef.current.length > 0) {
             const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType || "audio/webm" });
             if (audioBlob.size < 100) {
-              showToast("Recording too short, please try again.", "warning");
+              showToast("Recording too short, please try again.", "error");
               return;
             }
             await transcribeAudio(audioBlob);

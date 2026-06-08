@@ -39,7 +39,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "3.3.5",
     "@tailwindcss/postcss": "4.3.0",
-    "@tailwindcss/typography": "0.5.19",
+    "@tailwindcss/typography": "0.5.20",
     "@types/node": "24.13.1",
     "@types/pg": "8.20.0",
     "@types/react": "19.2.17",

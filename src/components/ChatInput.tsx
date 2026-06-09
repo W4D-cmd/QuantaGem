@@ -822,7 +822,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
         const transcription = await response.text();
         if (!transcription.trim()) {
-          showToast("No speech detected, please try again.", "warning");
+          showToast("No speech detected, please try again.", "error");
           setSttPhase("error");
           return;
         }

@@ -754,9 +754,6 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           stopCalled = true;
           // Safety timeout: if the final ondataavailable never fires after stop()
           const safetyTimer = setTimeout(tryFinalize, 200);
-          // Try to finalize immediately in case the debounce from the last
-          // ondataavailable already elapsed while we were entering onstop
-          tryFinalize();
           await chunksReady;
           clearTimeout(safetyTimer);
           if (audioChunksRef.current.length > 0) {

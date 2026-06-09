@@ -723,37 +723,42 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
         let chunksReadyResolve: (() => void) | null = null;
         let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+        let stopCalled = false;
 
         const chunksReady = new Promise<void>((resolve) => {
           chunksReadyResolve = resolve;
         });
+
+        const tryFinalize = () => {
+          if (!stopCalled) return;
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = null;
+          if (chunksReadyResolve) {
+            chunksReadyResolve();
+            chunksReadyResolve = null;
+          }
+        };
 
         mediaRecorderRef.current.ondataavailable = (event) => {
           if (event.data.size > 0) {
             audioChunksRef.current.push(event.data);
           }
           if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            if (chunksReadyResolve) {
-              chunksReadyResolve();
-              chunksReadyResolve = null;
-            }
-          }, 50);
+          debounceTimer = setTimeout(tryFinalize, 50);
         };
 
         mediaRecorderRef.current.onstop = async () => {
           setIsRecording(false);
           setSttPhase("assembling");
           stream.getTracks().forEach((track) => track.stop());
-          const safetyTimer = setTimeout(() => {
-            if (chunksReadyResolve) {
-              chunksReadyResolve();
-              chunksReadyResolve = null;
-            }
-          }, 200);
+          stopCalled = true;
+          // Safety timeout: if the final ondataavailable never fires after stop()
+          const safetyTimer = setTimeout(tryFinalize, 200);
+          // Try to finalize immediately in case the debounce from the last
+          // ondataavailable already elapsed while we were entering onstop
+          tryFinalize();
           await chunksReady;
           clearTimeout(safetyTimer);
-          if (debounceTimer) clearTimeout(debounceTimer);
           if (audioChunksRef.current.length > 0) {
             const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType || "audio/webm" });
             if (audioBlob.size < 100) {

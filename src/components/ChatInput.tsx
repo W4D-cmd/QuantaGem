@@ -65,6 +65,8 @@ import { Model } from "@google/genai";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { motion, AnimatePresence } from "motion/react";
 
+type SttPhase = "idle" | "recording" | "assembling" | "sending" | "transcribing" | "complete" | "error";
+
 export interface UploadedFileInfo {
   objectName: string;
   fileName: string;
@@ -229,6 +231,15 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [isTranscribing, setIsTranscribing] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
+
+    const [sttPhase, setSttPhase] = useState<SttPhase>("idle");
+
+    useEffect(() => {
+      if (sttPhase === "complete" || sttPhase === "error") {
+        const timer = setTimeout(() => setSttPhase("idle"), 3000);
+        return () => clearTimeout(timer);
+      }
+    }, [sttPhase]);
 
     const [isScanning, setIsScanning] = useState(false);
     const [scanStatusMessage, setScanStatusMessage] = useState<string | null>(null);
@@ -710,20 +721,45 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         mediaRecorderRef.current = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
         audioChunksRef.current = [];
 
+        let chunksReadyResolve: (() => void) | null = null;
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const chunksReady = new Promise<void>((resolve) => {
+          chunksReadyResolve = resolve;
+        });
+
         mediaRecorderRef.current.ondataavailable = (event) => {
           if (event.data.size > 0) {
             audioChunksRef.current.push(event.data);
           }
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            if (chunksReadyResolve) {
+              chunksReadyResolve();
+              chunksReadyResolve = null;
+            }
+          }, 50);
         };
 
         mediaRecorderRef.current.onstop = async () => {
           setIsRecording(false);
+          setSttPhase("assembling");
           stream.getTracks().forEach((track) => track.stop());
-          await new Promise((resolve) => setTimeout(resolve, 0));
+          const safetyTimer = setTimeout(() => {
+            if (chunksReadyResolve) {
+              chunksReadyResolve();
+              chunksReadyResolve = null;
+            }
+          }, 200);
+          await chunksReady;
+          clearTimeout(safetyTimer);
+          if (debounceTimer) clearTimeout(debounceTimer);
           if (audioChunksRef.current.length > 0) {
             const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType || "audio/webm" });
             if (audioBlob.size < 100) {
               showToast("Recording too short, please try again.", "error");
+              setSttPhase("error");
+              audioChunksRef.current = [];
               return;
             }
             await transcribeAudio(audioBlob);
@@ -733,9 +769,11 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
         mediaRecorderRef.current.start(100);
         setIsRecording(true);
+        setSttPhase("recording");
       } catch (err) {
         showToast(`Microphone access denied or error: ${err instanceof Error ? err.message : String(err)}`, "error");
         console.error("Error accessing microphone:", err);
+        setSttPhase("idle");
       }
     };
 
@@ -749,10 +787,15 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       }
       audioChunksRef.current = [];
       setIsRecording(false);
+      setSttPhase("idle");
     };
 
     const transcribeAudio = async (audioBlob: Blob) => {
       setIsTranscribing(true);
+      setSttPhase("sending");
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       try {
         const ext = audioBlob.type.includes("ogg") ? ".ogg" : ".webm";
@@ -765,21 +808,37 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             ...getAuthHeaders(),
           },
           body: formData,
+          signal: controller.signal,
         });
 
         if (!response.ok) {
+          clearTimeout(timeoutId);
           const errorData = await response.json();
           throw new Error(errorData.error || "Failed to transcribe audio.");
         }
 
+        setSttPhase("transcribing");
+        clearTimeout(timeoutId);
+
         const transcription = await response.text();
+        if (!transcription.trim()) {
+          showToast("No speech detected, please try again.", "warning");
+          setSttPhase("error");
+          return;
+        }
         setInput((prev) => (prev ? prev + " " : "") + transcription);
         textareaRef.current?.focus();
+        setSttPhase("complete");
       } catch (err) {
-        showToast(`Transcription error: ${err instanceof Error ? err.message : String(err)}`, "error");
-        setInput("");
+        if (err instanceof DOMException && err.name === "AbortError") {
+          showToast("Transcription timed out, please try again.", "error");
+        } else {
+          showToast(`Transcription error: ${err instanceof Error ? err.message : String(err)}`, "error");
+        }
+        setSttPhase("error");
         console.error("Error during transcription:", err);
       } finally {
+        clearTimeout(timeoutId);
         setIsTranscribing(false);
       }
     };
@@ -1054,6 +1113,31 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             <div className="mb-2 p-2 text-sm text-neutral-500 flex items-center gap-2">
               <RefreshCw className="size-4 animate-spin" />
               <span>{scanStatusMessage}</span>
+            </div>
+          )}
+          {sttPhase !== "idle" && (
+            <div className={`mb-2 p-2 text-sm flex items-center gap-2 ${
+              sttPhase === "recording" ? "text-red-500"
+                : sttPhase === "assembling" ? "text-amber-500"
+                  : sttPhase === "sending" ? "text-blue-500"
+                    : sttPhase === "transcribing" ? "text-indigo-500"
+                      : sttPhase === "complete" ? "text-green-500"
+                        : "text-red-500"
+            }`}>
+              {sttPhase === "recording" && <Mic className="size-4 animate-pulse" />}
+              {sttPhase === "assembling" && <RefreshCw className="size-4 animate-spin" />}
+              {sttPhase === "sending" && <ArrowUp className="size-4" />}
+              {sttPhase === "transcribing" && <Cpu className="size-4 animate-spin" />}
+              {sttPhase === "complete" && <Check className="size-4" />}
+              {sttPhase === "error" && <XCircle className="size-4" />}
+              <span>{
+                sttPhase === "recording" ? "Recording..."
+                  : sttPhase === "assembling" ? "Assembling audio..."
+                    : sttPhase === "sending" ? "Sending audio..."
+                      : sttPhase === "transcribing" ? "Transcribing..."
+                        : sttPhase === "complete" ? "Transcription complete"
+                          : "Transcription failed"
+              }</span>
             </div>
           )}
 

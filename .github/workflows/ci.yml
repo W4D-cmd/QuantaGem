@@ -1,11 +1,14 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - "main"
+      - "vertexai"
   pull_request:
     branches:
       - "main"
       - "vertexai"
-      - "feat/openai"
 
 jobs:
   build:

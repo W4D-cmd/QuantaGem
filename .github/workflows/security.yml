@@ -1,0 +1,115 @@
+name: Security Scan
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  npm-audit:
+    name: npm Audit
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ github.event_name == 'schedule' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
+  pip-audit:
+    name: pip Audit
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ github.event_name == 'schedule' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: stt-service/requirements.txt
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        run: pip-audit -r stt-service/requirements.txt
+
+  hadolint:
+    name: Hadolint
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ github.event_name == 'schedule' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Lint App Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+      - name: Lint STT Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: stt-service/Dockerfile
+
+  trivy:
+    name: Trivy Vulnerability Scan
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ github.event_name == 'schedule' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: quantagem-app:scan
+
+      - name: Build STT image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./stt-service
+          push: false
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: quantagem-stt:scan
+
+      # TODO: Pin aquasecurity/trivy-action to a versioned tag once a stable release is available
+      - name: Scan app image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: quantagem-app:scan
+          severity: CRITICAL,HIGH
+          exit-code: 1
+
+      - name: Scan STT image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: quantagem-stt:scan
+          severity: CRITICAL,HIGH
+          exit-code: 1

@@ -1,0 +1,38 @@
+name: Auto Format
+
+on:
+  push:
+    branches:
+      - main
+      - vertexai
+
+jobs:
+  prettier:
+    name: Prettier Auto-Format
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a0111bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Prettier
+        run: npm run format
+
+      - name: Commit and push formatting changes
+        run: |
+          git diff --exit-code --quiet && echo "No formatting changes needed" && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github"
+          git add -A
+          git commit -m "style: auto-format with prettier"
+          git push

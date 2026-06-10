@@ -1,2 +1,26 @@
-README.md
-renovate.json
+# Dependency / generated directories
+node_modules
+.next
+out
+build
+
+# Agent / skill references (vendored, not editable)
+.agents/
+
+# Docker / infra config (YAML formatting is opinionated and not worth enforcing)
+docker-compose.yml
+docker-compose-dev.yml
+docker-compose.override.yml
+
+# Documentation (formatting markdown docs adds no value and creates churn)
+*.md
+
+# Config files (JSON configs should not be auto-reformatted)
+tsconfig.json
+next.config.ts
+
+# Secrets
+secrets/
+
+# Python STT service (separate linter: ruff)
+stt-service/

@@ -64,8 +64,12 @@ export function getStyleFromParams(params: GenerationParameters): GenerationStyl
       (style.params.temperature === null
         ? params.temperature === null
         : Number(style.params.temperature) === Number(params.temperature)) &&
-      (style.params.topP === null ? params.topP === null : Number(style.params.topP) === Number(params.topP)) &&
-      (style.params.topK === null ? params.topK === null : Number(style.params.topK) === Number(params.topK))
+      (style.params.topP === null
+        ? params.topP === null
+        : Number(style.params.topP) === Number(params.topP)) &&
+      (style.params.topK === null
+        ? params.topK === null
+        : Number(style.params.topK) === Number(params.topK))
     ) {
       return styleId as GenerationStyleId;
     }

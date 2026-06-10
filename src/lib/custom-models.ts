@@ -34,9 +34,11 @@ export interface FetchedCustomModel {
  * For backwards compatibility, also checks "custom:"
  */
 export function isCustomModel(modelId: string): boolean {
-  return modelId.startsWith(CUSTOM_PROVIDER_PREFIX) || 
-         modelId.startsWith(CUSTOM_OPENAI_PREFIX) || 
-         modelId.startsWith(CUSTOM_ANTHROPIC_PREFIX);
+  return (
+    modelId.startsWith(CUSTOM_PROVIDER_PREFIX) ||
+    modelId.startsWith(CUSTOM_OPENAI_PREFIX) ||
+    modelId.startsWith(CUSTOM_ANTHROPIC_PREFIX)
+  );
 }
 
 /**
@@ -60,7 +62,10 @@ export function getOriginalModelId(customModelId: string): string {
  * Creates a custom model identifier from an original model ID.
  * E.g., "llama-3.2-3b" -> "custom-openai:llama-3.2-3b"
  */
-export function createCustomModelId(originalModelId: string, apiType: "openai" | "anthropic" = "openai"): string {
+export function createCustomModelId(
+  originalModelId: string,
+  apiType: "openai" | "anthropic" = "openai",
+): string {
   if (apiType === "anthropic") {
     return `${CUSTOM_ANTHROPIC_PREFIX}${originalModelId}`;
   }
@@ -172,7 +177,7 @@ export function getStaticModelsForEndpoint(endpoint: string): FetchedCustomModel
   try {
     const url = new URL(endpoint);
     const host = url.hostname;
-    
+
     // Check for exact match or subdomain match
     for (const [providerHost, models] of Object.entries(STATIC_CUSTOM_PROVIDERS)) {
       if (host === providerHost || host.endsWith(`.${providerHost}`)) {

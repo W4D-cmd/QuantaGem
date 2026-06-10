@@ -29,25 +29,37 @@ const modelConfigs: Record<string, ThinkingModelConfig> = {
   "2.5-pro": { min: 2048, max: 32768, canBeOff: false, medium: 8192 },
   "2.5-flash": { min: 2048, max: 24576, canBeOff: true, medium: 8192 },
   "3.5-flash": {
-    min: 0, max: 0, canBeOff: false, medium: 0,
+    min: 0,
+    max: 0,
+    canBeOff: false,
+    medium: 0,
     useThinkingLevel: true,
     supportedLevels: ["minimal", "low", "medium", "high"],
     defaultLevel: "medium",
   },
   "3.1-pro": {
-    min: 0, max: 0, canBeOff: false, medium: 0,
+    min: 0,
+    max: 0,
+    canBeOff: false,
+    medium: 0,
     useThinkingLevel: true,
     supportedLevels: ["low", "medium", "high"],
     defaultLevel: "high",
   },
   "3.1-flash": {
-    min: 0, max: 0, canBeOff: false, medium: 0,
+    min: 0,
+    max: 0,
+    canBeOff: false,
+    medium: 0,
     useThinkingLevel: true,
     supportedLevels: ["minimal", "low", "medium", "high"],
     defaultLevel: "minimal",
   },
   "3-flash": {
-    min: 0, max: 0, canBeOff: false, medium: 0,
+    min: 0,
+    max: 0,
+    canBeOff: false,
+    medium: 0,
     useThinkingLevel: true,
     supportedLevels: ["minimal", "low", "medium", "high"],
     defaultLevel: "high",
@@ -344,17 +356,29 @@ export function mapBudgetToGeminiThinkingLevel(
   if (budget === undefined || budget === -1) {
     const defaultLevel = config?.defaultLevel ?? "medium";
     switch (defaultLevel) {
-      case "minimal": return "MINIMAL" as const;
-      case "low": return "LOW" as const;
-      case "high": return "HIGH" as const;
-      default: return "MEDIUM" as const;
+      case "minimal":
+        return "MINIMAL" as const;
+      case "low":
+        return "LOW" as const;
+      case "high":
+        return "HIGH" as const;
+      default:
+        return "MEDIUM" as const;
     }
   }
 
-  if (budget === 0) return "MINIMAL" as const;
-  if (budget === 1) return "LOW" as const;
-  if (budget === 2) return "MEDIUM" as const;
-  if (budget === 3) return "HIGH" as const;
+  if (budget === 0) {
+    return "MINIMAL" as const;
+  }
+  if (budget === 1) {
+    return "LOW" as const;
+  }
+  if (budget === 2) {
+    return "MEDIUM" as const;
+  }
+  if (budget === 3) {
+    return "HIGH" as const;
+  }
   return "MEDIUM" as const;
 }
 

@@ -87,6 +87,23 @@ CREATE TABLE IF NOT EXISTS user_settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS custom_models (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  model_id TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  api_type TEXT NOT NULL CHECK (api_type IN ('openai', 'anthropic')),
+  input_token_limit INTEGER NOT NULL DEFAULT 128000,
+  output_token_limit INTEGER NOT NULL DEFAULT 4096,
+  supports_reasoning BOOLEAN NOT NULL DEFAULT FALSE,
+  supports_verbosity BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, model_id, api_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_models_user_id ON custom_models (user_id);
+
 CREATE TABLE IF NOT EXISTS prompt_suggestion_templates (
   id SERIAL PRIMARY KEY,
   title TEXT NOT NULL,

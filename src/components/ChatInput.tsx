@@ -57,7 +57,7 @@ import {
   getStyleFromParams,
 } from "@/lib/generation-styles";
 import CustomStyleModal from "./CustomStyleModal";
-import { modelSupportsVerbosity } from "@/lib/custom-models";
+import { ManualCustomModel, modelSupportsVerbosity } from "@/lib/custom-models";
 import VerbositySelector from "./VerbositySelector";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
 import { ToastProps } from "./Toast";
@@ -95,6 +95,7 @@ interface ChatInputProps {
   currentSystemPrompt: string;
   onSystemPromptGenerated: (prompt: string) => void;
   isTemporaryChat: boolean;
+  manualCustomModels?: ManualCustomModel[];
 }
 
 export interface ChatInputHandle {
@@ -205,6 +206,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       currentSystemPrompt,
       onSystemPromptGenerated,
       isTemporaryChat,
+      manualCustomModels = [],
     },
     ref,
   ) => {
@@ -248,8 +250,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
     const isVerbositySupported = useMemo(
-      () => (selectedModel?.name ? modelSupportsVerbosity(selectedModel.name) : false),
-      [selectedModel],
+      () => (selectedModel?.name ? modelSupportsVerbosity(selectedModel.name, manualCustomModels) : false),
+      [selectedModel, manualCustomModels],
     );
 
     const [isRefining, setIsRefining] = useState(false);

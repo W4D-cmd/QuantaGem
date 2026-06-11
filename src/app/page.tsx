@@ -36,6 +36,8 @@ import {
   createCustomModelId,
   ModelProvider,
   getModelPricing,
+  ManualCustomModel,
+  mergeCustomModels,
 } from "@/lib/custom-models";
 
 function calculateTurnCost(modelId: string, promptTokens: number, completionTokens: number): number {
@@ -260,8 +262,9 @@ export default function Home() {
   const [suggestionsVersion, setSuggestionsVersion] = useState(0);
   const [isTemporaryChat, setIsTemporaryChat] = useState(false);
 
-  const [fetchedCustomModels, setFetchedCustomModels] = useState<{ id: string; displayName: string; apiType?: "openai" | "anthropic" }[]>([]);
-  const [isLoadingCustomModels, setIsLoadingCustomModels] = useState<boolean>(true);
+  const [fetchedCustomModels, setFetchedCustomModels] = useState<{ id: string; displayName: string; apiType?: "openai" | "anthropic"; inputTokenLimit?: number; outputTokenLimit?: number; supportsReasoning?: boolean; supportsVerbosity?: boolean }[]>([]);
+  const [manualCustomModels, setManualCustomModels] = useState<ManualCustomModel[]>([]);
+  const [isLoadingCustomModels, setIsLoadingCustomModels] = useState<boolean>(false);
   const dragCounter = useRef(0);
   const threeDotMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatAreaRef = useRef<ChatAreaHandle>(null);
@@ -341,6 +344,23 @@ export default function Home() {
       setIsLoadingCustomModels(false);
     }
   }, [getAuthHeaders]);
+
+  const fetchManualModels = useCallback(async () => {
+    try {
+      const res = await fetch("/api/models/custom-models", { headers: getAuthHeaders(), cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.models && Array.isArray(data.models)) {
+        setManualCustomModels(data.models);
+      }
+    } catch (err) {
+      console.error("Failed to fetch manual custom models:", extractErrorMessage(err));
+    }
+  }, [getAuthHeaders]);
+
+  const mergedCustomModels = useMemo(() => {
+    return mergeCustomModels(fetchedCustomModels, manualCustomModels);
+  }, [fetchedCustomModels, manualCustomModels]);
 
   const handleDragEnter = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
@@ -713,7 +733,9 @@ export default function Home() {
 
   useEffect(() => {
     fetchModelList();
-  }, [fetchModelList]);
+    fetchCustomModels();
+    fetchManualModels();
+  }, [fetchModelList, fetchCustomModels, fetchManualModels]);
 
   const handleRenameChat = async (chatId: number, newTitle: string) => {
     try {
@@ -2063,7 +2085,7 @@ export default function Home() {
       try {
         const syncTasks: Promise<void>[] = [fetchAllChats()];
         if (isGlobalSettings) {
-          syncTasks.push(fetchAllProjects(), fetchCustomModels());
+          syncTasks.push(fetchAllProjects(), fetchCustomModels(), fetchManualModels());
         }
 
         // Run non-dependent refreshes in parallel
@@ -2072,7 +2094,7 @@ export default function Home() {
         console.error("Background sync failed:", err);
       }
     },
-    [activeChatId, editingChatId, fetchAllChats, fetchAllProjects, fetchCustomModels, showToast],
+    [activeChatId, editingChatId, fetchAllChats, fetchAllProjects, fetchCustomModels, fetchManualModels, showToast],
   );
 
   const toggleThreeDotMenu = () => {
@@ -2201,7 +2223,7 @@ export default function Home() {
                 models={models}
                 selected={selectedModel}
                 onChangeAction={handleModelChange}
-                customModelsList={fetchedCustomModels}
+                customModelsList={mergedCustomModels}
                 isLoadingCustomModels={isLoadingCustomModels}
               />
 
@@ -2387,6 +2409,7 @@ export default function Home() {
                       currentSystemPrompt={newChatSystemPrompt}
                       onSystemPromptGenerated={setNewChatSystemPrompt}
                       isTemporaryChat={isTemporaryChat}
+                      manualCustomModels={manualCustomModels}
                     />
                   </div>
                 </div>
@@ -2405,6 +2428,7 @@ export default function Home() {
             onSettingsSaved={handleSettingsSaved}
             getAuthHeaders={getAuthHeaders}
             showToast={showToast}
+            onManualModelsChanged={fetchManualModels}
           />
         )}
       </AnimatePresence>

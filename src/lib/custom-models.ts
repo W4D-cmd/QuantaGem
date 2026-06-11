@@ -26,6 +26,24 @@ export interface FetchedCustomModel {
   id: string;
   displayName: string;
   apiType?: "openai" | "anthropic";
+  inputTokenLimit?: number;
+  outputTokenLimit?: number;
+  supportsReasoning?: boolean;
+  supportsVerbosity?: boolean;
+}
+
+/**
+ * Interface for manually defined custom models stored in the database.
+ */
+export interface ManualCustomModel {
+  id: number;
+  modelId: string;
+  displayName: string;
+  apiType: "openai" | "anthropic";
+  inputTokenLimit: number;
+  outputTokenLimit: number;
+  supportsReasoning: boolean;
+  supportsVerbosity: boolean;
 }
 
 /**
@@ -80,8 +98,15 @@ export function getProviderForModel(modelId: string): ModelProvider | undefined 
   return model?.provider;
 }
 
-export function modelSupportsVerbosity(modelId: string): boolean {
-  // Custom models don't support verbosity control
+export function modelSupportsVerbosity(modelId: string, manualModels?: ManualCustomModel[]): boolean {
+  if (isCustomModel(modelId) && manualModels && manualModels.length > 0) {
+    const originalId = getOriginalModelId(modelId);
+    const apiType = modelId.startsWith(CUSTOM_ANTHROPIC_PREFIX) ? "anthropic" : "openai";
+    const manualModel = manualModels.find((m) => m.modelId === originalId && m.apiType === apiType);
+    if (manualModel) {
+      return manualModel.supportsVerbosity;
+    }
+  }
   if (isCustomModel(modelId)) {
     return false;
   }
@@ -90,8 +115,15 @@ export function modelSupportsVerbosity(modelId: string): boolean {
   return model?.supportsVerbosity ?? false;
 }
 
-export function modelSupportsReasoning(modelId: string): boolean {
-  // Custom models don't support reasoning effort control in the UI
+export function modelSupportsReasoning(modelId: string, manualModels?: ManualCustomModel[]): boolean {
+  if (isCustomModel(modelId) && manualModels && manualModels.length > 0) {
+    const originalId = getOriginalModelId(modelId);
+    const apiType = modelId.startsWith(CUSTOM_ANTHROPIC_PREFIX) ? "anthropic" : "openai";
+    const manualModel = manualModels.find((m) => m.modelId === originalId && m.apiType === apiType);
+    if (manualModel) {
+      return manualModel.supportsReasoning;
+    }
+  }
   if (isCustomModel(modelId)) {
     return false;
   }
@@ -101,10 +133,11 @@ export function modelSupportsReasoning(modelId: string): boolean {
 }
 
 /**
- * Gets token limits for a model. For custom models, uses sensible defaults.
+ * Gets token limits for a model. For custom models, uses manual model data if available, otherwise sensible defaults.
  */
 export function getModelTokenLimits(
   modelId: string,
+  manualModels?: ManualCustomModel[],
 ): { inputTokenLimit: number; outputTokenLimit: number } {
   // Default limits for custom models (conservative estimates)
   const CUSTOM_MODEL_DEFAULTS = {
@@ -113,6 +146,17 @@ export function getModelTokenLimits(
   };
 
   if (isCustomModel(modelId)) {
+    if (manualModels && manualModels.length > 0) {
+      const originalId = getOriginalModelId(modelId);
+      const apiType = modelId.startsWith(CUSTOM_ANTHROPIC_PREFIX) ? "anthropic" : "openai";
+      const manualModel = manualModels.find((m) => m.modelId === originalId && m.apiType === apiType);
+      if (manualModel) {
+        return {
+          inputTokenLimit: manualModel.inputTokenLimit,
+          outputTokenLimit: manualModel.outputTokenLimit,
+        };
+      }
+    }
     return CUSTOM_MODEL_DEFAULTS;
   }
 
@@ -126,6 +170,64 @@ export function getModelTokenLimits(
 
   // Fallback for unknown models
   return CUSTOM_MODEL_DEFAULTS;
+}
+
+/**
+ * Merges auto-fetched custom models with manually defined ones.
+ * Manual models take precedence: if a manual model has the same (id, apiType) as a fetched model,
+ * the manual model's attributes override the fetched model's display name, token limits, and capabilities.
+ */
+export function mergeCustomModels(
+  fetched: FetchedCustomModel[],
+  manual: ManualCustomModel[],
+): FetchedCustomModel[] {
+  const result: FetchedCustomModel[] = [];
+  const manualMap = new Map<string, ManualCustomModel>();
+  for (const m of manual) {
+    manualMap.set(`${m.apiType}:${m.modelId}`, m);
+  }
+
+  const seenManual = new Set<string>();
+
+  // Process fetched models, overriding with manual data where available
+  for (const fm of fetched) {
+    const apiType = fm.apiType || "openai";
+    const key = `${apiType}:${fm.id}`;
+    const manualEntry = manualMap.get(key);
+
+    if (manualEntry) {
+      seenManual.add(key);
+      result.push({
+        id: fm.id,
+        displayName: manualEntry.displayName,
+        apiType: manualEntry.apiType as "openai" | "anthropic",
+        inputTokenLimit: manualEntry.inputTokenLimit,
+        outputTokenLimit: manualEntry.outputTokenLimit,
+        supportsReasoning: manualEntry.supportsReasoning,
+        supportsVerbosity: manualEntry.supportsVerbosity,
+      });
+    } else {
+      result.push(fm);
+    }
+  }
+
+  // Add manual models that don't exist in fetched models
+  for (const m of manual) {
+    const key = `${m.apiType}:${m.modelId}`;
+    if (!seenManual.has(key)) {
+      result.push({
+        id: m.modelId,
+        displayName: m.displayName,
+        apiType: m.apiType,
+        inputTokenLimit: m.inputTokenLimit,
+        outputTokenLimit: m.outputTokenLimit,
+        supportsReasoning: m.supportsReasoning,
+        supportsVerbosity: m.supportsVerbosity,
+      });
+    }
+  }
+
+  return result;
 }
 
 /**

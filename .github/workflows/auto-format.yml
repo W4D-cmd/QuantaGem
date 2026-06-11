@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,11 +29,19 @@ jobs:
       - name: Run Prettier
         run: npm run format
 
-      - name: Commit and push formatting changes
-        run: |
-          git diff --exit-code --quiet && echo "No formatting changes needed" && exit 0
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github"
-          git add -A
-          git commit -m "style: auto-format with prettier"
-          git push
+      - name: Create pull request for formatting changes
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "style: auto-format with prettier"
+          title: "style: auto-format with prettier"
+          body: |
+            Automated formatting fixes by Prettier.
+
+            Triggered by a push that contained unformatted files.
+          branch: auto-format/prettier
+          delete-branch: true
+
+      - name: Auto-merge pull request
+        run: gh pr merge auto-format/prettier --merge --auto
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

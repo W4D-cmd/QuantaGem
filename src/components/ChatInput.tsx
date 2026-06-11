@@ -248,7 +248,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const [fileAnimationParent] = useAutoAnimate();
 
-    const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
+    const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name, manualCustomModels), [selectedModel, manualCustomModels]);
     const isVerbositySupported = useMemo(
       () => (selectedModel?.name ? modelSupportsVerbosity(selectedModel.name, manualCustomModels) : false),
       [selectedModel, manualCustomModels],
@@ -446,30 +446,38 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const thinkingDropdownItems = useMemo((): DropdownItem[] => {
       const modelName = selectedModel?.name;
-      const config = getThinkingConfigForModel(modelName);
+      const config = getThinkingConfigForModel(modelName, manualCustomModels);
       if (!config) return [];
 
       let options: ThinkingOption[];
 
-      if (isOpenAIReasoningModel(modelName)) {
-        const openaiConfig = getOpenAIReasoningConfig(modelName);
-        const efforts = openaiConfig?.supportedEfforts ?? [];
-        options = ["dynamic"];
-        if (efforts.includes("none")) options.push("off");
-        if (efforts.includes("low")) options.push("low");
-        if (efforts.includes("medium")) options.push("medium");
-        if (efforts.includes("high")) options.push("high");
-        if (efforts.includes("xhigh")) options.push("xhigh");
-      } else if (isAnthropicReasoningModel(modelName)) {
-        const anthropicConfig = getAnthropicReasoningConfig(modelName);
-        const efforts = anthropicConfig?.supportedEfforts ?? [];
-        options = ["dynamic"];
-        if (efforts.includes("low")) options.push("low");
-        if (efforts.includes("medium")) options.push("medium");
-        if (efforts.includes("high")) options.push("high");
-        if (efforts.includes("xhigh")) options.push("xhigh");
-      } else if (modelUsesGeminiThinkingLevel(modelName)) {
-        const supportedLevels = getGeminiSupportedLevels(modelName);
+      if (isOpenAIReasoningModel(modelName, manualCustomModels)) {
+        if (modelName?.startsWith("custom-openai:")) {
+          options = ["dynamic", "off", "low", "medium", "high", "xhigh"];
+        } else {
+          const openaiConfig = getOpenAIReasoningConfig(modelName);
+          const efforts = openaiConfig?.supportedEfforts ?? [];
+          options = ["dynamic"];
+          if (efforts.includes("none")) options.push("off");
+          if (efforts.includes("low")) options.push("low");
+          if (efforts.includes("medium")) options.push("medium");
+          if (efforts.includes("high")) options.push("high");
+          if (efforts.includes("xhigh")) options.push("xhigh");
+        }
+      } else if (isAnthropicReasoningModel(modelName, manualCustomModels)) {
+        if (modelName?.startsWith("custom-anthropic:")) {
+          options = ["dynamic", "low", "medium", "high", "xhigh"];
+        } else {
+          const anthropicConfig = getAnthropicReasoningConfig(modelName);
+          const efforts = anthropicConfig?.supportedEfforts ?? [];
+          options = ["dynamic"];
+          if (efforts.includes("low")) options.push("low");
+          if (efforts.includes("medium")) options.push("medium");
+          if (efforts.includes("high")) options.push("high");
+          if (efforts.includes("xhigh")) options.push("xhigh");
+        }
+      } else if (modelUsesGeminiThinkingLevel(modelName, manualCustomModels)) {
+        const supportedLevels = getGeminiSupportedLevels(modelName, manualCustomModels);
         options = ["dynamic", ...supportedLevels];
       } else {
         options = ["dynamic", "low", "medium", "high"];
@@ -498,7 +506,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         className: thinkingOption === option ? "font-semibold" : "",
         icon: thinkingOption === option ? <Check className="size-4 text-blue-500" /> : <div className="size-4" />,
       }));
-    }, [selectedModel, thinkingOption, onThinkingOptionChange]);
+    }, [selectedModel, thinkingOption, onThinkingOptionChange, manualCustomModels]);
 
     const currentStyleId = useMemo(() => getStyleFromParams(generationParams), [generationParams]);
 

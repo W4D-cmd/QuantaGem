@@ -293,7 +293,7 @@ export default function Home() {
     chatCacheRef.current.delete(chatId);
   }, []);
 
-  const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name), [selectedModel]);
+  const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name, manualCustomModels), [selectedModel, manualCustomModels]);
 
   const estimatedNextCost = useMemo(() => {
     if (!selectedModel || !selectedModel.name || totalTokens === null || totalTokens === 0) return 0;

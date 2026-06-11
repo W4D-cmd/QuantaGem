@@ -1,4 +1,4 @@
-import { isCustomModel } from "./custom-models";
+import { isCustomModel, ManualCustomModel, CUSTOM_OPENAI_PREFIX, CUSTOM_ANTHROPIC_PREFIX, getOriginalModelId } from "./custom-models";
 
 export type ThinkingOption = "dynamic" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -94,8 +94,13 @@ function getAnthropicModelBase(modelName: string): string | null {
   return null;
 }
 
-export function isAnthropicReasoningModel(modelName: string | null | undefined): boolean {
+export function isAnthropicReasoningModel(modelName: string | null | undefined, manualModels?: ManualCustomModel[]): boolean {
   if (!modelName) return false;
+  if (modelName.startsWith(CUSTOM_ANTHROPIC_PREFIX) && manualModels) {
+    const originalId = getOriginalModelId(modelName);
+    const manualModel = manualModels.find((m) => m.modelId === originalId && m.apiType === "anthropic");
+    return manualModel?.supportsReasoning ?? false;
+  }
   const baseModel = getAnthropicModelBase(modelName);
   return baseModel !== null && baseModel in anthropicReasoningModelConfigs;
 }
@@ -133,8 +138,13 @@ function getOpenAIModelBase(modelName: string): string | null {
   return null;
 }
 
-export function isOpenAIReasoningModel(modelName: string | null | undefined): boolean {
+export function isOpenAIReasoningModel(modelName: string | null | undefined, manualModels?: ManualCustomModel[]): boolean {
   if (!modelName) return false;
+  if (modelName.startsWith(CUSTOM_OPENAI_PREFIX) && manualModels) {
+    const originalId = getOriginalModelId(modelName);
+    const manualModel = manualModels.find((m) => m.modelId === originalId && m.apiType === "openai");
+    return manualModel?.supportsReasoning ?? false;
+  }
   if (isCustomModel(modelName)) return false;
   const baseModel = getOpenAIModelBase(modelName);
   return baseModel !== null && baseModel in openAIReasoningModelConfigs;
@@ -180,29 +190,48 @@ export function getDefaultReasoningEffort(modelName: string | null | undefined):
   return config?.defaultEffort ?? "none";
 }
 
-export function getThinkingConfigForModel(modelName: string | null | undefined): ThinkingModelConfig | null {
+export function getThinkingConfigForModel(modelName: string | null | undefined, manualModels?: ManualCustomModel[]): ThinkingModelConfig | null {
   if (!modelName) return null;
+  if (isCustomModel(modelName) && manualModels) {
+    const originalId = getOriginalModelId(modelName);
+    const apiType = modelName.startsWith(CUSTOM_ANTHROPIC_PREFIX) ? "anthropic" : "openai";
+    const manualModel = manualModels.find((m) => m.modelId === originalId && m.apiType === apiType);
+    if (manualModel?.supportsReasoning) {
+      return { min: 0, max: 0, canBeOff: apiType === "openai", medium: 0 };
+    }
+  }
   if (modelName.includes("2.5-pro")) return modelConfigs["2.5-pro"];
   if (modelName.includes("3.1-pro")) return modelConfigs["3.1-pro"];
   if (modelName.includes("3.5-flash")) return modelConfigs["3.5-flash"];
   if (modelName.includes("3.1-flash")) return modelConfigs["3.1-flash"];
   if (modelName.includes("gemini-3-flash")) return modelConfigs["3-flash"];
   if (modelName.includes("2.5-flash")) return modelConfigs["2.5-flash"];
-  if (isOpenAIReasoningModel(modelName)) {
+  if (isOpenAIReasoningModel(modelName, manualModels)) {
     const config = getOpenAIReasoningConfig(modelName);
     const canBeOff = config?.supportedEfforts.includes("none") ?? false;
     return { min: 0, max: 0, canBeOff, medium: 0 };
   }
-  if (isAnthropicReasoningModel(modelName)) {
+  if (isAnthropicReasoningModel(modelName, manualModels)) {
     return { min: 0, max: 0, canBeOff: false, medium: 0 };
   }
   return null;
 }
 
-export function getThinkingBudgetMap(modelName: string | null | undefined): Record<ThinkingOption, number> | null {
+export function getThinkingBudgetMap(modelName: string | null | undefined, manualModels?: ManualCustomModel[]): Record<ThinkingOption, number> | null {
   if (!modelName) return null;
 
-  if (isAnthropicReasoningModel(modelName)) {
+  if (isAnthropicReasoningModel(modelName, manualModels)) {
+    if (modelName.startsWith(CUSTOM_ANTHROPIC_PREFIX)) {
+      return {
+        dynamic: -1,
+        off: -1,
+        minimal: -1,
+        low: 1,
+        medium: 2,
+        high: 3,
+        xhigh: 4,
+      };
+    }
     return {
       dynamic: -1,
       off: -1,
@@ -214,7 +243,18 @@ export function getThinkingBudgetMap(modelName: string | null | undefined): Reco
     };
   }
 
-  if (isOpenAIReasoningModel(modelName)) {
+  if (isOpenAIReasoningModel(modelName, manualModels)) {
+    if (modelName.startsWith(CUSTOM_OPENAI_PREFIX)) {
+      return {
+        dynamic: -1,
+        off: 0,
+        minimal: -1,
+        low: 1,
+        medium: 2,
+        high: 3,
+        xhigh: 4,
+      };
+    }
     const config = getOpenAIReasoningConfig(modelName);
     const efforts = config?.supportedEfforts ?? [];
     return {
@@ -228,7 +268,7 @@ export function getThinkingBudgetMap(modelName: string | null | undefined): Reco
     };
   }
 
-  const config = getThinkingConfigForModel(modelName);
+  const config = getThinkingConfigForModel(modelName, manualModels);
   if (!config) return null;
 
   if (config.useThinkingLevel && config.supportedLevels) {
@@ -261,10 +301,10 @@ export function getThinkingBudgetMap(modelName: string | null | undefined): Reco
   };
 }
 
-export function getThinkingValueMap(modelName: string | null | undefined): { [key: number]: ThinkingOption } | null {
+export function getThinkingValueMap(modelName: string | null | undefined, manualModels?: ManualCustomModel[]): { [key: number]: ThinkingOption } | null {
   if (!modelName) return null;
 
-  if (isAnthropicReasoningModel(modelName)) {
+  if (isAnthropicReasoningModel(modelName, manualModels)) {
     return {
       [-1]: "dynamic",
       1: "low",
@@ -274,7 +314,17 @@ export function getThinkingValueMap(modelName: string | null | undefined): { [ke
     };
   }
 
-  if (isOpenAIReasoningModel(modelName)) {
+  if (isOpenAIReasoningModel(modelName, manualModels)) {
+    if (modelName.startsWith(CUSTOM_OPENAI_PREFIX)) {
+      return {
+        [-1]: "dynamic",
+        0: "off",
+        1: "low",
+        2: "medium",
+        3: "high",
+        4: "xhigh",
+      };
+    }
     const config = getOpenAIReasoningConfig(modelName);
     const efforts = config?.supportedEfforts ?? [];
     const valueMap: { [key: number]: ThinkingOption } = {
@@ -288,7 +338,7 @@ export function getThinkingValueMap(modelName: string | null | undefined): { [ke
     return valueMap;
   }
 
-  const config = getThinkingConfigForModel(modelName);
+  const config = getThinkingConfigForModel(modelName, manualModels);
   if (!config) return null;
 
   if (config.useThinkingLevel && config.supportedLevels) {
@@ -320,18 +370,18 @@ export function getThinkingValueMap(modelName: string | null | undefined): { [ke
   return valueMap;
 }
 
-export function modelUsesGeminiThinkingLevel(modelName: string | null | undefined): boolean {
-  const config = getThinkingConfigForModel(modelName);
+export function modelUsesGeminiThinkingLevel(modelName: string | null | undefined, manualModels?: ManualCustomModel[]): boolean {
+  const config = getThinkingConfigForModel(modelName, manualModels);
   return config?.useThinkingLevel === true;
 }
 
-export function getDefaultGeminiThinkingLevel(modelName: string | null | undefined): ThinkingOption {
-  const config = getThinkingConfigForModel(modelName);
+export function getDefaultGeminiThinkingLevel(modelName: string | null | undefined, manualModels?: ManualCustomModel[]): ThinkingOption {
+  const config = getThinkingConfigForModel(modelName, manualModels);
   return config?.defaultLevel ?? "medium";
 }
 
-export function getGeminiSupportedLevels(modelName: string | null | undefined): ThinkingOption[] {
-  const config = getThinkingConfigForModel(modelName);
+export function getGeminiSupportedLevels(modelName: string | null | undefined, manualModels?: ManualCustomModel[]): ThinkingOption[] {
+  const config = getThinkingConfigForModel(modelName, manualModels);
   return config?.supportedLevels ?? [];
 }
 

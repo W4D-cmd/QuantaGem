@@ -117,7 +117,17 @@ export function getAnthropicReasoningConfig(
 export function mapBudgetToAnthropicEffort(
   modelName: string | null | undefined,
   budget: number | undefined,
+  manualModels?: ManualCustomModel[],
 ): AnthropicEffort {
+  if (modelName && isCustomModel(modelName) && modelName.startsWith(CUSTOM_ANTHROPIC_PREFIX) && manualModels) {
+    const isReasoning = isAnthropicReasoningModel(modelName, manualModels);
+    if (!isReasoning) return "high";
+    if (budget === undefined || budget === -1) return "high";
+    if (budget <= 1) return "low";
+    if (budget === 2) return "medium";
+    if (budget === 3) return "high";
+    return "xhigh";
+  }
   const config = getAnthropicReasoningConfig(modelName);
   if (!config) return "high";
 
@@ -411,7 +421,19 @@ export function mapBudgetToGeminiThinkingLevel(
 export function mapBudgetToOpenAIReasoningEffort(
   modelName: string | null | undefined,
   budget: number | undefined,
+  manualModels?: ManualCustomModel[],
 ): OpenAIReasoningEffort {
+  if (modelName && isCustomModel(modelName) && modelName.startsWith(CUSTOM_OPENAI_PREFIX) && manualModels) {
+    const isReasoning = isOpenAIReasoningModel(modelName, manualModels);
+    if (!isReasoning) return "none";
+    if (budget === undefined || budget === -1) return "none";
+    if (budget === 0) return "none";
+    if (budget === 1) return "low";
+    if (budget === 2) return "medium";
+    if (budget === 3) return "high";
+    if (budget === 4) return "xhigh";
+    return "none";
+  }
   const config = getOpenAIReasoningConfig(modelName);
   if (!config) return "none";
 

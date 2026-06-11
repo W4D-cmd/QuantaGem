@@ -14,9 +14,11 @@ import {
   isCustomModel,
   getOriginalModelId,
   getModelTokenLimits,
+  ManualCustomModel,
 } from "@/lib/custom-models";
 import {
   isOpenAIReasoningModel,
+  isAnthropicReasoningModel,
   isGPT5FamilyModel,
   mapBudgetToOpenAIReasoningEffort,
   mapBudgetToAnthropicEffort,
@@ -882,15 +884,35 @@ type ResponsesAPIInputItem =
       >;
     };
 
+async function fetchManualCustomModels(userId: number): Promise<ManualCustomModel[]> {
+  const { rows } = await pool.query(
+    "SELECT id, model_id, display_name, api_type, input_token_limit, output_token_limit, supports_reasoning, supports_verbosity FROM custom_models WHERE user_id = $1",
+    [userId],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    modelId: row.model_id,
+    displayName: row.display_name,
+    apiType: row.api_type,
+    inputTokenLimit: row.input_token_limit,
+    outputTokenLimit: row.output_token_limit,
+    supportsReasoning: row.supports_reasoning,
+    supportsVerbosity: row.supports_verbosity,
+  }));
+}
+
 async function handleCustomOpenAIRequest(
   model: string,
   newMessageAppParts: MessagePart[],
   clientHistoryWithAppParts: Array<{ role: string; parts: MessagePart[] }>,
   systemPromptText: string | null,
   userId: number,
+  thinkingBudget: number | undefined,
+  verbosity: VerbosityOption | undefined,
   temperature: number | null,
   topP: number | null,
   topK: number | null,
+  manualModels: ManualCustomModel[],
 ): Promise<Response> {
   // Fetch custom endpoint and key from database
   const settingsResult = await pool.query(
@@ -1044,7 +1066,10 @@ async function handleCustomOpenAIRequest(
 
   messages.push({ role: "user", content: newMessageContentParts });
 
-  const requestOptions: OpenAI.ChatCompletionCreateParamsStreaming = {
+  const requestOptions: OpenAI.ChatCompletionCreateParamsStreaming & {
+    reasoning_effort?: string;
+    text?: { verbosity: string };
+  } = {
     model: actualModelId,
     messages,
     stream: true,
@@ -1053,6 +1078,16 @@ async function handleCustomOpenAIRequest(
 
   if (temperature !== null) requestOptions.temperature = temperature;
   if (topP !== null) requestOptions.top_p = topP;
+
+  if (isOpenAIReasoningModel(model, manualModels)) {
+    const reasoningEffort = mapBudgetToOpenAIReasoningEffort(model, thinkingBudget, manualModels);
+    requestOptions.reasoning_effort = reasoningEffort;
+  }
+
+  if (modelSupportsVerbosity(model, manualModels)) {
+    const effectiveVerbosity = verbosity ?? "medium";
+    requestOptions.text = { verbosity: effectiveVerbosity };
+  }
 
   const stream = (await openai.chat.completions.create(requestOptions)) as unknown as AsyncIterable<any>;
 
@@ -1068,8 +1103,8 @@ async function handleCustomOpenAIRequest(
           
           const delta = chunk.choices[0]?.delta;
           
-          if (delta?.reasoning_content) {
-            const reasoningText = delta.reasoning_content as string;
+          if (isOpenAIReasoningModel(model, manualModels) && (delta as Record<string, unknown>)?.reasoning_content) {
+            const reasoningText = (delta as Record<string, unknown>).reasoning_content as string;
             const jsonChunk = { type: "thought", value: reasoningText };
             controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
           }
@@ -1765,6 +1800,7 @@ async function handleCustomAnthropicRequest(
   temperature: number | null,
   topP: number | null,
   topK: number | null,
+  manualModels: ManualCustomModel[],
 ): Promise<Response> {
   const settingsResult = await pool.query(
     "SELECT custom_anthropic_endpoint, custom_anthropic_key FROM user_settings WHERE user_id = $1",
@@ -1994,21 +2030,25 @@ async function handleCustomAnthropicRequest(
 
   messages.push({ role: "user", content: newMessageBlocks });
 
-  const effort = mapBudgetToAnthropicEffort(model, thinkingBudget);
+  const isReasoning = isAnthropicReasoningModel(model, manualModels);
+  const effort = mapBudgetToAnthropicEffort(model, thinkingBudget, manualModels);
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const requestParams: any = {
     model: actualModelId,
-    max_tokens: getModelTokenLimits(model).outputTokenLimit,
+    max_tokens: getModelTokenLimits(model, manualModels).outputTokenLimit,
     messages,
-    thinking: {
+  };
+
+  if (isReasoning) {
+    requestParams.thinking = {
       type: "adaptive",
       display: "summarized",
-    },
-    output_config: {
+    };
+    requestParams.output_config = {
       effort,
-    },
-  };
+    };
+  }
 
   if (systemPromptText && systemPromptText.trim() !== "") {
     requestParams.system = systemPromptText;
@@ -2113,6 +2153,13 @@ export async function POST(request: NextRequest) {
 
   const provider: ModelProvider = getProviderForModel(model) ?? "gemini";
 
+  let manualModels: ManualCustomModel[] = [];
+  try {
+    manualModels = await fetchManualCustomModels(userId);
+  } catch (e) {
+    console.error("Failed to fetch manual custom models:", e);
+  }
+
   const systemPromptText = await fetchSystemPrompt(newChatSystemPrompt, chatSessionId, projectId, userId);
 
   try {
@@ -2160,9 +2207,12 @@ export async function POST(request: NextRequest) {
         clientHistoryWithAppParts,
         systemPromptText,
         userId,
+        thinkingBudget,
+        verbosity,
         temperature,
         topP,
         topK,
+        manualModels,
       );
     } else if (provider === "custom-anthropic") {
       return await handleCustomAnthropicRequest(
@@ -2175,6 +2225,7 @@ export async function POST(request: NextRequest) {
         temperature,
         topP,
         topK,
+        manualModels,
       );
     } else {
       return await handleGeminiRequest(

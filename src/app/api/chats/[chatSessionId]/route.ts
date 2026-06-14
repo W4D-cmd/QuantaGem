@@ -93,7 +93,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
   };
 
   const sets: string[] = [];
-  const vals: (string | number | null)[] = [];
+  const vals: (string | number | boolean | null)[] = [];
   let idx = 1;
 
   if (title !== undefined) {

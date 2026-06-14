@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Modal from "./Modal";
 import { ToastProps } from "./Toast";
-import { Server, RefreshCw, Settings, ShieldCheck, Eye, EyeOff, Plus, Pencil, Trash2 } from "lucide-react";
+import { Server, RefreshCw, Settings, ShieldCheck, Eye, EyeOff, Plus, Pencil, Trash2, BookOpen } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { ManualCustomModel } from "@/lib/custom-models";
 
@@ -18,6 +18,7 @@ interface SettingsModalProps {
   getAuthHeaders: () => HeadersInit;
   showToast: (message: string, type?: ToastProps["type"]) => void;
   onManualModelsChanged?: () => void;
+  onOpenSkillsModal?: () => void;
 }
 
 interface ModelFormState {
@@ -49,6 +50,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   getAuthHeaders,
   showToast,
   onManualModelsChanged,
+  onOpenSkillsModal,
 }) => {
   // General settings
   const [systemPrompt, setSystemPrompt] = useState<string>("");
@@ -683,6 +685,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       </span>
                     )}
                   </div>
+                  {chatId !== null && (
+                    <div className="pt-4 border-t border-neutral-200 dark:border-zinc-800">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={onOpenSkillsModal}
+                          className="flex items-center gap-2 cursor-pointer h-9 px-4 rounded-full text-sm font-medium
+                            transition-colors bg-white dark:bg-zinc-900 border border-neutral-300 dark:border-zinc-700
+                            hover:bg-neutral-100 dark:hover:bg-zinc-800 text-neutral-700 dark:text-zinc-300
+                            focus:outline-none"
+                        >
+                          <BookOpen className="size-4" />
+                          Manage Skills
+                        </button>
+                      </div>
+                      <p className="text-xs text-neutral-500 dark:text-zinc-500 mt-2">
+                        Skills are additional instructions appended to the system prompt for this chat.
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 ml-2 flex-shrink-0">
                   <button
@@ -780,6 +802,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       />
                     )}
                   </div>
+                  {chatId !== null && (
+                    <div className="pt-4 border-t border-neutral-200 dark:border-zinc-800">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={onOpenSkillsModal}
+                          className="flex items-center gap-2 cursor-pointer h-9 px-4 rounded-full text-sm font-medium
+                            transition-colors bg-white dark:bg-zinc-900 border border-neutral-300 dark:border-zinc-700
+                            hover:bg-neutral-100 dark:hover:bg-zinc-800 text-neutral-700 dark:text-zinc-300
+                            focus:outline-none"
+                        >
+                          <BookOpen className="size-4" />
+                          Manage Skills
+                        </button>
+                      </div>
+                      <p className="text-xs text-neutral-500 dark:text-zinc-500 mt-2">
+                        Skills are additional instructions appended to the system prompt for this chat.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -264,11 +264,12 @@ async function fetchSystemPrompt(
   userId: string,
 ): Promise<string | null> {
   let systemPromptText: string | null = null;
+  let useChatScope = false;
 
   try {
     if (chatSessionId) {
       const chatSettingsResult = await pool.query(
-        "SELECT system_prompt, project_id FROM chat_sessions WHERE id = $1 AND user_id = $2",
+        "SELECT system_prompt, project_id, skill_override_enabled FROM chat_sessions WHERE id = $1 AND user_id = $2",
         [chatSessionId, userId],
       );
 
@@ -286,6 +287,10 @@ async function fetchSystemPrompt(
           systemPromptText = projectSettingsResult.rows[0].system_prompt;
         }
       }
+
+      if (chatSettingsResult.rows[0]?.skill_override_enabled) {
+        useChatScope = true;
+      }
     } else if (projectId) {
       const projectSettingsResult = await pool.query(
         "SELECT system_prompt FROM projects WHERE id = $1 AND user_id = $2",
@@ -302,6 +307,36 @@ async function fetchSystemPrompt(
       ]);
       if (globalSettingsResult.rows.length > 0 && globalSettingsResult.rows[0].system_prompt?.trim() !== "") {
         systemPromptText = globalSettingsResult.rows[0].system_prompt;
+      }
+    }
+
+    // Fetch active skills based on scope cascade
+    let skillQuery: string;
+    let skillParams: (string | number)[];
+
+    if (useChatScope && chatSessionId) {
+      skillQuery = `SELECT s.name, s.content FROM skills s
+        JOIN user_skill_activations usa ON usa.skill_id = s.id
+        WHERE s.user_id = $1 AND usa.user_id = $1 AND usa.scope = 'chat' AND usa.chat_session_id = $2
+        ORDER BY s.name`;
+      skillParams = [userId, chatSessionId];
+    } else {
+      skillQuery = `SELECT s.name, s.content FROM skills s
+        JOIN user_skill_activations usa ON usa.skill_id = s.id
+        WHERE s.user_id = $1 AND usa.user_id = $1 AND usa.scope = 'global' AND usa.chat_session_id IS NULL
+        ORDER BY s.name`;
+      skillParams = [userId];
+    }
+
+    const skillResult = await pool.query(skillQuery, skillParams);
+    if (skillResult.rows.length > 0) {
+      const skillsXml = skillResult.rows
+        .map((row) => `<skill name="${row.name}">\n${row.content}\n</skill>`)
+        .join("\n\n");
+      if (systemPromptText) {
+        systemPromptText = systemPromptText + "\n\n" + skillsXml;
+      } else {
+        systemPromptText = skillsXml;
       }
     }
   } catch (dbError) {

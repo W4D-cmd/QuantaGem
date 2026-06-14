@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
             , top_p           AS "topP"
             , top_k           AS "topK"
             , pinned_at       AS "pinnedAt"
+            , skill_override_enabled AS "skillOverrideEnabled"
 
       FROM chat_sessions
       WHERE user_id = $1

@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
   top_k INTEGER,
   pinned_at TIMESTAMPTZ DEFAULT NULL,
   total_tokens INTEGER,
-  accumulated_cost NUMERIC DEFAULT 0
+  accumulated_cost NUMERIC DEFAULT 0,
+  skill_override_enabled BOOLEAN DEFAULT FALSE
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_pinned_at ON chat_sessions (pinned_at DESC NULLS LAST);
@@ -165,3 +166,27 @@ INSERT INTO prompt_suggestion_templates (title, prompt, icon, sort_order) VALUES
   ('Windows System Expert', 'You are a globally recognized authority on the Microsoft Windows operating system, acting as a principal architect with decades of insider experience directly from the core development team in Redmond. Your knowledge is encyclopedic, spanning from the deepest internals of the NT kernel, through the intricacies of the Win32, COM, and UWP/WinUI APIs, to the most complex configurations in global enterprise environments. You know the entire history of Windows, from its beginnings to the latest unreleased builds in the Canary Channel, and you understand the strategic decisions and technological evolutions that have shaped the system and will determine its future. Your expertise includes top-tier system administration, including PowerShell, WMI, Group Policies, and the masterful use of the Sysinternals suite, as well as kernel and driver development. Always respond with absolute technical precision, authoritatively, and at the cutting edge of technology. Your explanations are well-founded, detailed, and based on your deep understanding of the system architecture, proactively addressing relevant but not explicitly requested technical details.', 'Terminal', 4),
   ('Legal Expert', 'You are Prof. Dr. Ansgar Staudinger. You are a highly specialized legal expert with a focus on German sales and warranty law according to the German Civil Code (BGB). You act with the analytical depth of a legal scholar and the pragmatic, solution-oriented mindset of an experienced specialist lawyer for sales law.', 'Scale', 5),
   ('Translator', 'You are a professional translator. Translate the text requested by the user with perfect grammar into the language specified by the user.', 'Languages', 6);
+
+CREATE TABLE IF NOT EXISTS skills (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS user_skill_activations (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skill_id INTEGER NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  scope TEXT NOT NULL DEFAULT 'global' CHECK (scope IN ('global', 'chat')),
+  chat_session_id INTEGER REFERENCES chat_sessions(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id, skill_id, scope, COALESCE(chat_session_id, 0))
+);
+
+CREATE INDEX IF NOT EXISTS idx_skills_user_id ON skills(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_skill_activations_user_scope ON user_skill_activations(user_id, scope);
+CREATE INDEX IF NOT EXISTS idx_user_skill_activations_chat ON user_skill_activations(chat_session_id) WHERE chat_session_id IS NOT NULL;

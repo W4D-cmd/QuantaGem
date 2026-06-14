@@ -29,7 +29,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cha
               top_p           AS "topP",
               top_k           AS "topK",
               total_tokens    AS "totalTokens",
-              accumulated_cost AS "accumulatedCost"
+              accumulated_cost AS "accumulatedCost",
+              skill_override_enabled AS "skillOverrideEnabled"
        FROM chat_sessions
        WHERE id = $1
          AND user_id = $2`,
@@ -77,7 +78,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     return NextResponse.json({ error: "Invalid Chat Session ID format" }, { status: 400 });
   }
 
-  const { title, lastModel, systemPrompt, projectId, thinkingBudget, temperature, topP, topK, totalTokens, accumulatedCost } = (await request.json()) as {
+  const { title, lastModel, systemPrompt, projectId, thinkingBudget, temperature, topP, topK, totalTokens, accumulatedCost, skillOverrideEnabled } = (await request.json()) as {
     title?: string;
     lastModel?: string;
     systemPrompt?: string;
@@ -88,6 +89,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     topK?: number | null;
     totalTokens?: number;
     accumulatedCost?: number;
+    skillOverrideEnabled?: boolean;
   };
 
   const sets: string[] = [];
@@ -134,6 +136,10 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     sets.push(`accumulated_cost = $${idx++}`);
     vals.push(accumulatedCost);
   }
+  if (skillOverrideEnabled !== undefined) {
+    sets.push(`skill_override_enabled = $${idx++}`);
+    vals.push(skillOverrideEnabled);
+  }
 
   if (!sets.length) {
     return NextResponse.json({ error: "nothing to update" }, { status: 400 });
@@ -163,7 +169,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
               top_p           AS "topP",
               top_k           AS "topK",
               total_tokens    AS "totalTokens",
-              accumulated_cost AS "accumulatedCost"
+              accumulated_cost AS "accumulatedCost",
+              skill_override_enabled AS "skillOverrideEnabled"
        FROM chat_sessions
        WHERE id = $1
          AND user_id = $2`,

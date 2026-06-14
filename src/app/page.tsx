@@ -10,8 +10,9 @@ import Tooltip from "@/components/Tooltip";
 import Toast, { ToastProps } from "@/components/Toast";
 import DropdownMenu, { DropdownItem } from "@/components/DropdownMenu";
 import SettingsModal from "@/components/SettingsModal";
+import SkillsModal from "@/components/SkillsModal";
 import { useRouter } from "next/navigation";
-import { ArrowDown, LogOut, Settings, EllipsisVertical, Paperclip, Shield } from "lucide-react";
+import { ArrowDown, LogOut, Settings, EllipsisVertical, Paperclip, Shield, BookOpen } from "lucide-react";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import TemporaryChatToggle from "@/components/TemporaryChatToggle";
 import ProjectManagement from "@/components/ProjectManagement";
@@ -122,6 +123,7 @@ export interface ChatListItem {
   pinnedAt: string | null;
   totalTokens: number | null;
   accumulatedCost: number | null;
+  skillOverrideEnabled: boolean;
 }
 
 export interface ProjectListItem {
@@ -223,6 +225,8 @@ export default function Home() {
   const [toast, setToast] = useState<Omit<ToastProps, "onClose"> | null>(null);
   const [isAutoScrollActive, setIsAutoScrollActive] = useState(true);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isSkillsModalOpen, setIsSkillsModalOpen] = useState(false);
+  const [skillsModalMode, setSkillsModalMode] = useState<"global" | "chat">("global");
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [editingChatId, setEditingChatId] = useState<number | null>(null);
   const [editingPromptInitialValue, setEditingPromptInitialValue] = useState<string | null>(null);
@@ -2129,6 +2133,12 @@ export default function Home() {
         ]
       : []),
     {
+      id: "skills",
+      label: "Skills",
+      icon: <BookOpen className="size-4" />,
+      onClick: () => { setIsSkillsModalOpen(true); setSkillsModalMode("global"); setIsThreeDotMenuOpen(false); },
+    },
+    {
       id: "settings",
       label: "Settings",
       icon: <Settings className="size-4" />,
@@ -2429,6 +2439,18 @@ export default function Home() {
             getAuthHeaders={getAuthHeaders}
             showToast={showToast}
             onManualModelsChanged={fetchManualModels}
+            onOpenSkillsModal={() => { setSkillsModalMode(editingChatId !== null ? "chat" : "global"); setIsSkillsModalOpen(true); closeSettingsModal(); }}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isSkillsModalOpen && (
+          <SkillsModal
+            isOpen={isSkillsModalOpen}
+            onClose={() => setIsSkillsModalOpen(false)}
+            chatId={skillsModalMode === "chat" ? editingChatId : null}
+            getAuthHeaders={getAuthHeaders}
+            showToast={showToast}
           />
         )}
       </AnimatePresence>

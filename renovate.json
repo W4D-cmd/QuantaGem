@@ -4,7 +4,7 @@
   "prHourlyLimit": 0,
   "prConcurrentLimit": 0,
   "prCreation": "immediate",
-  "baseBranchPatterns": ["main", "vertexai"],
+  "baseBranchPatterns": ["vertexai"],
   "platformAutomerge": true,
   "dependencyDashboard": true,
   "lockFileMaintenance": {

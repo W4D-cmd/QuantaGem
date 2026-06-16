@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.3.5",
-    "@tailwindcss/postcss": "4.3.0",
+    "@tailwindcss/postcss": "4.3.1",
     "@tailwindcss/typography": "0.5.20",
     "@types/node": "24.13.2",
     "@types/pg": "8.20.0",
@@ -48,7 +48,7 @@
     "eslint-config-next": "16.2.9",
     "prettier": "3.8.4",
     "prettier-plugin-classnames": "0.10.2",
-    "tailwindcss": "4.3.0",
+    "tailwindcss": "4.3.1",
     "typescript": "6.0.3"
   }
 }

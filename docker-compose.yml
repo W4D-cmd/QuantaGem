@@ -57,6 +57,8 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     command: uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "0.0.0.0:8000:8000"
     environment:
       HF_HOME: /app/models
       # STT_THREADS: 4  # Number of CPU threads for transcription (default: auto)
@@ -92,6 +94,7 @@ services:
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-key.json
       GOOGLE_GENAI_USE_VERTEXAI: "True"
       NODE_OPTIONS: "--dns-result-order=ipv6first"
+      STT_SERVICE_URL: ${STT_SERVICE_URL:-http://stt-service:8000}
     depends_on:
       db:
         condition: service_healthy

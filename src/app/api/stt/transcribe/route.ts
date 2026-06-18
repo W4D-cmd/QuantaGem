@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
     const sttFormData = new FormData();
     sttFormData.append("audio_file", new Blob([buffer], { type: audioFile.type }), filename);
 
-    const sttResponse = await fetch("http://stt-service:8000/transcribe", {
+    const sttBaseUrl = process.env.STT_SERVICE_URL || "http://stt-service:8000";
+    const sttResponse = await fetch(`${sttBaseUrl}/transcribe`, {
       method: "POST",
       body: sttFormData,
     });

@@ -241,7 +241,17 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const timer = setTimeout(() => setSttPhase("idle"), 3000);
         return () => clearTimeout(timer);
       }
-    }, [sttPhase]);
+      // Safety net: assembling/sending should complete in milliseconds under normal
+      // conditions. If a non-terminal phase lingers for 30s, reset so the UI can
+      // never get permanently stuck (defensive catch-all for future bugs).
+      if (sttPhase === "assembling" || sttPhase === "sending") {
+        const timer = setTimeout(() => {
+          showToast("Audio processing timed out, please try again.", "error");
+          setSttPhase("idle");
+        }, 30000);
+        return () => clearTimeout(timer);
+      }
+    }, [sttPhase, showToast]);
 
     const [isScanning, setIsScanning] = useState(false);
     const [scanStatusMessage, setScanStatusMessage] = useState<string | null>(null);
@@ -733,6 +743,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
         let chunksReadyResolve: (() => void) | null = null;
         let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+        let safetyTimer: ReturnType<typeof setTimeout> | null = null;
         let stopCalled = false;
 
         const chunksReady = new Promise<void>((resolve) => {
@@ -743,6 +754,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           if (!stopCalled) return;
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = null;
+          if (safetyTimer) clearTimeout(safetyTimer);
+          safetyTimer = null;
           if (chunksReadyResolve) {
             chunksReadyResolve();
             chunksReadyResolve = null;
@@ -753,6 +766,10 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           if (event.data.size > 0) {
             audioChunksRef.current.push(event.data);
           }
+          // Once chunks start arriving, the safety timer is no longer needed:
+          // the debounce timer becomes the sole resolution mechanism.
+          if (safetyTimer) clearTimeout(safetyTimer);
+          safetyTimer = null;
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = setTimeout(tryFinalize, 50);
         };
@@ -762,10 +779,11 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           setSttPhase("assembling");
           stream.getTracks().forEach((track) => track.stop());
           stopCalled = true;
-          // Safety timeout: if the final ondataavailable never fires after stop()
-          const safetyTimer = setTimeout(tryFinalize, 200);
+          // Safety timeout: only fires if zero ondataavailable events occur after stop()
+          safetyTimer = setTimeout(tryFinalize, 200);
           await chunksReady;
-          clearTimeout(safetyTimer);
+          if (safetyTimer) clearTimeout(safetyTimer);
+          safetyTimer = null;
           if (audioChunksRef.current.length > 0) {
             const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType || "audio/webm" });
             if (audioBlob.size < 100) {
@@ -775,6 +793,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               return;
             }
             await transcribeAudio(audioBlob);
+          } else {
+            showToast("No audio captured, please try again.", "error");
+            setSttPhase("error");
           }
           audioChunksRef.current = [];
         };
@@ -1045,7 +1066,17 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const getMainButtonAction = () => {
       if (isLoading) return onCancelAction;
-      if (isRecording) return () => mediaRecorderRef.current?.stop();
+      if (isRecording)
+        return () => {
+          try {
+            if (mediaRecorderRef.current?.state === "recording") {
+              mediaRecorderRef.current.stop();
+            }
+          } catch {
+            // InvalidStateError or recorder already stopped: ensure full cleanup
+            cancelRecording();
+          }
+        };
       return undefined;
     };
 

@@ -59,7 +59,7 @@
     "eslint": "10.5.0",
     "eslint-config-next": "16.2.9",
     "prettier": "3.8.4",
-    "prettier-plugin-classnames": "0.10.2",
+    "prettier-plugin-classnames": "0.10.3",
     "tailwindcss": "4.3.1",
     "typescript": "6.0.3"
   }

@@ -1300,7 +1300,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       dark:bg-zinc-900 dark:border-zinc-800 dark:hover:bg-zinc-700
                       disabled:opacity-50"
                   >
-                    <Paperclip                      ease-in-out" />
+                    <Paperclip className="size-5 text-neutral-500 dark:text-zinc-400 transition-colors duration-300
+                      ease-in-out" />
                   </button>
                 </Tooltip>
                 <DropdownMenu

@@ -25,7 +25,6 @@ import {
   Paperclip,
   Sparkles,
   XCircle,
-  X,
   ChevronDown,
   ArrowUp,
   Square,
@@ -37,6 +36,7 @@ import {
   Scale,
   Wind,
   Settings2,
+  Loader2,
 } from "lucide-react";
 import { Message, ProjectFile } from "@/app/page";
 import {
@@ -65,7 +65,15 @@ import { Model } from "@google/genai";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { motion, AnimatePresence } from "motion/react";
 
-type SttPhase = "idle" | "recording" | "assembling" | "sending" | "transcribing" | "complete" | "error";
+type SttPhase =
+  | "idle"
+  | "priming"
+  | "recording"
+  | "assembling"
+  | "sending"
+  | "transcribing"
+  | "complete"
+  | "error";
 
 export interface UploadedFileInfo {
   objectName: string;
@@ -235,6 +243,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const audioChunksRef = useRef<Blob[]>([]);
 
     const [sttPhase, setSttPhase] = useState<SttPhase>("idle");
+    const isPriming = sttPhase === "priming";
 
     useEffect(() => {
       if (sttPhase === "complete" || sttPhase === "error") {
@@ -249,6 +258,15 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           showToast("Audio processing timed out, please try again.", "error");
           setSttPhase("idle");
         }, 30000);
+        return () => clearTimeout(timer);
+      }
+      // Priming should never take longer than a few seconds. If it lingers,
+      // reset to idle so the UI never gets stuck in the priming state.
+      if (sttPhase === "priming") {
+        const timer = setTimeout(() => {
+          showToast("Microphone initialization timed out, please try again.", "error");
+          setSttPhase("idle");
+        }, 10000);
         return () => clearTimeout(timer);
       }
     }, [sttPhase, showToast]);
@@ -729,7 +747,30 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const startRecording = async () => {
       if (isLoading) return;
+      setSttPhase("priming");
       try {
+        // ── Microphone priming ──────────────────────────────────────────────
+        // Some hardware (especially combined webcam + mic USB devices) needs a
+        // moment to "wake up" before it delivers clean audio. We grab the stream
+        // once, immediately release it, wait for the hardware to settle, then
+        // acquire it a second time — this is the stream we actually record from.
+        // The second getUserMedia call does NOT re-prompt for permission.
+        let primingStream: MediaStream | null = null;
+        try {
+          primingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          primingStream.getTracks().forEach((track) => track.stop());
+        } catch {
+          // Priming failure is non-fatal — fall through to the real call below.
+        } finally {
+          if (primingStream) {
+            primingStream.getTracks().forEach((track) => track.stop());
+            primingStream = null;
+          }
+        }
+        // Give the hardware a brief settling period before re-acquiring.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        // ── End priming ─────────────────────────────────────────────────────
+
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const mimeType = MediaRecorder.isTypeSupported("audio/webm")
           ? "audio/webm"
@@ -820,6 +861,10 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       }
       audioChunksRef.current = [];
       setIsRecording(false);
+      setSttPhase("idle");
+    };
+
+    const cancelPriming = () => {
       setSttPhase("idle");
     };
 
@@ -1160,26 +1205,34 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           )}
           {sttPhase !== "idle" && (
             <div className={`mb-2 p-2 text-sm flex items-center gap-2 ${
-              sttPhase === "recording" ? "text-red-500"
-                : sttPhase === "assembling" ? "text-amber-500"
-                  : sttPhase === "sending" ? "text-blue-500"
-                    : sttPhase === "transcribing" ? "text-indigo-500"
-                      : sttPhase === "complete" ? "text-green-500"
-                        : "text-red-500"
+              sttPhase === "priming" ? "text-blue-500"
+                : sttPhase === "recording" ? "text-red-500"
+                  : sttPhase === "assembling" ? "text-amber-500"
+                    : sttPhase === "sending" ? "text-blue-500"
+                      : sttPhase === "transcribing" ? "text-indigo-500"
+                        : sttPhase === "complete" ? "text-green-500"
+                          : "text-red-500"
             }`}>
-              {sttPhase === "recording" && <Mic className="size-4 animate-pulse" />}
+              {sttPhase === "priming" && <Loader2 className="size-4 animate-spin" />}
+              {sttPhase === "recording" && (
+                <span className="relative flex size-4 items-center justify-center">
+                  <span className="absolute inline-flex h-3 w-3 animate-ping rounded-full bg-red-400 opacity-75" />
+                  <Mic className="relative size-3.5" />
+                </span>
+              )}
               {sttPhase === "assembling" && <RefreshCw className="size-4 animate-spin" />}
               {sttPhase === "sending" && <ArrowUp className="size-4" />}
               {sttPhase === "transcribing" && <Cpu className="size-4 animate-spin" />}
               {sttPhase === "complete" && <Check className="size-4" />}
               {sttPhase === "error" && <XCircle className="size-4" />}
               <span>{
-                sttPhase === "recording" ? "Recording..."
-                  : sttPhase === "assembling" ? "Assembling audio..."
-                    : sttPhase === "sending" ? "Sending audio..."
-                      : sttPhase === "transcribing" ? "Transcribing..."
-                        : sttPhase === "complete" ? "Transcription complete"
-                          : "Transcription failed"
+                sttPhase === "priming" ? "Warming up microphone..."
+                  : sttPhase === "recording" ? "Listening — speak now"
+                    : sttPhase === "assembling" ? "Assembling audio..."
+                      : sttPhase === "sending" ? "Sending audio..."
+                        : sttPhase === "transcribing" ? "Transcribing..."
+                          : sttPhase === "complete" ? "Transcription complete"
+                            : "Transcription failed"
               }</span>
             </div>
           )}
@@ -1217,7 +1270,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   scrollbarGutter: "stable",
                 }}
                 disabled={
-                  isLoading || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt
+                  isLoading || isRecording || isPriming || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt
                 }
               />
             </div>
@@ -1235,6 +1288,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     disabled={
                       isLoading ||
                       isRecording ||
+                      isPriming ||
                       isTranscribing ||
                       isScanning ||
                       uploadingFiles.length > 0 ||
@@ -1243,11 +1297,10 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     }
                     className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm font-medium
                       border transition-colors duration-300 ease-in-out bg-white border-neutral-300 hover:bg-neutral-100
-                      dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-700
+                      dark:bg-zinc-900 dark:border-zinc-800 dark:hover:bg-zinc-700
                       disabled:opacity-50"
                   >
-                    <Paperclip className="size-5 text-neutral-500 dark:text-zinc-400 transition-colors duration-300
-                      ease-in-out" />
+                    <Paperclip                      ease-in-out" />
                   </button>
                 </Tooltip>
                 <DropdownMenu
@@ -1264,14 +1317,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   multiple
                   className="hidden"
                   disabled={
-                    isLoading || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt
+                    isLoading || isRecording || isPriming || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt
                   }
                 />
                 <Tooltip text="Search the web">
                   <button
                     type="button"
                     onClick={() => onToggleSearch(!isSearchActive)}
-                    disabled={isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
+                    disabled={isPriming || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
                     className={` cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
                       transition-colors duration-300 ease-in-out ${
                         isSearchActive
@@ -1298,7 +1351,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       ref={thinkingButtonRef}
                       type="button"
                       onClick={() => setIsThinkingMenuOpen((prev) => !prev)}
-                      disabled={isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
+                      disabled={isPriming || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
                       className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
                       transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
                       text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700
@@ -1322,7 +1375,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     ref={styleButtonRef}
                     type="button"
                     onClick={() => setIsStyleMenuOpen((prev) => !prev)}
-                    disabled={isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
+                    disabled={isPriming || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
                     className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
                       transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
                       text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700
@@ -1356,14 +1409,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   <VerbositySelector
                     verbosity={verbosity}
                     onVerbosityChange={onVerbosityChange}
-                    disabled={isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
+                    disabled={isPriming || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
                   />
                 )}
               </div>
 
               <div className="flex items-center gap-2">
                 <div className="flex h-9 items-center">
-                  {!isLoading && !isTranscribing && !isScanning && (
+                  {!isLoading && !isPriming && !isTranscribing && !isScanning && (
                     <div className="flex items-center gap-2">
                       <Tooltip text="Create system prompt">
                         <button
@@ -1374,6 +1427,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           disabled={
                             isLoading ||
                             isRecording ||
+                            isPriming ||
                             isTranscribing ||
                             uploadingFiles.length > 0 ||
                             isScanning ||
@@ -1404,6 +1458,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           disabled={
                             isLoading ||
                             isRecording ||
+                            isPriming ||
                             isTranscribing ||
                             uploadingFiles.length > 0 ||
                             isScanning ||
@@ -1433,10 +1488,10 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           )}
                         </button>
                       </Tooltip>
-                      <Tooltip text={isRecording ? "Cancel recording" : "Dictate message"}>
+                      <Tooltip text={isPriming ? "Initializing microphone..." : isRecording ? "Cancel recording" : "Dictate message"}>
                         <button
                           type="button"
-                          onClick={isRecording ? cancelRecording : startRecording}
+                          onClick={isPriming ? cancelPriming : isRecording ? cancelRecording : startRecording}
                           disabled={
                             isLoading ||
                             isTranscribing ||
@@ -1445,13 +1500,23 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                             isRefining ||
                             isGeneratingSystemPrompt
                           }
-                          className="cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
-                            font-medium border transition-colors duration-300 ease-in-out bg-white border-neutral-300
-                            hover:bg-neutral-100 dark:bg-zinc-900 dark:border-zinc-800 dark:hover:bg-zinc-700
-                            disabled:opacity-50"
+                          className={`cursor-pointer size-9 flex items-center justify-center rounded-full text-sm
+                            font-medium border transition-colors duration-300 ease-in-out disabled:opacity-50
+                            ${
+                              isPriming
+                                ? "bg-blue-50 border-blue-400 dark:bg-blue-950 dark:border-blue-800"
+                                : isRecording
+                                  ? "bg-red-50 border-red-400 dark:bg-red-950 dark:border-red-800"
+                                  : "bg-white border-neutral-300 hover:bg-neutral-100 dark:bg-zinc-900 dark:border-zinc-800 dark:hover:bg-zinc-700"
+                            }`}
                         >
-                          {isRecording ? (
-                            <X className="size-5 text-red-500" />
+                          {isPriming ? (
+                            <Loader2 className="size-5 animate-spin text-blue-500" />
+                          ) : isRecording ? (
+                            <span className="relative flex size-5 items-center justify-center">
+                              <span className="absolute inline-flex h-4 w-4 animate-ping rounded-full bg-red-400 opacity-75" />
+                              <Mic className="relative size-4 text-red-500" />
+                            </span>
                           ) : (
                             <Mic className="size-5 text-neutral-500 dark:text-zinc-400" />
                           )}
@@ -1462,7 +1527,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 </div>
 
                 <button
-                  type={isLoading || isRecording || isTranscribing ? "button" : "submit"}
+                  type={isLoading || isRecording || isPriming || isTranscribing ? "button" : "submit"}
                   onClick={getMainButtonAction()}
                   disabled={
                     isLoading
@@ -1471,11 +1536,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         ? true
                         : isRecording
                           ? false
-                          : isScanning ||
-                            uploadingFiles.length > 0 ||
-                            isRefining ||
-                            isGeneratingSystemPrompt ||
-                            (!input.trim() && selectedFiles.length === 0)
+                          : isPriming
+                            ? true
+                            : isScanning ||
+                              uploadingFiles.length > 0 ||
+                              isRefining ||
+                              isGeneratingSystemPrompt ||
+                              (!input.trim() && selectedFiles.length === 0)
                   }
                   className={`cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-full flex
                     items-center justify-center transition-colors duration-300 ease-in-out ${
@@ -1495,6 +1562,15 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         exit={{ opacity: 0, scale: 0.5 }}
                       >
                         <Square className="size-5" />
+                      </motion.div>
+                    ) : isPriming ? (
+                      <motion.div
+                        key="priming"
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                      >
+                        <Loader2 className="size-5 animate-spin text-blue-500" />
                       </motion.div>
                     ) : isTranscribing || isScanning ? (
                       <motion.div

@@ -1859,6 +1859,8 @@ export default function Home() {
         generationParams,
         true,
         placeholderMessage.id,
+        activeChatId === null ? newChatSystemPrompt : undefined,
+        activeChatId === null ? currentChatProjectId : null,
       );
 
       if (modelResponse && !willBeTemporary && activeChatId) {
@@ -1963,6 +1965,8 @@ export default function Home() {
         generationParams,
         true,
         placeholderMessage.id,
+        activeChatId === null ? newChatSystemPrompt : undefined,
+        activeChatId === null ? currentChatProjectId : null,
       );
 
       if (modelResponse && !willBeTemporary && activeChatId) {

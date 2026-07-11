@@ -61,6 +61,6 @@
     "prettier": "3.9.4",
     "prettier-plugin-classnames": "0.10.4",
     "tailwindcss": "4.3.2",
-    "typescript": "6.0.3"
+    "typescript": "7.0.2"
   }
 }

@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   },
   turbopack: {
     resolveAlias: {
-      "drizzle-orm": "@/lib/empty-module.js",
+      "drizzle-orm": "./src/lib/empty-module.js",
     },
   },
   async headers() {

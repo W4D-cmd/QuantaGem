@@ -28,7 +28,7 @@ interface OpenAIReasoningModelConfig {
 const modelConfigs: Record<string, ThinkingModelConfig> = {
   "2.5-pro": { min: 2048, max: 32768, canBeOff: false, medium: 8192 },
   "2.5-flash": { min: 2048, max: 24576, canBeOff: true, medium: 8192 },
-  "3.5-flash": {
+  "3.6-flash": {
     min: 0, max: 0, canBeOff: false, medium: 0,
     useThinkingLevel: true,
     supportedLevels: ["minimal", "low", "medium", "high"],
@@ -40,7 +40,7 @@ const modelConfigs: Record<string, ThinkingModelConfig> = {
     supportedLevels: ["low", "medium", "high"],
     defaultLevel: "high",
   },
-  "3.1-flash": {
+  "3.5-flash-lite": {
     min: 0, max: 0, canBeOff: false, medium: 0,
     useThinkingLevel: true,
     supportedLevels: ["minimal", "low", "medium", "high"],
@@ -212,8 +212,8 @@ export function getThinkingConfigForModel(modelName: string | null | undefined, 
   }
   if (modelName.includes("2.5-pro")) return modelConfigs["2.5-pro"];
   if (modelName.includes("3.1-pro")) return modelConfigs["3.1-pro"];
-  if (modelName.includes("3.5-flash")) return modelConfigs["3.5-flash"];
-  if (modelName.includes("3.1-flash")) return modelConfigs["3.1-flash"];
+  if (modelName.includes("3.6-flash")) return modelConfigs["3.6-flash"];
+  if (modelName.includes("3.5-flash-lite")) return modelConfigs["3.5-flash-lite"];
   if (modelName.includes("gemini-3-flash")) return modelConfigs["3-flash"];
   if (modelName.includes("2.5-flash")) return modelConfigs["2.5-flash"];
   if (isOpenAIReasoningModel(modelName, manualModels)) {

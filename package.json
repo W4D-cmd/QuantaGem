@@ -21,7 +21,7 @@
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
     "highlight.js": "^11.11.1",
-    "ioredis": "^5.10.0",
+    "ioredis": "^6.0.0",
     "jose": "^6.2.1",
     "js-tiktoken": "^1.0.21",
     "jspdf": "^4.2.0",

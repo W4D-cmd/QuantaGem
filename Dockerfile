@@ -1,5 +1,5 @@
 # --- Stage 1: Dependencies ---
-FROM node:24-bookworm-slim@sha256:cd84903a12dbd26b46f1f3b8144a2568c41c5d37ddd0c7a80a34c7a19786b35f AS deps
+FROM node:24-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS deps
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates
@@ -8,7 +8,7 @@ COPY package*.json ./
 RUN npm ci
 
 # --- Stage 2: Builder ---
-FROM node:24-bookworm-slim@sha256:cd84903a12dbd26b46f1f3b8144a2568c41c5d37ddd0c7a80a34c7a19786b35f AS builder
+FROM node:24-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

@@ -289,8 +289,8 @@ export function getStaticModelsForEndpoint(endpoint: string): FetchedCustomModel
 
 export const customModels: CustomModelEntry[] = [
   {
-    displayName: "Gemini 3.7 Flash",
-    modelId: "gemini-3.7-flash",
+    displayName: "Gemini 3.8 Flash",
+    modelId: "gemini-3.8-flash",
     inputTokenLimit: 1048576,
     outputTokenLimit: 65536,
     provider: "gemini",

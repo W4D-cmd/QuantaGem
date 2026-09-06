@@ -496,8 +496,11 @@ async function handleGeminiRequest(
 
     if (modelUsesGeminiThinkingLevel(baseModelId)) {
       // Gemini 3.x models use named thinkingLevel instead of numeric thinkingBudget
+      // When thinkingBudget is -1 (dynamic), level is undefined to let the API choose automatically
       const level = mapBudgetToGeminiThinkingLevel(baseModelId, thinkingBudget);
-      effectiveThinkingConfig.thinkingLevel = level as ThinkingLevel;
+      if (level) {
+        effectiveThinkingConfig.thinkingLevel = level as ThinkingLevel;
+      }
     } else if (thinkingBudget !== undefined) {
       // Legacy Gemini 2.x models: 0 is DISABLED, -1 is AUTOMATIC in the SDK
       effectiveThinkingConfig.thinkingBudget = thinkingBudget;

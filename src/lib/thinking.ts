@@ -34,6 +34,12 @@ const modelConfigs: Record<string, ThinkingModelConfig> = {
     supportedLevels: ["low", "medium", "high"],
     defaultLevel: "medium",
   },
+  "3.8-flash": {
+    min: 0, max: 0, canBeOff: false, medium: 0,
+    useThinkingLevel: true,
+    supportedLevels: ["low", "medium", "high"],
+    defaultLevel: "high",
+  },
   "3.1-pro": {
     min: 0, max: 0, canBeOff: false, medium: 0,
     useThinkingLevel: true,
@@ -212,6 +218,7 @@ export function getThinkingConfigForModel(modelName: string | null | undefined, 
   }
   if (modelName.includes("2.5-pro")) return modelConfigs["2.5-pro"];
   if (modelName.includes("3.1-pro")) return modelConfigs["3.1-pro"];
+  if (modelName.includes("3.8-flash")) return modelConfigs["3.8-flash"];
   if (modelName.includes("3.7-flash")) return modelConfigs["3.7-flash"];
   if (modelName.includes("3.5-flash-lite")) return modelConfigs["3.5-flash-lite"];
   if (modelName.includes("gemini-3-flash")) return modelConfigs["3-flash"];
@@ -398,17 +405,11 @@ export function getGeminiSupportedLevels(modelName: string | null | undefined, m
 export function mapBudgetToGeminiThinkingLevel(
   modelName: string | null | undefined,
   budget: number | undefined,
-): "MINIMAL" | "LOW" | "MEDIUM" | "HIGH" {
+): "MINIMAL" | "LOW" | "MEDIUM" | "HIGH" | undefined {
   const config = getThinkingConfigForModel(modelName);
 
   if (budget === undefined || budget === -1) {
-    const defaultLevel = config?.defaultLevel ?? "medium";
-    switch (defaultLevel) {
-      case "minimal": return "MINIMAL" as const;
-      case "low": return "LOW" as const;
-      case "high": return "HIGH" as const;
-      default: return "MEDIUM" as const;
-    }
+    return undefined;
   }
 
   if (budget === 0) {
@@ -420,7 +421,7 @@ export function mapBudgetToGeminiThinkingLevel(
   if (budget === 1) return "LOW" as const;
   if (budget === 2) return "MEDIUM" as const;
   if (budget === 3) return "HIGH" as const;
-  return "MEDIUM" as const;
+  return undefined;
 }
 
 export function mapBudgetToOpenAIReasoningEffort(

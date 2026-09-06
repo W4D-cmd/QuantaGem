@@ -57,7 +57,7 @@ import {
   getStyleFromParams,
 } from "@/lib/generation-styles";
 import CustomStyleModal from "./CustomStyleModal";
-import { ManualCustomModel, modelSupportsVerbosity } from "@/lib/custom-models";
+import { ManualCustomModel, modelSupportsVerbosity, getProviderForModel, ModelProvider } from "@/lib/custom-models";
 import VerbositySelector from "./VerbositySelector";
 import DropdownMenu, { DropdownItem } from "./DropdownMenu";
 import { ToastProps } from "./Toast";
@@ -277,6 +277,11 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [fileAnimationParent] = useAutoAnimate();
 
     const isThinkingSupported = useMemo(() => !!getThinkingConfigForModel(selectedModel?.name, manualCustomModels), [selectedModel, manualCustomModels]);
+    const isGeminiModel = useMemo(() => {
+      if (!selectedModel?.name) return false;
+      const provider = (selectedModel as { provider?: ModelProvider }).provider ?? getProviderForModel(selectedModel.name);
+      return provider === "gemini";
+    }, [selectedModel]);
     const isVerbositySupported = useMemo(
       () => (selectedModel?.name ? modelSupportsVerbosity(selectedModel.name, manualCustomModels) : false),
       [selectedModel, manualCustomModels],
@@ -1371,41 +1376,45 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   items={thinkingDropdownItems}
                   position="left"
                 />
-                <Tooltip text="Generation Style">
-                  <button
-                    ref={styleButtonRef}
-                    type="button"
-                    onClick={() => setIsStyleMenuOpen((prev) => !prev)}
-                    disabled={isPriming || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
-                    className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
-                      transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
-                      text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700
-                      disabled:opacity-50`}
-                  >
-                    {currentStyleId === "precise" ? (
-                      <Target className="size-5" />
-                    ) : currentStyleId === "balanced" ? (
-                      <Scale className="size-5" />
-                    ) : currentStyleId === "creative" ? (
-                      <Sparkles className="size-5" />
-                    ) : currentStyleId === "unconstrained" ? (
-                      <Wind className="size-5" />
-                    ) : currentStyleId === "custom" ? (
-                      <Settings2 className="size-5" />
-                    ) : (
-                      <Zap className="size-5" />
-                    )}
-                    <span className="capitalize">{GENERATION_STYLES[currentStyleId].label}</span>
-                    <ChevronDown className="size-3" />
-                  </button>
-                </Tooltip>
-                <DropdownMenu
-                  open={isStyleMenuOpen}
-                  onCloseAction={() => setIsStyleMenuOpen(false)}
-                  anchorRef={styleButtonRef}
-                  items={styleDropdownItems}
-                  position="left"
-                />
+                {!isGeminiModel && (
+                  <>
+                    <Tooltip text="Generation Style">
+                      <button
+                        ref={styleButtonRef}
+                        type="button"
+                        onClick={() => setIsStyleMenuOpen((prev) => !prev)}
+                        disabled={isPriming || isRecording || isTranscribing || isScanning || isRefining || isGeneratingSystemPrompt}
+                        className={`cursor-pointer h-9 flex items-center gap-2 px-4 rounded-full text-sm font-medium
+                          transition-colors duration-300 ease-in-out bg-white border border-neutral-300 hover:bg-neutral-100
+                          text-neutral-500 dark:bg-zinc-950 dark:border-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700
+                          disabled:opacity-50`}
+                      >
+                        {currentStyleId === "precise" ? (
+                          <Target className="size-5" />
+                        ) : currentStyleId === "balanced" ? (
+                          <Scale className="size-5" />
+                        ) : currentStyleId === "creative" ? (
+                          <Sparkles className="size-5" />
+                        ) : currentStyleId === "unconstrained" ? (
+                          <Wind className="size-5" />
+                        ) : currentStyleId === "custom" ? (
+                          <Settings2 className="size-5" />
+                        ) : (
+                          <Zap className="size-5" />
+                        )}
+                        <span className="capitalize">{GENERATION_STYLES[currentStyleId].label}</span>
+                        <ChevronDown className="size-3" />
+                      </button>
+                    </Tooltip>
+                    <DropdownMenu
+                      open={isStyleMenuOpen}
+                      onCloseAction={() => setIsStyleMenuOpen(false)}
+                      anchorRef={styleButtonRef}
+                      items={styleDropdownItems}
+                      position="left"
+                    />
+                  </>
+                )}
                 {isVerbositySupported && (
                   <VerbositySelector
                     verbosity={verbosity}

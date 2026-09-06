@@ -86,6 +86,7 @@ export function createCustomModelId(originalModelId: string, apiType: "openai" |
 }
 
 export function getProviderForModel(modelId: string): ModelProvider | undefined {
+  if (!modelId) return undefined;
   // Check for custom provider first
   if (modelId.startsWith(CUSTOM_ANTHROPIC_PREFIX)) {
     return "custom-anthropic";
@@ -94,8 +95,15 @@ export function getProviderForModel(modelId: string): ModelProvider | undefined 
     return "custom-openai";
   }
 
-  const model = customModels.find((m) => m.modelId === modelId);
-  return model?.provider;
+  const cleanModelId = modelId.startsWith("models/") ? modelId.slice(7) : modelId;
+  const model = customModels.find((m) => m.modelId === cleanModelId || m.modelId === modelId);
+  if (model?.provider) return model.provider;
+
+  if (cleanModelId.startsWith("gemini-") || cleanModelId.startsWith("gemini")) return "gemini";
+  if (cleanModelId.startsWith("gpt-") || cleanModelId.startsWith("o1-") || cleanModelId.startsWith("o3-") || cleanModelId.startsWith("chatgpt-")) return "openai";
+  if (cleanModelId.startsWith("claude-")) return "anthropic";
+
+  return undefined;
 }
 
 export function modelSupportsVerbosity(modelId: string, manualModels?: ManualCustomModel[]): boolean {

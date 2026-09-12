@@ -72,7 +72,7 @@ MINIO_ROOT_PASSWORD=minioadminsecret
 MINIO_DEFAULT_BUCKET=chat-files
 ```
 
-**Object storage (SeaweedFS):** Chat attachments and project files are stored in SeaweedFS running single-process `weed mini` mode (pinned to `4.46`), exposed as an S3 endpoint at `seaweedfs:8333`. Uploads under the `temporary/` prefix are auto-expired (1 day) by a lifecycle rule. To migrate data from a legacy MinIO store, run `docker compose --profile migrate --profile legacy run --rm migrate-storage` (copy + verify with `rclone check`), then `docker compose --profile migrate run --rm configure-storage` (applies the lifecycle rule). See `docs/storage-migration.md`.
+**Object storage (SeaweedFS):** Chat attachments and project files are stored in SeaweedFS running single-process `weed mini` mode (pinned to `4.46`), exposed as an S3 endpoint at `seaweedfs:8333`. Uploads under the `temporary/` prefix are auto-expired (1 day) by a lifecycle rule. To migrate data from a legacy MinIO store, run `docker compose --profile migrate run --rm migrate-storage` (copy + verify with `rclone check`), then `docker compose --profile migrate run --rm configure-storage` (applies the lifecycle rule). See `docs/storage-migration.md`.
 
 ### 3. GCP Authentication
 

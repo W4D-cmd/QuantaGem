@@ -40,7 +40,7 @@ services:
 
   minio:
     image: minio/minio:RELEASE.2025-06-13T11-33-47Z@sha256:064117214caceaa8d8a90ef7caa58f2b2aeb316b5156afe9ee8da5b4d83e12c8
-    profiles: ["legacy"]
+    profiles: ["legacy", "migrate"]
     restart: unless-stopped
     env_file:
       - .env
@@ -94,7 +94,7 @@ services:
       - app-network
 
   configure-storage:
-    image: public.ecr.aws/aws-cli/aws-cli:v2
+    image: amazon/aws-cli:2.36.44
     profiles: ["migrate"]
     depends_on:
       seaweedfs:

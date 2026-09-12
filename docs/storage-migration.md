@@ -31,8 +31,10 @@ SeaweedFS, the rollback procedure, and the post-migration decommission checklist
 | Client | `src/lib/storage.ts` — `minio` npm package used as a plain S3 client (`pathStyle: true`) |
 
 The app no longer references MinIO. The legacy `minio` service is moved behind
-the `legacy` compose profile and is **not** started by a normal
-`docker compose up`.
+the `legacy` and `migrate` compose profiles and is **not** started by a normal
+`docker compose up`. It is included whenever the `migrate` profile is enabled
+(the migration tooling reads from it) and is only started when `migrate-storage`
+requests it as a dependency.
 
 ## Migration runbook (run on a host with Docker)
 
@@ -46,14 +48,14 @@ modified, and its `minio_data` volume is retained until decommission.
    ```
 2. Initial data copy + verification (starts legacy MinIO automatically):
    ```bash
-   docker compose --profile migrate --profile legacy run --rm migrate-storage
+   docker compose --profile migrate run --rm migrate-storage
    ```
    This runs `rclone copy`, then `rclone check` (full checksum), then `rclone size`
    for both stores. **`rclone check` must report zero differences.**
 3. Stop writes, run the final incremental sync, and verify again:
    ```bash
    docker compose stop app
-   docker compose --profile migrate --profile legacy run --rm migrate-storage
+   docker compose --profile migrate run --rm migrate-storage
    ```
 4. Apply the lifecycle rule to the new store and confirm it:
    ```bash
@@ -75,13 +77,15 @@ Fill the counts from the `migrate-storage` run (`rclone size` + `rclone check`).
 
 | Step | Date | src objects | dst objects | src bytes | dst bytes | rclone check |
 |---|---|---|---|---|---|---|
-| 2 initial sync | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
-| 3 final sync | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| 2 initial sync | 2026-09-12 | 1616 | 1616 | 1431487412 | 1431487412 | 0 differences |
+| 3 final sync | 2026-09-12 | 1616 | 1616 | 1431487412 | 1431487412 | 0 differences |
 
-> **Status:** the code, compose, env, and documentation changes are complete and
-> the TypeScript typecheck is clean for all changed files. The runtime steps above
-> (steps 1–6) and the log values require a Docker host and were **not** executed in
-> the environment where the code changes were made (Docker is not installed there).
+> **Status:** the code, compose, env, and documentation changes are complete and the
+> TypeScript typecheck is clean for all changed files. Runtime step 2 (initial data
+> copy + verification) has been executed on the operator's Docker host and passed
+> (1616 objects, 1.333 GiB, `rclone check` = 0 differences). Remaining steps 3–6
+> (final sync, lifecycle, rebuild, smoke test) and the decommission steps are still
+> pending.
 
 ## Rollback (during the soak window)
 

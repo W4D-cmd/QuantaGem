@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
+import { storageClient, S3_BUCKET_NAME } from "@/lib/storage";
 import { MessagePart } from "@/app/page";
 
 export async function GET(request: NextRequest) {
@@ -81,7 +81,7 @@ export async function DELETE(request: NextRequest) {
         uniqueObjectNames,
       );
       try {
-        await minioClient.removeObjects(MINIO_BUCKET_NAME, uniqueObjectNames);
+        await storageClient.removeObjects(S3_BUCKET_NAME, uniqueObjectNames);
         console.log(
           `Successfully submitted deletion request for ${uniqueObjectNames.length} objects from MinIO for user ${userId}'s global chats.`,
         );

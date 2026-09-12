@@ -1,4 +1,4 @@
-import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
+import { storageClient, S3_BUCKET_NAME } from "@/lib/storage";
 import { pool } from "@/lib/db";
 
 export async function cleanupExpiredTemporaryFiles(): Promise<{ deletedCount: number; error?: string }> {
@@ -15,7 +15,7 @@ export async function cleanupExpiredTemporaryFiles(): Promise<{ deletedCount: nu
 
     const objectNames = expiredFiles.map((f) => f.object_name);
 
-    await minioClient.removeObjects(MINIO_BUCKET_NAME, objectNames);
+    await storageClient.removeObjects(S3_BUCKET_NAME, objectNames);
 
     const ids = expiredFiles.map((f) => f.id);
     await pool.query(`DELETE FROM temporary_files WHERE id = ANY($1)`, [ids]);

@@ -8,7 +8,7 @@ QuantaGem is a high-performance, production-grade WebUI for Google's Gemini AI, 
 - **Language:** [TypeScript](https://www.typescriptlang.org/) with strict type safety.
 - **Styling:** [Tailwind CSS 4.0](https://tailwindcss.com/) with Lightning CSS.
 - **Database:** [PostgreSQL 18](https://www.postgresql.org/) for session, message, and project persistence.
-- **Object Storage:** [MinIO](https://min.io/) (S3-compatible) for handling chat attachments and project files.
+- **Object Storage:** [SeaweedFS](https://github.com/seaweedfs/seaweedfs) (S3-compatible, `weed mini` single-process) for handling chat attachments and project files.
 - **Cache/Rate Limiting:** [Redis 8](https://redis.io/) for secure authentication limiting.
 - **AI Integration:** [Google Vertex AI SDK](https://cloud.google.com/vertex-ai) (Gemini 2.0/2.5/3 and more).
 - **Speech-to-Text:** Local Python microservice using [ONNX ASR](https://github.com/thewh1teagle/onnx-asr) with NVIDIA NeMo Parakeet TDT model.
@@ -58,10 +58,21 @@ POSTGRES_USER=quantagemuser
 POSTGRES_PASSWORD=quantagempass
 POSTGRES_DB=quantagemdb
 
+# Object storage (SeaweedFS, S3-compatible)
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadminsecret
+S3_ENDPOINT=seaweedfs
+S3_PORT=8333
+S3_USE_SSL=false
+S3_BUCKET=chat-files
+
+# Legacy MinIO credentials — only needed when migrating from an existing MinIO store
 MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=minioadminsecret
 MINIO_DEFAULT_BUCKET=chat-files
 ```
+
+**Object storage (SeaweedFS):** Chat attachments and project files are stored in SeaweedFS running single-process `weed mini` mode (pinned to `4.46`), exposed as an S3 endpoint at `seaweedfs:8333`. Uploads under the `temporary/` prefix are auto-expired (1 day) by a lifecycle rule. To migrate data from a legacy MinIO store, run `docker compose --profile migrate --profile legacy run --rm migrate-storage` (copy + verify with `rclone check`), then `docker compose --profile migrate run --rm configure-storage` (applies the lifecycle rule). See `docs/storage-migration.md`.
 
 ### 3. GCP Authentication
 

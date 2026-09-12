@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { ChatListItem, MessagePart } from "@/app/page";
-import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
+import { storageClient, S3_BUCKET_NAME } from "@/lib/storage";
 import { randomUUID } from "crypto";
 
 interface DbMessage {
@@ -15,14 +15,14 @@ interface DbMessage {
 
 async function duplicateFile(originalObjectName: string): Promise<string | null> {
   try {
-    const originalFileStream = await minioClient.getObject(MINIO_BUCKET_NAME, originalObjectName);
+    const originalFileStream = await storageClient.getObject(S3_BUCKET_NAME, originalObjectName);
     const chunks: Buffer[] = [];
     for await (const chunk of originalFileStream) {
       chunks.push(chunk as Buffer);
     }
     const fileBuffer = Buffer.concat(chunks);
 
-    const stat = await minioClient.statObject(MINIO_BUCKET_NAME, originalObjectName);
+    const stat = await storageClient.statObject(S3_BUCKET_NAME, originalObjectName);
     const originalMimeType = stat.metaData?.["content-type"] || "application/octet-stream";
     const originalSize = stat.size;
 
@@ -32,7 +32,7 @@ async function duplicateFile(originalObjectName: string): Promise<string | null>
       .replace(/[^a-zA-Z0-9_.-]/g, "_");
     const newObjectName = `${randomUUID()}_${baseName}.${fileExtension}`;
 
-    await minioClient.putObject(MINIO_BUCKET_NAME, newObjectName, fileBuffer, originalSize, {
+    await storageClient.putObject(S3_BUCKET_NAME, newObjectName, fileBuffer, originalSize, {
       "Content-Type": originalMimeType,
     });
 

@@ -16,8 +16,31 @@ services:
       timeout: 5s
       retries: 5
 
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.46
+    restart: unless-stopped
+    command: ["mini", "-webdav=false", "-master.telemetry=false"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+    volumes:
+      - seaweedfs_data:/data
+    ports:
+      - "127.0.0.1:8333:8333"
+      - "127.0.0.1:23646:23646"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   minio:
     image: minio/minio:RELEASE.2025-06-13T11-33-47Z@sha256:064117214caceaa8d8a90ef7caa58f2b2aeb316b5156afe9ee8da5b4d83e12c8
+    profiles: ["legacy"]
     restart: unless-stopped
     env_file:
       - .env
@@ -37,19 +60,64 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
 
-  minio-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+  migrate-storage:
+    image: rclone/rclone:1.75.1
+    profiles: ["migrate"]
     depends_on:
       minio:
         condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    environment:
+      SRC_ACCESS_KEY: ${MINIO_ROOT_USER}
+      SRC_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      SRC_BUCKET: ${MINIO_DEFAULT_BUCKET:-chat-files}
+      DST_ACCESS_KEY: ${S3_ACCESS_KEY}
+      DST_SECRET_KEY: ${S3_SECRET_KEY}
+      DST_BUCKET: ${S3_BUCKET}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        rclone config create src s3 provider=Minio access_key_id="$$SRC_ACCESS_KEY" secret_access_key="$$SRC_SECRET_KEY" endpoint="http://minio:9000" force_path_style=true --config /config/rclone.conf --non-interactive
+        rclone config create dst s3 provider=Minio access_key_id="$$DST_ACCESS_KEY" secret_access_key="$$DST_SECRET_KEY" endpoint="http://seaweedfs:8333" force_path_style=true --config /config/rclone.conf --non-interactive
+        echo "=== [migrate] rclone copy src:$$SRC_BUCKET -> dst:$$DST_BUCKET ==="
+        rclone copy "src:$$SRC_BUCKET" "dst:$$DST_BUCKET" --config /config/rclone.conf --transfers 8 --checkers 16 --s3-no-check-bucket --stats 30s
+        echo "=== [migrate] rclone check (verify zero differences) ==="
+        rclone check "src:$$SRC_BUCKET" "dst:$$DST_BUCKET" --config /config/rclone.conf --checkers 16
+        echo "=== [migrate] rclone size (src) ==="
+        rclone size "src:$$SRC_BUCKET" --config /config/rclone.conf
+        echo "=== [migrate] rclone size (dst) ==="
+        rclone size "dst:$$DST_BUCKET" --config /config/rclone.conf
+        echo "=== [migrate] done ==="
     networks:
       - app-network
-    entrypoint: >
-      /bin/sh -c "
-        mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
-        mc ilm rule add myminio/${MINIO_DEFAULT_BUCKET} --prefix 'temporary/' --expire-days 1 || true &&
-        echo 'MinIO ILM rule configured for temporary/ prefix'
-      "
+
+  configure-storage:
+    image: public.ecr.aws/aws-cli/aws-cli:v2
+    profiles: ["migrate"]
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    environment:
+      ENDPOINT: "http://seaweedfs:8333"
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+      BUCKET: ${S3_BUCKET}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        echo "=== [configure] applying lifecycle rule to $$BUCKET ==="
+        aws s3api put-bucket-lifecycle-configuration \
+          --endpoint-url "$$ENDPOINT" \
+          --bucket "$$BUCKET" \
+          --lifecycle-configuration '{"Rules":[{"ID":"temporary-cleanup","Status":"Enabled","Filter":{"Prefix":"temporary/"},"Expiration":{"Days":1}}]}'
+        echo "=== [configure] verifying lifecycle configuration ==="
+        aws s3api get-bucket-lifecycle-configuration --endpoint-url "$$ENDPOINT" --bucket "$$BUCKET"
+        echo "=== [configure] done ==="
+    networks:
+      - app-network
 
   stt-service:
     build:
@@ -98,7 +166,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      minio:
+      seaweedfs:
         condition: service_healthy
       stt-service:
         condition: service_healthy
@@ -129,4 +197,5 @@ networks:
 volumes:
   db_data:
   minio_data:
+  seaweedfs_data:
   stt_models:

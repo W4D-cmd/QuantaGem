@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { minioClient, MINIO_BUCKET_NAME, ensureBucketExists } from "@/lib/minio";
+import { storageClient, S3_BUCKET_NAME, ensureBucketExists } from "@/lib/storage";
 import { randomUUID } from "crypto";
 import { getUserFromToken } from "@/lib/auth";
 
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pr
 
     const objectName = `${randomUUID()}_${baseName}.${fileExtension}`;
 
-    await minioClient.putObject(MINIO_BUCKET_NAME, objectName, fileBuffer, fileSize, { "Content-Type": mimeType });
+    await storageClient.putObject(S3_BUCKET_NAME, objectName, fileBuffer, fileSize, { "Content-Type": mimeType });
 
     const { rows } = await pool.query(
       `INSERT INTO project_files (project_id, user_id, object_name, file_name, mime_type, size)

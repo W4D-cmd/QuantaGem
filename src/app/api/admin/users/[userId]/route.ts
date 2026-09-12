@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { pool } from "@/lib/db";
-import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
+import { storageClient, S3_BUCKET_NAME } from "@/lib/storage";
 
 export async function DELETE(
   request: NextRequest,
@@ -41,7 +41,7 @@ export async function DELETE(
     // 2. Delete files from MinIO
     if (objectNames.length > 0) {
       try {
-        await minioClient.removeObjects(MINIO_BUCKET_NAME, objectNames);
+        await storageClient.removeObjects(S3_BUCKET_NAME, objectNames);
       } catch (minioError) {
         console.error("Failed to delete user files from MinIO:", minioError);
         // We continue anyway to delete the DB record, but we log the error

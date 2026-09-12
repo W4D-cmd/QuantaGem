@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
+import { S3_BUCKET_NAME, storageClient } from "@/lib/storage";
 import { MessagePart } from "@/app/page";
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ chatSessionId: string }> }) {
@@ -65,7 +65,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
 
     if (objectNamesToDelete.length > 0) {
       console.log(`Deleting ${objectNamesToDelete.length} orphaned files from message edit.`);
-      await minioClient.removeObjects(MINIO_BUCKET_NAME, objectNamesToDelete);
+      await storageClient.removeObjects(S3_BUCKET_NAME, objectNamesToDelete);
     }
 
     const newContent = newParts
@@ -147,7 +147,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     if (objectNamesToDelete.length > 0) {
       const uniqueObjectNames = Array.from(new Set(objectNamesToDelete));
       try {
-        await minioClient.removeObjects(MINIO_BUCKET_NAME, uniqueObjectNames);
+        await storageClient.removeObjects(S3_BUCKET_NAME, uniqueObjectNames);
       } catch (minioError) {
         console.error(`Error deleting objects from MinIO for chat session ${chatSessionId}:`, minioError);
       }

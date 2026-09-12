@@ -4,7 +4,7 @@ Guide for AI agents working in the QuantaGem codebase.
 
 ## Project Overview
 
-QuantaGem is a production-grade WebUI for Google's Gemini AI, built with a full-stack architecture using Next.js 16, PostgreSQL, MinIO (S3-compatible storage), and Redis. It supports multiple AI providers (Google Vertex AI, OpenAI, Anthropic) and includes speech-to-text capabilities.
+QuantaGem is a production-grade WebUI for Google's Gemini AI, built with a full-stack architecture using Next.js 16, PostgreSQL, SeaweedFS (S3-compatible storage), and Redis. It supports multiple AI providers (Google Vertex AI, OpenAI, Anthropic) and includes speech-to-text capabilities.
 
 ## Essential Commands
 
@@ -46,7 +46,7 @@ QuantaGem/
 │   │   │   ├── chat/           # Main chat streaming endpoint
 │   │   │   ├── chats/          # Chat session CRUD
 │   │   │   ├── projects/       # Project management
-│   │   │   ├── files/          # File storage (MinIO)
+│   │   │   ├── files/          # File storage (SeaweedFS)
 │   │   │   ├── auth/           # Login, signup, logout
 │   │   │   ├── models/         # Available AI models
 │   │   │   ├── stt/            # Speech-to-text proxy
@@ -68,7 +68,7 @@ QuantaGem/
 │   ├── lib/                    # Server-side utilities
 │   │   ├── auth.ts             # JWT authentication
 │   │   ├── db.ts               # PostgreSQL connection pool
-│   │   ├── minio.ts            # S3-compatible storage
+│   │   ├── storage.ts          # S3-compatible storage (SeaweedFS)
 │   │   ├── custom-models.ts    # Multi-provider model routing
 │   │   ├── thinking.ts         # Thinking budget/verbosity
 │   │   └── webr/               # WebR R execution
@@ -96,7 +96,7 @@ QuantaGem/
 - **Language**: TypeScript (strict mode)
 - **Styling**: Tailwind CSS 4.0
 - **Database**: PostgreSQL 18
-- **Object Storage**: MinIO (S3-compatible)
+- **Object Storage**: SeaweedFS 4.46 (`weed mini` single-process, S3-compatible)
 - **Cache/Rate Limiting**: Redis 8
 - **AI SDKs**:
   - `@google/genai` - Google Vertex AI
@@ -221,9 +221,15 @@ DATABASE_URL="postgresql://..."        # Auto-set in Docker
 POSTGRES_USER=quantagemuser
 POSTGRES_PASSWORD=quantagempass
 POSTGRES_DB=quantagemdb
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=minioadminsecret
-MINIO_DEFAULT_BUCKET=chat-files
+# Object storage (SeaweedFS, S3-compatible)
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadminsecret
+S3_ENDPOINT=seaweedfs
+S3_PORT=8333
+S3_USE_SSL=false
+S3_BUCKET=chat-files
+# Legacy MinIO creds (only needed for the MinIO->SeaweedFS migration window):
+# MINIO_ROOT_USER / MINIO_ROOT_PASSWORD / MINIO_DEFAULT_BUCKET
 ```
 
 GCP credentials: Place service account JSON at `secrets/gcp-key.json`
@@ -234,7 +240,7 @@ Key tables (see `init.sql` for full schema):
 
 - `users` - User accounts with bcrypt password hashes
 - `projects` - Project containers with system prompts
-- `project_files` - Files attached to projects (MinIO references)
+- `project_files` - Files attached to projects (S3 object references)
 - `chat_sessions` - Chat conversations with optional project linkage
 - `messages` - Individual messages with JSONB parts array
 - `user_settings` - Per-user settings (system prompt, TTS config)
@@ -280,6 +286,9 @@ System prompt cascade: chat level > project level > user level
 - **Redis rate limiting**: Login endpoints limited to 5 attempts per 20 minutes
 - **Model names**: Custom models prefixed with `custom:` in the UI
 - **IPv6**: Docker compose supports IPv6 via override file (see README.md)
+- **Object storage**: SeaweedFS runs as a single `weed mini` process (pinned to `4.46`); S3 endpoint at `seaweedfs:8333`, admin UI at `127.0.0.1:23646`. The client module is `src/lib/storage.ts` (uses the `minio` npm package as a plain S3 client with `pathStyle: true`).
+- **Lifecycle lag**: SeaweedFS ILM runs on a ~daily worker, so `temporary/` expiry can lag up to a day; the app's DB-driven `cleanup.ts` is the primary temp-file cleanup and ILM is a safety net.
+- **MinIO migration**: one-shot `migrate-storage` (rclone) and `configure-storage` (AWS CLI) services live under the `migrate` profile; the legacy MinIO service lives under the `legacy` profile. See `docs/storage-migration.md`.
 
 ## Testing
 

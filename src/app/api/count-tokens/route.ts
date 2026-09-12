@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getEncoding } from "js-tiktoken";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
-import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
+import { storageClient, S3_BUCKET_NAME } from "@/lib/storage";
 import { getProviderForModel, isCustomModel } from "@/lib/custom-models";
 
 interface CountTokensRequest {
@@ -228,7 +228,7 @@ async function countFileTokensForOpenAI(filePart: MessagePart): Promise<number> 
   // Handle PDFs with size-based estimate
   if (mimeType === "application/pdf") {
     try {
-      const stat = await minioClient.statObject(MINIO_BUCKET_NAME, filePart.objectName);
+      const stat = await storageClient.statObject(S3_BUCKET_NAME, filePart.objectName);
       const fileSizeKB = stat.size / 1024;
       return Math.max(Math.ceil(fileSizeKB * OPENAI_PDF_TOKENS_PER_KB), 100);
     } catch (error) {
@@ -240,7 +240,7 @@ async function countFileTokensForOpenAI(filePart: MessagePart): Promise<number> 
   // Handle text-based files by reading content
   if (isTextBasedFile(mimeType, filePart.fileName)) {
     try {
-      const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, filePart.objectName);
+      const fileStream = await storageClient.getObject(S3_BUCKET_NAME, filePart.objectName);
       const chunks: Buffer[] = [];
       for await (const chunk of fileStream) {
         chunks.push(chunk as Buffer);
@@ -389,7 +389,7 @@ async function countTokensForGemini(
             }
 
             try {
-              const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+              const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
               const chunks: Buffer[] = [];
               for await (const chunk of fileStream) {
                 chunks.push(chunk as Buffer);
@@ -498,7 +498,7 @@ async function countTokensForAnthropic(
 
           if (SUPPORTED_ANTHROPIC_IMAGE_TYPES.includes(mimeType)) {
             try {
-              const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+              const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
               const chunks: Buffer[] = [];
               for await (const chunk of fileStream) {
                 chunks.push(chunk as Buffer);
@@ -517,7 +517,7 @@ async function countTokensForAnthropic(
             }
           } else if (mimeType === "application/pdf") {
             try {
-              const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+              const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
               const chunks: Buffer[] = [];
               for await (const chunk of fileStream) {
                 chunks.push(chunk as Buffer);
@@ -536,7 +536,7 @@ async function countTokensForAnthropic(
             }
           } else if (isTextBasedFile(mimeType, appPart.fileName)) {
             try {
-              const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+              const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
               const chunks: Buffer[] = [];
               for await (const chunk of fileStream) {
                 chunks.push(chunk as Buffer);

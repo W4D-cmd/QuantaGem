@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { minioClient, MINIO_BUCKET_NAME, ensureBucketExists } from "@/lib/minio";
+import { storageClient, S3_BUCKET_NAME, ensureBucketExists } from "@/lib/storage";
 import { randomUUID } from "crypto";
 import { getUserFromToken } from "@/lib/auth";
 import { pool } from "@/lib/db";
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       ? `temporary/${uuid}_${baseName}.${fileExtension}`
       : `${uuid}_${baseName}.${fileExtension}`;
 
-    await minioClient.putObject(MINIO_BUCKET_NAME, objectName, fileBuffer, fileSize, { "Content-Type": mimeType });
+    await storageClient.putObject(S3_BUCKET_NAME, objectName, fileBuffer, fileSize, { "Content-Type": mimeType });
 
     if (isTemporary) {
       await pool.query(

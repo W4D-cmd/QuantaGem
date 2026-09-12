@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
+import { storageClient, S3_BUCKET_NAME } from "@/lib/storage";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ objectKey: string[] }> }) {
   const userIdHeader = request.headers.get("x-user-id");
@@ -18,8 +18,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ obj
   const objectPath = objectKey.join("/");
 
   try {
-    const stat = await minioClient.statObject(MINIO_BUCKET_NAME, objectPath);
-    const stream = await minioClient.getObject(MINIO_BUCKET_NAME, objectPath);
+    const stat = await storageClient.statObject(S3_BUCKET_NAME, objectPath);
+    const stream = await storageClient.getObject(S3_BUCKET_NAME, objectPath);
 
     const webReadableStream = new ReadableStream({
       start(controller) {

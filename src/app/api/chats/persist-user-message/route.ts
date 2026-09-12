@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart, Message } from "@/app/page";
-import { migrateTemporaryFile } from "@/lib/minio";
+import { migrateTemporaryFile } from "@/lib/storage";
 
 interface PersistUserMessageRequest {
   chatSessionId: number | null;

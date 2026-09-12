@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
+import { S3_BUCKET_NAME, storageClient } from "@/lib/storage";
 
 export async function DELETE(
   request: NextRequest,
@@ -41,7 +41,7 @@ export async function DELETE(
     const objectNameToDelete = fileResult.rows[0].object_name;
 
     try {
-      await minioClient.removeObject(MINIO_BUCKET_NAME, objectNameToDelete);
+      await storageClient.removeObject(S3_BUCKET_NAME, objectNameToDelete);
       console.log(
         `Successfully deleted object ${objectNameToDelete} from MinIO for project file ${fileId} (project ${projectId}, user ${userId}).`,
       );

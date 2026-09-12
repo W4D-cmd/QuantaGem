@@ -5,7 +5,7 @@ import { ChatCompletionMessageParam, ChatCompletionContentPart } from "openai/re
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
-import { MINIO_BUCKET_NAME, minioClient } from "@/lib/minio";
+import { S3_BUCKET_NAME, storageClient } from "@/lib/storage";
 import {
   getProviderForModel,
   ModelProvider,
@@ -356,7 +356,7 @@ async function handleGeminiRequest(
       }
 
       try {
-        const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+        const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
         const chunks: Buffer[] = [];
         for await (const chunk of fileStream) {
           chunks.push(chunk as Buffer);
@@ -429,7 +429,7 @@ async function handleGeminiRequest(
               }
 
               try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                 const chunks: Buffer[] = [];
                 for await (const chunk of fileStream) {
                   chunks.push(chunk as Buffer);
@@ -672,7 +672,7 @@ async function handleOpenAIRequest(
             const mimeType = appPart.mimeType.toLowerCase();
             if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType)) {
               try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                 const chunks: Buffer[] = [];
                 for await (const chunk of fileStream) {
                   chunks.push(chunk as Buffer);
@@ -696,7 +696,7 @@ async function handleOpenAIRequest(
 
               if (isTextFile) {
                 try {
-                  const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                  const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                   const chunks: Buffer[] = [];
                   for await (const chunk of fileStream) {
                     chunks.push(chunk as Buffer);
@@ -741,7 +741,7 @@ async function handleOpenAIRequest(
       const mimeType = appPart.mimeType.toLowerCase();
       if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType)) {
         try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+          const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
           const chunks: Buffer[] = [];
           for await (const chunk of fileStream) {
             chunks.push(chunk as Buffer);
@@ -769,7 +769,7 @@ async function handleOpenAIRequest(
 
         if (isTextFile) {
           try {
-            const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+            const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
             const chunks: Buffer[] = [];
             for await (const chunk of fileStream) {
               chunks.push(chunk as Buffer);
@@ -991,7 +991,7 @@ async function handleCustomOpenAIRequest(
             const mimeType = appPart.mimeType.toLowerCase();
             if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType)) {
               try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                 const chunks: Buffer[] = [];
                 for await (const chunk of fileStream) {
                   chunks.push(chunk as Buffer);
@@ -1012,7 +1012,7 @@ async function handleCustomOpenAIRequest(
                 mimeType === "application/json";
               if (isTextFile) {
                 try {
-                  const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                  const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                   const chunks: Buffer[] = [];
                   for await (const chunk of fileStream) {
                     chunks.push(chunk as Buffer);
@@ -1055,7 +1055,7 @@ async function handleCustomOpenAIRequest(
       const mimeType = appPart.mimeType.toLowerCase();
       if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType)) {
         try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+          const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
           const chunks: Buffer[] = [];
           for await (const chunk of fileStream) {
             chunks.push(chunk as Buffer);
@@ -1080,7 +1080,7 @@ async function handleCustomOpenAIRequest(
           mimeType === "application/json";
         if (isTextFile) {
           try {
-            const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+            const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
             const chunks: Buffer[] = [];
             for await (const chunk of fileStream) {
               chunks.push(chunk as Buffer);
@@ -1231,7 +1231,7 @@ async function handleOpenAIResponsesAPIRequest(
             const mimeType = appPart.mimeType.toLowerCase();
             if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType) || mimeType === "application/pdf") {
               try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                 const chunks: Buffer[] = [];
                 for await (const chunk of fileStream) {
                   chunks.push(chunk as Buffer);
@@ -1257,7 +1257,7 @@ async function handleOpenAIResponsesAPIRequest(
 
               if (isTextFile) {
                 try {
-                  const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                  const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                   const chunks: Buffer[] = [];
                   for await (const chunk of fileStream) {
                     chunks.push(chunk as Buffer);
@@ -1292,7 +1292,7 @@ async function handleOpenAIResponsesAPIRequest(
       const mimeType = appPart.mimeType.toLowerCase();
       if (SUPPORTED_OPENAI_IMAGE_TYPES.includes(mimeType) || mimeType === "application/pdf") {
         try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+          const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
           const chunks: Buffer[] = [];
           for await (const chunk of fileStream) {
             chunks.push(chunk as Buffer);
@@ -1322,7 +1322,7 @@ async function handleOpenAIResponsesAPIRequest(
 
         if (isTextFile) {
           try {
-            const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+            const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
             const chunks: Buffer[] = [];
             for await (const chunk of fileStream) {
               chunks.push(chunk as Buffer);
@@ -1534,7 +1534,7 @@ async function handleAnthropicRequest(
 
             if (SUPPORTED_ANTHROPIC_IMAGE_TYPES.includes(mimeType)) {
               try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                 const chunks: Buffer[] = [];
                 for await (const chunk of fileStream) {
                   chunks.push(chunk as Buffer);
@@ -1557,7 +1557,7 @@ async function handleAnthropicRequest(
               }
             } else if (SUPPORTED_ANTHROPIC_DOCUMENT_TYPES.includes(mimeType)) {
               try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                 const chunks: Buffer[] = [];
                 for await (const chunk of fileStream) {
                   chunks.push(chunk as Buffer);
@@ -1587,7 +1587,7 @@ async function handleAnthropicRequest(
 
               if (isTextFile) {
                 try {
-                  const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                  const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                   const chunks: Buffer[] = [];
                   for await (const chunk of fileStream) {
                     chunks.push(chunk as Buffer);
@@ -1639,7 +1639,7 @@ async function handleAnthropicRequest(
 
       if (SUPPORTED_ANTHROPIC_IMAGE_TYPES.includes(mimeType)) {
         try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+          const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
           const chunks: Buffer[] = [];
           for await (const chunk of fileStream) {
             chunks.push(chunk as Buffer);
@@ -1662,7 +1662,7 @@ async function handleAnthropicRequest(
         }
       } else if (SUPPORTED_ANTHROPIC_DOCUMENT_TYPES.includes(mimeType)) {
         try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+          const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
           const chunks: Buffer[] = [];
           for await (const chunk of fileStream) {
             chunks.push(chunk as Buffer);
@@ -1692,7 +1692,7 @@ async function handleAnthropicRequest(
 
         if (isTextFile) {
           try {
-            const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+            const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
             const chunks: Buffer[] = [];
             for await (const chunk of fileStream) {
               chunks.push(chunk as Buffer);
@@ -1879,7 +1879,7 @@ async function handleCustomAnthropicRequest(
 
             if (SUPPORTED_ANTHROPIC_IMAGE_TYPES.includes(mimeType)) {
               try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                 const chunks: Buffer[] = [];
                 for await (const chunk of fileStream) {
                   chunks.push(chunk as Buffer);
@@ -1902,7 +1902,7 @@ async function handleCustomAnthropicRequest(
               }
             } else if (SUPPORTED_ANTHROPIC_DOCUMENT_TYPES.includes(mimeType)) {
               try {
-                const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                 const chunks: Buffer[] = [];
                 for await (const chunk of fileStream) {
                   chunks.push(chunk as Buffer);
@@ -1932,7 +1932,7 @@ async function handleCustomAnthropicRequest(
 
               if (isTextFile) {
                 try {
-                  const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+                  const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
                   const chunks: Buffer[] = [];
                   for await (const chunk of fileStream) {
                     chunks.push(chunk as Buffer);
@@ -1984,7 +1984,7 @@ async function handleCustomAnthropicRequest(
 
       if (SUPPORTED_ANTHROPIC_IMAGE_TYPES.includes(mimeType)) {
         try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+          const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
           const chunks: Buffer[] = [];
           for await (const chunk of fileStream) {
             chunks.push(chunk as Buffer);
@@ -2007,7 +2007,7 @@ async function handleCustomAnthropicRequest(
         }
       } else if (SUPPORTED_ANTHROPIC_DOCUMENT_TYPES.includes(mimeType)) {
         try {
-          const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+          const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
           const chunks: Buffer[] = [];
           for await (const chunk of fileStream) {
             chunks.push(chunk as Buffer);
@@ -2037,7 +2037,7 @@ async function handleCustomAnthropicRequest(
 
         if (isTextFile) {
           try {
-            const fileStream = await minioClient.getObject(MINIO_BUCKET_NAME, appPart.objectName);
+            const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
             const chunks: Buffer[] = [];
             for await (const chunk of fileStream) {
               chunks.push(chunk as Buffer);

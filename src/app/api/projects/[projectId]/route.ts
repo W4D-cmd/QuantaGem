@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { minioClient, MINIO_BUCKET_NAME } from "@/lib/minio";
+import { storageClient, S3_BUCKET_NAME } from "@/lib/storage";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ projectId: string }> }) {
   const userIdHeader = request.headers.get("x-user-id");
@@ -129,7 +129,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
         uniqueObjectNames,
       );
       try {
-        await minioClient.removeObjects(MINIO_BUCKET_NAME, uniqueObjectNames);
+        await storageClient.removeObjects(S3_BUCKET_NAME, uniqueObjectNames);
         console.log(
           `Successfully submitted deletion request for ${uniqueObjectNames.length} objects from MinIO for project ${projectId} (user ${userId}).`,
         );

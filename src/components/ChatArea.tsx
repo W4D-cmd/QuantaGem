@@ -63,6 +63,7 @@ import {
   RefreshCw,
   XCircle,
   ChevronRight,
+  Globe,
 } from "lucide-react";
 
 const KATEX_OPTIONS: KatexOptions = { macros: { "\\dollar": "\\$" } };
@@ -935,6 +936,39 @@ function ChatAreaComponent(
                             </div>
                           );
                         }
+                      } else if (part.type === "scraped_url" && part.url) {
+                        return (
+                          <div
+                            key={j}
+                            className="my-2 flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-zinc-800
+                              px-3 py-2"
+                          >
+                            <Globe className="size-4 flex-shrink-0 text-neutral-500" />
+                            <div className="min-w-0">
+                              <a
+                                href={part.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600
+                                  break-all text-sm"
+                              >
+                                {part.url}
+                              </a>
+                              {part.text && (
+                                <details className="mt-1">
+                                  <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-700
+                                    dark:hover:text-neutral-300"
+                                  >
+                                    Show content preview
+                                  </summary>
+                                  <div className="mt-1 text-xs text-neutral-500 whitespace-pre-wrap">
+                                    {part.text.slice(0, 500)}
+                                  </div>
+                                </details>
+                              )}
+                            </div>
+                          </div>
+                        );
                       }
                       return null;
                     })}

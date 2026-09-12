@@ -1469,6 +1469,49 @@ Generate an ephemeral token for live streaming features.
 
 ---
 
+### Scrape URL
+
+Fetch a web page and convert its content to plain text (HTML is stripped, JSON is pretty-printed).
+
+**Endpoint:** `POST /api/scrape-url`
+
+**Authentication Required:** Yes (`x-user-id` header)
+
+**Request Body:**
+
+```json
+{
+  "url": "https://example.com"
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "url": "https://example.com",
+  "title": "Example Domain",
+  "text": "Example Domain\n\nThis domain is for use in illustrative examples...",
+  "truncated": false
+}
+```
+
+**Fields:**
+- `url` - The URL that was fetched
+- `title` - The page title (empty for non-HTML content)
+- `text` - Extracted content (truncated to 50,000 characters)
+- `truncated` - Whether `text` was truncated
+- `truncatedFrom` - Original content length in characters (only present when `truncated` is `true`)
+
+**Errors:**
+- `400` - Invalid URL or blocked host (SSRF protection)
+- `401` - Missing or invalid user identification
+- `415` - Unsupported content type (e.g., binary files)
+- `422` - Fetch failed (non-200 status, timeout, or DNS failure)
+- `502` - Unexpected upstream error
+
+---
+
 ## Code Examples
 
 ### Complete Flow: Login, Create Chat, Send Message

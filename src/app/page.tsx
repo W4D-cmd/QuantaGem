@@ -211,12 +211,35 @@ function extractErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+// Client-side duplicate of extractUrls from @/lib/web-scrape. That module is
+// server-only (it imports node:dns/promises), so the pure helper is duplicated
+// here. Keep the two implementations in sync.
+const MAX_EXTRACTED_URLS = 3;
+const URL_PATTERN = /https?:\/\/[^\s<>"'()\[\]]+/gi;
+
+function extractUrls(text: string): string[] {
+  const matches = text.match(URL_PATTERN) ?? [];
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  for (const raw of matches) {
+    const url = raw.replace(/[),.;:!?'"}\]]+$/, "");
+    if (!url) continue;
+    const key = url.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    urls.push(url);
+    if (urls.length >= MAX_EXTRACTED_URLS) break;
+  }
+  return urls;
+}
+
 export default function Home() {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [streamStarted, setStreamStarted] = useState(false);
+  const [scrapingUrl, setScrapingUrl] = useState<string | null>(null);
   const [allChats, setAllChats] = useState<ChatListItem[]>([]);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [controller, setController] = useState<AbortController | null>(null);
@@ -1574,6 +1597,42 @@ export default function Home() {
     }
     uploadedFiles.forEach((file) => newUserMessageParts.push({ type: "file", ...file }));
 
+    try {
+      const detectedUrls = extractUrls(inputText);
+      for (const url of detectedUrls) {
+        setScrapingUrl(url);
+        const res = await fetch("/api/scrape-url", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({ url }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          newUserMessageParts.push({
+            type: "scraped_url",
+            url,
+            text: `[Web page content fetched from ${url}${data.title ? ` (${data.title})` : ""} — retrieved automatically; use it as context for the user's question]\n\n${data.text}\n\n[End of web page content]`,
+          });
+        } else {
+          let detail = "Unknown error";
+          try {
+            const errBody = await res.json();
+            detail = errBody.details || errBody.error || "Unknown error";
+          } catch {
+            // Keep the generic detail when the response body is not JSON.
+          }
+          showToast(`Could not fetch web page: ${detail}`, "error");
+        }
+      }
+    } catch (err) {
+      showToast(`Could not fetch web page: ${extractErrorMessage(err)}`, "error");
+    } finally {
+      setScrapingUrl(null);
+    }
+
     const tempUserMessageId = Date.now();
     const newUserMessage: Message = {
       role: "user",
@@ -2401,6 +2460,13 @@ export default function Home() {
                         )}
                       </AnimatePresence>
                     </div>
+
+                    {scrapingUrl !== null && (
+                      <div className="flex items-center gap-2 px-4 pb-1 text-xs text-neutral-500">
+                        <div className="w-3 h-3 border-2 border-neutral-300 border-t-neutral-500 rounded-full animate-spin" />
+                        <span className="break-all">Fetching {scrapingUrl}…</span>
+                      </div>
+                    )}
 
                     <ChatInput
                       ref={chatInputRef}

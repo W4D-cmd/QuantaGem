@@ -17,7 +17,7 @@ services:
       retries: 5
 
   seaweedfs:
-    image: chrislusf/seaweedfs:4.46
+    image: chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
     restart: unless-stopped
     command: ["mini", "-webdav=false", "-master.telemetry=false"]
     environment:
@@ -61,7 +61,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
 
   migrate-storage:
-    image: rclone/rclone:1.75.1
+    image: rclone/rclone:1.75.1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5
     profiles: ["migrate"]
     depends_on:
       minio:
@@ -94,7 +94,7 @@ services:
       - app-network
 
   configure-storage:
-    image: amazon/aws-cli:2.36.44
+    image: amazon/aws-cli:2.36.45@sha256:de71ba5460023cdafb0b163b8ba4553e221a5c23e4b851ab5543d29a85c98ef4
     profiles: ["migrate"]
     depends_on:
       seaweedfs:

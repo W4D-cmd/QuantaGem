@@ -642,7 +642,7 @@ export default function Home() {
   };
 
   const handleModelChange = (model: Model) => {
-    const newModelConfig = getThinkingConfigForModel(model.name);
+    const newModelConfig = getThinkingConfigForModel(model.name, manualCustomModels);
     if (thinkingOption === "off" && !newModelConfig?.canBeOff) {
       setThinkingOption("dynamic");
     }
@@ -668,7 +668,7 @@ export default function Home() {
     (option: ThinkingOption) => {
       setThinkingOption(option);
       if (activeChatId !== null) {
-        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+        const budgetMap = getThinkingBudgetMap(selectedModel?.name, manualCustomModels);
         const budgetValue = budgetMap ? budgetMap[option] : -1;
         invalidateChatCache(activeChatId);
 
@@ -684,7 +684,7 @@ export default function Home() {
           .catch((err) => showToast(extractErrorMessage(err), "error"));
       }
     },
-    [activeChatId, getAuthHeaders, showToast, fetchAllChats, selectedModel],
+    [activeChatId, getAuthHeaders, showToast, fetchAllChats, selectedModel, manualCustomModels],
   );
 
   const handleVerbosityChange = useCallback((newVerbosity: VerbosityOption) => {
@@ -1042,7 +1042,7 @@ export default function Home() {
     } | null> => {
       const cached = chatCacheRef.current.get(chatId);
       if (cached) {
-        const modelValueMap = getThinkingValueMap(cached.lastModel);
+        const modelValueMap = getThinkingValueMap(cached.lastModel, manualCustomModels);
         setMessages(cached.messages);
         setEditingPromptInitialValue(cached.systemPrompt);
         setCurrentChatProjectId(cached.projectId);
@@ -1102,7 +1102,7 @@ export default function Home() {
           accumulatedCost: number | null;
         } = await res.json();
 
-        const modelValueMap = getThinkingValueMap(data.lastModel);
+        const modelValueMap = getThinkingValueMap(data.lastModel, manualCustomModels);
         setMessages(data.messages);
         setEditingPromptInitialValue(data.systemPrompt);
         setCurrentChatProjectId(data.projectId);
@@ -1135,6 +1135,7 @@ export default function Home() {
       setEditingPromptInitialValue,
       setCurrentChatProjectId,
       showToast,
+      manualCustomModels,
     ],
   );
 
@@ -1300,7 +1301,7 @@ export default function Home() {
             if (defaultModel) setSelectedModel(defaultModel);
           }
         }
-        const modelValueMap = getThinkingValueMap(chat?.lastModel);
+        const modelValueMap = getThinkingValueMap(chat?.lastModel, manualCustomModels);
         if (chat?.thinkingBudget !== undefined && modelValueMap) {
           setThinkingOption(modelValueMap[chat.thinkingBudget] || "dynamic");
         } else {
@@ -1356,6 +1357,7 @@ export default function Home() {
     isLoading,
     fetchedCustomModels,
     fetchTokenCount,
+    manualCustomModels,
   ]);
 
   const handleCancel = () => {
@@ -1394,7 +1396,7 @@ export default function Home() {
       setController(ctrl);
 
       const performFetch = async () => {
-        const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+        const budgetMap = getThinkingBudgetMap(selectedModel?.name, manualCustomModels);
         const budgetValue = budgetMap ? budgetMap[currentThinkingOption] : -1;
 
         return fetch("/api/chat", {
@@ -1580,7 +1582,7 @@ export default function Home() {
         setController(null);
       }
     },
-    [getAuthHeaders, selectedModel, showToast, setStreamStarted, setIsThinking, setController, setMessages, verbosity],
+    [getAuthHeaders, selectedModel, showToast, setStreamStarted, setIsThinking, setController, setMessages, verbosity, manualCustomModels],
   );
 
   const handleSendMessage = async (inputText: string, uploadedFiles: UploadedFileInfo[], sendWithSearch: boolean) => {
@@ -1689,7 +1691,7 @@ export default function Home() {
 
       if (!isTemporaryChat) {
         try {
-          const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+          const budgetMap = getThinkingBudgetMap(selectedModel?.name, manualCustomModels);
           const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
 
           const unsavedMessages = previousMessages.filter((msg) => msg.isTemporary);
@@ -1766,7 +1768,7 @@ export default function Home() {
     } else {
       if (!isTemporaryChat) {
         try {
-          const budgetMap = getThinkingBudgetMap(selectedModel?.name);
+          const budgetMap = getThinkingBudgetMap(selectedModel?.name, manualCustomModels);
           const budgetValue = budgetMap ? budgetMap[thinkingOption] : -1;
 
           const unsavedMessages = previousMessages.filter((msg) => msg.isTemporary);

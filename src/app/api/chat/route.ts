@@ -1120,9 +1120,9 @@ async function handleCustomOpenAIRequest(
   if (temperature !== null) requestOptions.temperature = temperature;
   if (topP !== null) requestOptions.top_p = topP;
 
-  if (isOpenAIReasoningModel(model, manualModels)) {
-    const reasoningEffort = mapBudgetToOpenAIReasoningEffort(model, thinkingBudget, manualModels);
-    requestOptions.reasoning_effort = reasoningEffort;
+  // thinkingBudget -1 means "Dynamic": let the endpoint apply its own default effort.
+  if (isOpenAIReasoningModel(model, manualModels) && thinkingBudget !== undefined && thinkingBudget !== -1) {
+    requestOptions.reasoning_effort = mapBudgetToOpenAIReasoningEffort(model, thinkingBudget, manualModels);
   }
 
   if (modelSupportsVerbosity(model, manualModels)) {
@@ -1144,8 +1144,8 @@ async function handleCustomOpenAIRequest(
           
           const delta = chunk.choices[0]?.delta;
           
-          if (isOpenAIReasoningModel(model, manualModels) && (delta as Record<string, unknown>)?.reasoning_content) {
-            const reasoningText = (delta as Record<string, unknown>).reasoning_content as string;
+          const reasoningText = (delta as Record<string, unknown>)?.reasoning_content as string | undefined;
+          if (reasoningText) {
             const jsonChunk = { type: "thought", value: reasoningText };
             controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
           }

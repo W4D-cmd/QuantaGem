@@ -1243,13 +1243,13 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           )}
 
           <div
-            className={`relative flex flex-col rounded-3xl border-2 dark:border-zinc-900 overflow-hidden shadow-lg
+            className={`relative flex flex-col rounded-3xl border dark:border-zinc-900 overflow-hidden shadow-lg
               transition duration-300 ease-in-out ${
                 isRefining
-                  ? "border-teal-600 ci-glow ci-glow-refine ci-glow-running"
+                  ? "border-2 border-teal-600 ci-glow ci-glow-refine ci-glow-running"
                   : isGeneratingSystemPrompt
-                    ? "border-indigo-500 ci-glow ci-glow-generate ci-glow-running"
-                    : "border-neutral-300 dark:border-zinc-900 ci-glow focus-within:border-blue-500"
+                    ? "border-2 border-indigo-500 ci-glow ci-glow-generate ci-glow-running"
+                    : "border-neutral-300 dark:border-zinc-900 ci-glow focus-within:border-2 focus-within:border-blue-500"
               }`}
           >
             <div aria-hidden className="ci-beam pointer-events-none absolute inset-0 z-10 rounded-[inherit]" />

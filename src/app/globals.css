@@ -101,7 +101,8 @@ html.dark .max-h-96.overflow-y-auto {
     --ci-glow 300ms ease-in-out,
     --ci-glow-ring 300ms ease-in-out,
     --ci-glow-halo 300ms ease-in-out,
-    border-color 300ms ease-in-out;
+    border-color 300ms ease-in-out,
+    border-width 300ms ease-in-out;
 }
 
 .ci-glow:focus-within {

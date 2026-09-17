@@ -44,14 +44,10 @@ export default function DropdownMenu({
     setIsMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (open) {
-      setPortalMounted(true);
-    }
-  }, [open]);
-
   useLayoutEffect(() => {
     if (!open || !anchorRef.current || !menuRef.current) return;
+
+    setPortalMounted(true);
 
     const anchorEl = anchorRef.current;
     const menuEl = menuRef.current;
@@ -165,7 +161,7 @@ export default function DropdownMenu({
     </AnimatePresence>
   );
 
-  if (!isMounted || !portalMounted) {
+  if (!isMounted || (!open && !portalMounted)) {
     return null;
   }
 

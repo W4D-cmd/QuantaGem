@@ -1244,14 +1244,17 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
           <div
             className={`relative flex flex-col rounded-3xl border dark:border-zinc-900 overflow-hidden shadow-lg
-              transition duration-300 ease-in-out focus-within:ring-2 focus-within:ring-opacity-50 ${
+              transition duration-300 ease-in-out ${
                 isRefining
-                  ? "border-teal-600 focus-within:border-teal-600 focus-within:ring-teal-600"
+                  ? "border-teal-600 ci-glow ci-glow-refine ci-glow-running"
                   : isGeneratingSystemPrompt
-                    ? "border-indigo-500 focus-within:border-indigo-500 focus-within:ring-indigo-500"
-                    : "border-neutral-300 focus-within:border-blue-500 focus-within:ring-blue-500"
+                    ? "border-indigo-500 ci-glow ci-glow-generate ci-glow-running"
+                    : "border-neutral-300 dark:border-zinc-900 ci-glow focus-within:border-blue-500"
               }`}
           >
+            {(isRefining || isGeneratingSystemPrompt) && (
+              <div aria-hidden className="ci-beam pointer-events-none absolute inset-0 z-10 rounded-[inherit]" />
+            )}
             <div className="p-4 bg-white dark:bg-zinc-900 transition-colors duration-300 ease-in-out">
               <textarea
                 ref={textareaRef}

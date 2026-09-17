@@ -64,3 +64,122 @@ html.dark .max-h-96.overflow-y-auto {
 .lucide {
   stroke-width: 1.75;
 }
+
+/* Chat input glow system: fading halo driven by --ci-glow (RGB triplet) + rotating border beam */
+@property --ci-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.ci-glow {
+  --ci-glow: 59 130 246;
+  --ci-glow-ring: 0.25;
+  --ci-glow-halo: 0.45;
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.08),
+    0 4px 6px -4px rgb(0 0 0 / 0.08),
+    0 0 0 1px rgb(var(--ci-glow) / var(--ci-glow-ring)),
+    0 0 14px -2px rgb(var(--ci-glow) / var(--ci-glow-halo));
+  transition:
+    border-color 300ms ease-in-out,
+    box-shadow 300ms ease-in-out;
+}
+
+.ci-glow:focus-within {
+  animation: ci-glow-breathe 3s ease-in-out infinite;
+}
+
+.ci-glow.ci-glow-refine {
+  --ci-glow: 13 148 136;
+  animation: ci-glow-pulse 1.8s ease-in-out infinite;
+}
+
+.ci-glow.ci-glow-generate {
+  --ci-glow: 99 102 241;
+  animation: ci-glow-pulse 1.8s ease-in-out infinite;
+}
+
+html.dark .ci-glow {
+  --ci-glow-ring: 0.35;
+  --ci-glow-halo: 0.6;
+}
+
+.ci-beam {
+  border: 2px solid transparent;
+  background:
+    conic-gradient(
+        from var(--ci-angle),
+        transparent 0deg,
+        transparent 235deg,
+        rgb(var(--ci-glow) / 0.9) 285deg,
+        rgb(var(--ci-glow) / 0.3) 325deg,
+        transparent 360deg
+      )
+      border-box;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) padding-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) padding-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: ci-beam-rotate 3s linear infinite;
+}
+
+@keyframes ci-glow-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 10px 15px -3px rgb(0 0 0 / 0.08),
+      0 4px 6px -4px rgb(0 0 0 / 0.08),
+      0 0 0 1px rgb(var(--ci-glow) / var(--ci-glow-ring)),
+      0 0 14px -2px rgb(var(--ci-glow) / var(--ci-glow-halo));
+  }
+  50% {
+    box-shadow:
+      0 10px 15px -3px rgb(0 0 0 / 0.08),
+      0 4px 6px -4px rgb(0 0 0 / 0.08),
+      0 0 0 1px rgb(var(--ci-glow) / calc(var(--ci-glow-ring) + 0.1)),
+      0 0 18px -2px rgb(var(--ci-glow) / calc(var(--ci-glow-halo) + 0.15));
+  }
+}
+
+@keyframes ci-glow-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 10px 15px -3px rgb(0 0 0 / 0.08),
+      0 4px 6px -4px rgb(0 0 0 / 0.08),
+      0 0 0 1px rgb(var(--ci-glow) / calc(var(--ci-glow-ring) + 0.1)),
+      0 0 16px -2px rgb(var(--ci-glow) / calc(var(--ci-glow-halo) + 0.1));
+  }
+  50% {
+    box-shadow:
+      0 10px 15px -3px rgb(0 0 0 / 0.08),
+      0 4px 6px -4px rgb(0 0 0 / 0.08),
+      0 0 0 1px rgb(var(--ci-glow) / calc(var(--ci-glow-ring) + 0.2)),
+      0 0 18px -2px rgb(var(--ci-glow) / calc(var(--ci-glow-halo) + 0.2));
+  }
+}
+
+@keyframes ci-beam-rotate {
+  to {
+    --ci-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ci-glow:focus-within,
+  .ci-glow.ci-glow-refine,
+  .ci-glow.ci-glow-generate {
+    animation: none;
+  }
+  .ci-beam {
+    animation: none;
+    background:
+      linear-gradient(90deg, transparent, rgb(var(--ci-glow) / 0.5), transparent)
+        border-box;
+  }
+}

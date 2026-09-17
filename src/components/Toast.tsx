@@ -104,7 +104,7 @@ const Toast: FC<ToastProps> = ({ message, type = "error", onClose }) => {
           <X className="size-5" />
         </button>
       </div>
-      <div className={"h-1 w-full bg-black/20 overflow-hidden"}>
+      <div className={"h-1 w-full bg-transparent overflow-hidden"}>
         <motion.div className={`h-full ${progressBgColor}`} initial={{ width: "100%" }} animate={progressControls} />
       </div>
     </motion.div>

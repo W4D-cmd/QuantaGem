@@ -497,6 +497,22 @@ async function handleCustomOpenAIGenerate(
   });
 }
 
+async function resolveCustomAnthropicMaxTokens(userId: number, model: string): Promise<number> {
+  try {
+    const result = await pool.query(
+      "SELECT output_token_limit FROM custom_models WHERE user_id = $1 AND model_id = $2 AND api_type = 'anthropic' LIMIT 1",
+      [userId, getOriginalModelId(model)],
+    );
+    const limit = result.rows[0]?.output_token_limit;
+    if (typeof limit === "number" && limit > 0) {
+      return limit;
+    }
+  } catch (error) {
+    console.error("Failed to resolve custom Anthropic max tokens:", error);
+  }
+  return 8192;
+}
+
 async function handleCustomAnthropicGenerate(
   model: string,
   userPrompt: string,
@@ -521,10 +537,11 @@ async function handleCustomAnthropicGenerate(
   const anthropic = new Anthropic({ apiKey, baseURL });
 
   const actualModelId = getOriginalModelId(model);
+  const maxTokens = await resolveCustomAnthropicMaxTokens(userId, model);
 
   const stream = anthropic.messages.stream({
     model: actualModelId,
-    max_tokens: 8192,
+    max_tokens: maxTokens,
     messages: [{ role: "user", content: userPrompt }],
     system: GENERATE_SYSTEM_PROMPT_INSTRUCTION,
   });

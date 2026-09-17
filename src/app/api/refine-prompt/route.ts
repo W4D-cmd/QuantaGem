@@ -1,7 +1,9 @@
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
-import { getProviderForModel, ModelProvider } from "@/lib/custom-models";
+import { getProviderForModel, getOriginalModelId, ModelProvider } from "@/lib/custom-models";
+import { pool } from "@/lib/db";
 
 const REFINE_SYSTEM_PROMPT = `You are the **Apex Task-Prompt Refiner**, the world's leading specialist in **Modular Prompt Engineering**. You understand that modern AI architectures separate "Identity" (System Prompt) from "Execution" (User Prompt).
 
@@ -173,6 +175,213 @@ async function handleOpenAIRefine(model: string, userPrompt: string): Promise<Re
   });
 }
 
+async function resolveCustomAnthropicMaxTokens(userId: number, model: string): Promise<number> {
+  try {
+    const result = await pool.query(
+      "SELECT output_token_limit FROM custom_models WHERE user_id = $1 AND model_id = $2 AND api_type = 'anthropic' LIMIT 1",
+      [userId, getOriginalModelId(model)],
+    );
+    const limit = result.rows[0]?.output_token_limit;
+    if (typeof limit === "number" && limit > 0) {
+      return limit;
+    }
+  } catch (error) {
+    console.error("Failed to resolve custom Anthropic max tokens:", error);
+  }
+  return 8192;
+}
+
+async function handleAnthropicRefine(model: string, userPrompt: string): Promise<Response> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured." }, { status: 500 });
+  }
+
+  const anthropic = new Anthropic({ apiKey });
+
+  const stream = anthropic.messages.stream({
+    model,
+    max_tokens: 8192,
+    messages: [{ role: "user", content: userPrompt }],
+    system: REFINE_SYSTEM_PROMPT,
+  });
+
+  const encoder = new TextEncoder();
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      try {
+        stream.on("text", (text) => {
+          const jsonChunk = { type: "text", value: text };
+          controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+        });
+
+        await stream.finalMessage();
+      } catch (streamError) {
+        console.error("Error during Anthropic refinement stream processing:", streamError);
+        const errorMessage = {
+          type: "error",
+          value: "An error occurred during refinement. Please try again.",
+        };
+        controller.enqueue(encoder.encode(JSON.stringify(errorMessage) + "\n"));
+      } finally {
+        controller.close();
+      }
+    },
+    cancel() {
+      stream.abort();
+      console.log("Anthropic refinement stream cancelled");
+    },
+  });
+
+  return new Response(readableStream, {
+    headers: {
+      "Content-Type": "application/jsonl; charset=utf-8",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
+
+async function handleCustomOpenAIRefine(
+  model: string,
+  userPrompt: string,
+  userId: number,
+): Promise<Response> {
+  const settingsResult = await pool.query(
+    "SELECT custom_openai_endpoint, custom_openai_key FROM user_settings WHERE user_id = $1",
+    [userId],
+  );
+
+  const settings = settingsResult.rows[0];
+  if (!settings?.custom_openai_endpoint) {
+    return NextResponse.json(
+      { error: "Custom OpenAI endpoint not configured. Please set it in Settings > Providers." },
+      { status: 400 },
+    );
+  }
+
+  const baseURL = settings.custom_openai_endpoint;
+  const apiKey = settings.custom_openai_key || "no-key";
+
+  const openai = new OpenAI({ apiKey, baseURL });
+
+  const actualModelId = getOriginalModelId(model);
+
+  const stream = await openai.chat.completions.create({
+    model: actualModelId,
+    messages: [
+      { role: "system", content: REFINE_SYSTEM_PROMPT },
+      { role: "user", content: userPrompt },
+    ],
+    stream: true,
+  });
+
+  const encoder = new TextEncoder();
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta;
+          if (delta?.content) {
+            const jsonChunk = { type: "text", value: delta.content };
+            controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+          }
+        }
+      } catch (streamError) {
+        console.error("Error during Custom OpenAI refinement stream processing:", streamError);
+        const errorMessage = {
+          type: "error",
+          value: "An error occurred during refinement. Please try again.",
+        };
+        controller.enqueue(encoder.encode(JSON.stringify(errorMessage) + "\n"));
+      } finally {
+        controller.close();
+      }
+    },
+    cancel() {
+      console.log("Custom OpenAI refinement stream cancelled");
+    },
+  });
+
+  return new Response(readableStream, {
+    headers: {
+      "Content-Type": "application/jsonl; charset=utf-8",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
+
+async function handleCustomAnthropicRefine(
+  model: string,
+  userPrompt: string,
+  userId: number,
+): Promise<Response> {
+  const settingsResult = await pool.query(
+    "SELECT custom_anthropic_endpoint, custom_anthropic_key FROM user_settings WHERE user_id = $1",
+    [userId],
+  );
+
+  const settings = settingsResult.rows[0];
+  if (!settings?.custom_anthropic_endpoint) {
+    return NextResponse.json(
+      { error: "Custom Anthropic endpoint not configured. Please set it in Settings > Providers." },
+      { status: 400 },
+    );
+  }
+
+  const baseURL = settings.custom_anthropic_endpoint;
+  const apiKey = settings.custom_anthropic_key || "no-key";
+
+  const anthropic = new Anthropic({ apiKey, baseURL });
+
+  const actualModelId = getOriginalModelId(model);
+  const maxTokens = await resolveCustomAnthropicMaxTokens(userId, model);
+
+  const stream = anthropic.messages.stream({
+    model: actualModelId,
+    max_tokens: maxTokens,
+    messages: [{ role: "user", content: userPrompt }],
+    system: REFINE_SYSTEM_PROMPT,
+  });
+
+  const encoder = new TextEncoder();
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      try {
+        stream.on("text", (text) => {
+          const jsonChunk = { type: "text", value: text };
+          controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
+        });
+
+        await stream.finalMessage();
+      } catch (streamError) {
+        console.error("Error during Custom Anthropic refinement stream processing:", streamError);
+        const errorMessage = {
+          type: "error",
+          value: "An error occurred during refinement. Please try again.",
+        };
+        controller.enqueue(encoder.encode(JSON.stringify(errorMessage) + "\n"));
+      } finally {
+        controller.close();
+      }
+    },
+    cancel() {
+      stream.abort();
+      console.log("Custom Anthropic refinement stream cancelled");
+    },
+  });
+
+  return new Response(readableStream, {
+    headers: {
+      "Content-Type": "application/jsonl; charset=utf-8",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const userIdHeader = request.headers.get("x-user-id");
   if (!userIdHeader) {
@@ -198,6 +407,12 @@ export async function POST(request: NextRequest) {
   try {
     if (provider === "openai") {
       return await handleOpenAIRefine(model, prompt);
+    } else if (provider === "anthropic") {
+      return await handleAnthropicRefine(model, prompt);
+    } else if (provider === "custom-openai") {
+      return await handleCustomOpenAIRefine(model, prompt, userId);
+    } else if (provider === "custom-anthropic") {
+      return await handleCustomAnthropicRefine(model, prompt, userId);
     } else {
       return await handleGeminiRefine(model, prompt);
     }

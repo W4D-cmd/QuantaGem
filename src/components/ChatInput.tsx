@@ -1243,7 +1243,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           )}
 
           <div
-            className={`relative flex flex-col rounded-3xl border dark:border-zinc-900 overflow-hidden shadow-lg
+            className={`relative flex flex-col rounded-3xl border-2 dark:border-zinc-900 overflow-hidden shadow-lg
               transition duration-300 ease-in-out ${
                 isRefining
                   ? "border-teal-600 ci-glow ci-glow-refine ci-glow-running"
@@ -1252,9 +1252,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     : "border-neutral-300 dark:border-zinc-900 ci-glow focus-within:border-blue-500"
               }`}
           >
-            {(isRefining || isGeneratingSystemPrompt) && (
-              <div aria-hidden className="ci-beam pointer-events-none absolute inset-0 z-10 rounded-[inherit]" />
-            )}
+            <div aria-hidden className="ci-beam pointer-events-none absolute inset-0 z-10 rounded-[inherit]" />
             <div className="p-4 bg-white dark:bg-zinc-900 transition-colors duration-300 ease-in-out">
               <textarea
                 ref={textareaRef}

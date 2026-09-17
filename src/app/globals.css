@@ -205,12 +205,3 @@ html.dark .ci-glow.ci-glow-generate {
     --ci-angle: 360deg;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .ci-glow:focus-within,
-  .ci-glow.ci-glow-refine,
-  .ci-glow.ci-glow-generate,
-  .ci-glow-running .ci-beam {
-    animation: none;
-  }
-}

@@ -113,7 +113,6 @@ export interface ChatListItem {
   id: number;
   title: string;
   lastModel: string;
-  systemPrompt: string;
   projectId: number | null;
   updatedAt: string;
   thinkingBudget: number;
@@ -155,7 +154,7 @@ async function generateAndSetChatTitle(
   getAuthHeaders: () => HeadersInit,
   router: AppRouterInstance,
   showToast: (message: string, type?: ToastProps["type"]) => void,
-  fetchAllChats: () => Promise<void>,
+  onTitleSet: (chatId: number, title: string) => void,
 ) {
   try {
     const truncatedContent =
@@ -201,7 +200,7 @@ async function generateAndSetChatTitle(
       return;
     }
 
-    await fetchAllChats();
+    onTitleSet(chatSessionId, title);
   } catch (err: unknown) {
     showToast(extractErrorMessage(err), "error");
   }
@@ -231,6 +230,17 @@ function extractUrls(text: string): string[] {
     if (urls.length >= MAX_EXTRACTED_URLS) break;
   }
   return urls;
+}
+
+function resortChatList(list: ChatListItem[]): ChatListItem[] {
+  return [...list].sort((a, b) => {
+    if (a.pinnedAt && b.pinnedAt) {
+      return new Date(b.pinnedAt).getTime() - new Date(a.pinnedAt).getTime();
+    }
+    if (a.pinnedAt) return -1;
+    if (b.pinnedAt) return 1;
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
 }
 
 export default function Home() {
@@ -629,6 +639,26 @@ export default function Home() {
     }
   }, [getAuthHeaders, router, showToast]);
 
+  const patchChatListItem = useCallback((chatId: number, patch: Partial<ChatListItem>) => {
+    setAllChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, ...patch } : c)));
+  }, []);
+
+  const bumpChatToTop = useCallback((chatId: number) => {
+    setAllChats((prev) => {
+      const target = prev.find((c) => c.id === chatId);
+      if (!target) return prev;
+      const updated = { ...target, updatedAt: new Date().toISOString() };
+      return resortChatList([updated, ...prev.filter((c) => c.id !== chatId)]);
+    });
+  }, []);
+
+  const handleChatTitleSet = useCallback(
+    (chatId: number, title: string) => {
+      patchChatListItem(chatId, { title });
+    },
+    [patchChatListItem],
+  );
+
   useEffect(() => {
     if (userEmail) {
       fetchAllChats();
@@ -680,11 +710,11 @@ export default function Home() {
           },
           body: JSON.stringify({ thinkingBudget: budgetValue }),
         })
-          .then(() => fetchAllChats())
+          .then(() => patchChatListItem(activeChatId, { thinkingBudget: budgetValue }))
           .catch((err) => showToast(extractErrorMessage(err), "error"));
       }
     },
-    [activeChatId, getAuthHeaders, showToast, fetchAllChats, selectedModel, manualCustomModels],
+    [activeChatId, getAuthHeaders, showToast, patchChatListItem, selectedModel, manualCustomModels],
   );
 
   const handleVerbosityChange = useCallback((newVerbosity: VerbosityOption) => {
@@ -708,11 +738,17 @@ export default function Home() {
             topK: newParams.topK,
           }),
         })
-          .then(() => fetchAllChats())
+          .then(() =>
+            patchChatListItem(activeChatId, {
+              temperature: newParams.temperature,
+              topP: newParams.topP,
+              topK: newParams.topK,
+            }),
+          )
           .catch((err) => showToast(extractErrorMessage(err), "error"));
       }
     },
-    [activeChatId, getAuthHeaders, showToast, fetchAllChats, invalidateChatCache],
+    [activeChatId, getAuthHeaders, showToast, patchChatListItem, invalidateChatCache],
   );
 
   const fetchModelList = useCallback(async () => {
@@ -764,77 +800,86 @@ export default function Home() {
     fetchManualModels();
   }, [fetchModelList, fetchCustomModels, fetchManualModels]);
 
-  const handleRenameChat = async (chatId: number, newTitle: string) => {
-    try {
-      const res = await fetch(`/api/chats/${chatId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify({ title: newTitle }),
-      });
-      if (res.status === 401) {
-        router.replace("/login");
+  const handleRenameChat = useCallback(
+    async (chatId: number, newTitle: string) => {
+      try {
+        const res = await fetch(`/api/chats/${chatId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({ title: newTitle }),
+        });
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          await showApiErrorToast(res, showToast);
+          return;
+        }
+        patchChatListItem(chatId, { title: newTitle });
+        invalidateChatCache(chatId);
+        showToast("Chat renamed.", "success");
+      } catch (err: unknown) {
+        showToast(extractErrorMessage(err), "error");
+      }
+    },
+    [getAuthHeaders, router, showToast, patchChatListItem, invalidateChatCache],
+  );
+
+  const handleDeleteChat = useCallback(
+    async (chatId: number) => {
+      try {
+        const res = await fetch(`/api/chats/${chatId}`, {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        });
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          await showApiErrorToast(res, showToast);
+          return;
+        }
+      } catch (err: unknown) {
+        showToast(extractErrorMessage(err), "error");
         return;
       }
-      if (!res.ok) {
-        await showApiErrorToast(res, showToast);
-        return;
-      }
-      await fetchAllChats();
+
+      setAllChats((prev) => prev.filter((c) => c.id !== chatId));
       invalidateChatCache(chatId);
-      showToast("Chat renamed.", "success");
-    } catch (err: unknown) {
-      showToast(extractErrorMessage(err), "error");
-    }
-    setAllChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, title: newTitle } : c)));
-  };
+      if (activeChatId === chatId) {
+        setActiveChatId(null);
+        setMessages([]);
+        setEditingPromptInitialValue(null);
+        setTotalTokens(0);
+        setThinkingOption("dynamic");
+      }
+      showToast("Chat deleted.", "success");
+    },
+    [getAuthHeaders, router, showToast, activeChatId, invalidateChatCache],
+  );
 
-  const confirmDeleteChat = (chatId: number) => {
-    const chat = allChats.find((c) => c.id === chatId);
-    setConfirmationModal({
-      isOpen: true,
-      title: "Delete Chat",
-      message: (
-        <span>
-          Are you sure you want to delete <strong>{chat?.title || "this chat"}</strong>? This action cannot be undone.
-        </span>
-      ),
-      onConfirm: () => handleDeleteChat(chatId),
-    });
-  };
-
-  const handleDeleteChat = async (chatId: number) => {
-    try {
-      const res = await fetch(`/api/chats/${chatId}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
+  const confirmDeleteChat = useCallback(
+    (chatId: number) => {
+      const chat = allChats.find((c) => c.id === chatId);
+      setConfirmationModal({
+        isOpen: true,
+        title: "Delete Chat",
+        message: (
+          <span>
+            Are you sure you want to delete <strong>{chat?.title || "this chat"}</strong>? This action cannot be
+            undone.
+          </span>
+        ),
+        onConfirm: () => handleDeleteChat(chatId),
       });
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      if (!res.ok) {
-        await showApiErrorToast(res, showToast);
-        return;
-      }
-    } catch (err: unknown) {
-      showToast(extractErrorMessage(err), "error");
-      return;
-    }
-
-    setAllChats((prev) => prev.filter((c) => c.id !== chatId));
-    invalidateChatCache(chatId);
-    if (activeChatId === chatId) {
-      setActiveChatId(null);
-      setMessages([]);
-      setEditingPromptInitialValue(null);
-      setTotalTokens(0);
-      setThinkingOption("dynamic");
-    }
-    showToast("Chat deleted.", "success");
-  };
+    },
+    [allChats, handleDeleteChat],
+  );
 
   const handleDuplicateChat = useCallback(
     async (chatId: number) => {
@@ -893,11 +938,6 @@ export default function Home() {
     },
     [getAuthHeaders, router, showToast],
   );
-
-  const handleOpenSaveSuggestionModal = useCallback((chatId: number, title: string, systemPrompt: string) => {
-    setSaveSuggestionData({ chatId, title, systemPrompt });
-    setIsSaveSuggestionModalOpen(true);
-  }, []);
 
   const handleSaveAsSuggestion = useCallback(
     async (title: string, prompt: string, icon: string) => {
@@ -1029,6 +1069,23 @@ export default function Home() {
       }
     },
     [getAuthHeaders],
+  );
+
+  const resolveChatSystemPrompt = useCallback(
+    async (chatId: number): Promise<string> => {
+      await prefetchChat(chatId);
+      return chatCacheRef.current.get(chatId)?.systemPrompt ?? "";
+    },
+    [prefetchChat],
+  );
+
+  const handleOpenSaveSuggestionModal = useCallback(
+    async (chatId: number, title: string) => {
+      const systemPrompt = await resolveChatSystemPrompt(chatId);
+      setSaveSuggestionData({ chatId, title, systemPrompt });
+      setIsSaveSuggestionModalOpen(true);
+    },
+    [resolveChatSystemPrompt],
   );
 
   const loadChat = useCallback(
@@ -1192,74 +1249,82 @@ export default function Home() {
     }
   }, [allProjects, getAuthHeaders, router, showToast]);
 
-  const handleRenameProject = async (projectId: number, newTitle: string) => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify({ title: newTitle }),
+  const handleRenameProject = useCallback(
+    async (projectId: number, newTitle: string) => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({ title: newTitle }),
+        });
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          await showApiErrorToast(res, showToast);
+          return;
+        }
+        showToast("Project renamed.", "success");
+      } catch (err: unknown) {
+        showToast(extractErrorMessage(err), "error");
+        return;
+      }
+      setAllProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, title: newTitle } : p)));
+    },
+    [getAuthHeaders, router, showToast],
+  );
+
+  const handleDeleteProject = useCallback(
+    async (projectId: number) => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}`, {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        });
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          await showApiErrorToast(res, showToast);
+          return;
+        }
+      } catch (err: unknown) {
+        showToast(extractErrorMessage(err), "error");
+        return;
+      }
+
+      setAllProjects((prev) => prev.filter((p) => p.id !== projectId));
+      setAllChats((prev) => prev.filter((c) => c.projectId !== projectId));
+      if (displayingProjectManagementId === projectId) {
+        setDisplayingProjectManagementId(null);
+        setActiveChatId(null);
+        setCurrentChatProjectId(null);
+        setMessages([]);
+        setEditingPromptInitialValue(null);
+        setTotalTokens(null);
+      }
+      showToast("Project deleted.", "success");
+    },
+    [getAuthHeaders, router, showToast, displayingProjectManagementId],
+  );
+
+  const confirmDeleteProject = useCallback(
+    (projectId: number) => {
+      setConfirmationModal({
+        isOpen: true,
+        title: "Delete Project",
+        message:
+          "Are you sure you want to delete this project and all its chats and files? This action cannot be undone.",
+        onConfirm: () => handleDeleteProject(projectId),
       });
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      if (!res.ok) {
-        await showApiErrorToast(res, showToast);
-        return;
-      }
-      await fetchAllChats();
-      showToast("Project renamed.", "success");
-    } catch (err: unknown) {
-      showToast(extractErrorMessage(err), "error");
-      return;
-    }
-    setAllProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, title: newTitle } : p)));
-  };
-
-  const confirmDeleteProject = (projectId: number) => {
-    setConfirmationModal({
-      isOpen: true,
-      title: "Delete Project",
-      message:
-        "Are you sure you want to delete this project and all its chats and files? This action cannot be undone.",
-      onConfirm: () => handleDeleteProject(projectId),
-    });
-  };
-
-  const handleDeleteProject = async (projectId: number) => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      });
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      if (!res.ok) {
-        await showApiErrorToast(res, showToast);
-        return;
-      }
-    } catch (err: unknown) {
-      showToast(extractErrorMessage(err), "error");
-      return;
-    }
-
-    setAllProjects((prev) => prev.filter((p) => p.id !== projectId));
-    setAllChats((prev) => prev.filter((c) => c.projectId !== projectId));
-    if (displayingProjectManagementId === projectId) {
-      setDisplayingProjectManagementId(null);
-      setActiveChatId(null);
-      setCurrentChatProjectId(null);
-      setMessages([]);
-      setEditingPromptInitialValue(null);
-      setTotalTokens(null);
-    }
-    showToast("Project deleted.", "success");
-  };
+    },
+    [handleDeleteProject],
+  );
 
   useEffect(() => {
     setEditingMessage(null);
@@ -1438,6 +1503,29 @@ export default function Home() {
         const currentSources: Array<{ title: string; uri: string }> = [];
         let modelReturnedEmptyMessage = false;
         let finalUsage: { input_tokens: number; output_tokens: number; total_tokens: number } | undefined = undefined;
+        let flushRafId: number | null = null;
+
+        const flushPlaceholderUpdate = () => {
+          flushRafId = null;
+          if (!placeholderIdToUpdate) return;
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === placeholderIdToUpdate
+                ? {
+                    ...msg,
+                    parts: [{ type: "text", text: textAccumulator }],
+                    sources: [...currentSources],
+                    thoughtSummary: thoughtSummaryAccumulator,
+                  }
+                : msg,
+            ),
+          );
+        };
+
+        const schedulePlaceholderUpdate = () => {
+          if (flushRafId !== null) return;
+          flushRafId = requestAnimationFrame(flushPlaceholderUpdate);
+        };
 
         while (true) {
           const { value, done } = await reader.read();
@@ -1476,21 +1564,13 @@ export default function Home() {
               console.error("Failed to parse JSONL chunk:", jsonError, "Raw line:", line);
             }
           }
-          if (placeholderIdToUpdate) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === placeholderIdToUpdate
-                  ? {
-                      ...msg,
-                      parts: [{ type: "text", text: textAccumulator }],
-                      sources: [...currentSources],
-                      thoughtSummary: thoughtSummaryAccumulator,
-                    }
-                  : msg,
-              ),
-            );
-          }
+          schedulePlaceholderUpdate();
         }
+
+        if (flushRafId !== null) {
+          cancelAnimationFrame(flushRafId);
+        }
+        flushPlaceholderUpdate();
 
         if ((modelReturnedEmptyMessage || textAccumulator.trim() === "") && !ctrl.signal.aborted) {
           return null;
@@ -1758,7 +1838,7 @@ export default function Home() {
           );
 
           if (isNewChat && inputText.trim()) {
-            generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
+            generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, handleChatTitleSet);
           }
         } catch (err) {
           showToast(extractErrorMessage(err), "error");
@@ -1805,7 +1885,7 @@ export default function Home() {
 
           const { newChatId, userMessage: savedUserMessage, unsavedMessagesMap } = await persistUserMsgRes.json();
           invalidateChatCache(newChatId);
-          await fetchAllChats();
+          bumpChatToTop(newChatId);
           setActiveChatId(newChatId);
           setMessages((prev) =>
             prev.map((msg) => {
@@ -1825,7 +1905,7 @@ export default function Home() {
           setMessages((prev) => prev.filter((msg) => msg.id !== 0));
 
           if (isNewChat && inputText.trim()) {
-            generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, fetchAllChats);
+            generateAndSetChatTitle(newChatId, inputText, getAuthHeaders, router, showToast, handleChatTitleSet);
           }
         } catch (err) {
           setMessages(previousMessages);
@@ -2080,61 +2160,76 @@ export default function Home() {
     }
   };
 
-  const confirmDeleteAllGlobalChats = () => {
+  const handleDeleteAllGlobalChats = useCallback(
+    async () => {
+      try {
+        const res = await fetch("/api/chats", {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        });
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          await showApiErrorToast(res, showToast);
+          return;
+        }
+      } catch (err: unknown) {
+        showToast(extractErrorMessage(err), "error");
+        return;
+      }
+
+      setAllChats((prev) => prev.filter((c) => c.projectId !== null));
+      if (activeChatId !== null && allChats.find((c) => c.id === activeChatId)?.projectId === null) {
+        setActiveChatId(null);
+        setMessages([]);
+        setEditingPromptInitialValue(null);
+        setTotalTokens(null);
+      }
+      showToast("All global chats deleted.", "success");
+    },
+    [getAuthHeaders, router, showToast, activeChatId, allChats],
+  );
+
+  const confirmDeleteAllGlobalChats = useCallback(() => {
     setConfirmationModal({
       isOpen: true,
       title: "Delete All Global Chats",
       message: "Are you sure you want to delete ALL your global chats? This action cannot be undone.",
       onConfirm: handleDeleteAllGlobalChats,
     });
-  };
+  }, [handleDeleteAllGlobalChats]);
 
-  const handleDeleteAllGlobalChats = async () => {
-    try {
-      const res = await fetch("/api/chats", {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      });
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      if (!res.ok) {
-        await showApiErrorToast(res, showToast);
-        return;
-      }
-    } catch (err: unknown) {
-      showToast(extractErrorMessage(err), "error");
-      return;
-    }
-
-    setAllChats((prev) => prev.filter((c) => c.projectId !== null));
-    if (activeChatId !== null && allChats.find((c) => c.id === activeChatId)?.projectId === null) {
-      setActiveChatId(null);
-      setMessages([]);
-      setEditingPromptInitialValue(null);
-      setTotalTokens(null);
-    }
-    showToast("All global chats deleted.", "success");
-  };
-
-  const openGlobalSettingsModal = () => {
+  const openGlobalSettingsModal = useCallback(() => {
     setEditingChatId(null);
     setIsSettingsModalOpen(true);
     setIsThreeDotMenuOpen(false);
-  };
+  }, []);
 
-  const openChatSettingsModal = (chatId: number, initialPrompt: string) => {
-    setEditingChatId(chatId);
-    setEditingPromptInitialValue(initialPrompt);
-    setIsSettingsModalOpen(true);
-  };
+  const openChatSettingsModal = useCallback(
+    async (chatId: number) => {
+      setEditingChatId(chatId);
+      const cached = chatCacheRef.current.get(chatId);
+      if (cached) {
+        setEditingPromptInitialValue(cached.systemPrompt);
+      } else {
+        setEditingPromptInitialValue(null);
+      }
+      setIsSettingsModalOpen(true);
+      if (!cached) {
+        await prefetchChat(chatId);
+        setEditingPromptInitialValue(chatCacheRef.current.get(chatId)?.systemPrompt ?? "");
+      }
+    },
+    [prefetchChat],
+  );
 
-  const closeSettingsModal = () => {
+  const closeSettingsModal = useCallback(() => {
     setIsSettingsModalOpen(false);
     setEditingChatId(null);
     setEditingPromptInitialValue(null);
-  };
+  }, []);
 
   const handleSettingsSaved = useCallback(
     async (newSettings: { systemPrompt: string }) => {
@@ -2152,18 +2247,25 @@ export default function Home() {
 
       // 3. Background synchronization
       try {
-        const syncTasks: Promise<void>[] = [fetchAllChats()];
-        if (isGlobalSettings) {
-          syncTasks.push(fetchAllProjects(), fetchCustomModels(), fetchManualModels());
+        if (!isGlobalSettings && editingChatId !== null) {
+          invalidateChatCache(editingChatId);
+          return;
         }
-
-        // Run non-dependent refreshes in parallel
-        await Promise.all(syncTasks);
+        await Promise.all([fetchAllChats(), fetchAllProjects(), fetchCustomModels(), fetchManualModels()]);
       } catch (err) {
         console.error("Background sync failed:", err);
       }
     },
-    [activeChatId, editingChatId, fetchAllChats, fetchAllProjects, fetchCustomModels, fetchManualModels, showToast],
+    [
+      editingChatId,
+      closeSettingsModal,
+      showToast,
+      fetchAllChats,
+      fetchAllProjects,
+      fetchCustomModels,
+      fetchManualModels,
+      invalidateChatCache,
+    ],
   );
 
   const toggleThreeDotMenu = () => {

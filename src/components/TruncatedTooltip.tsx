@@ -16,15 +16,13 @@ const TruncatedTooltip: React.FC<TruncatedTooltipProps> = ({ children, title }) 
     const element = contentRef.current;
     if (element) {
       const hasOverflow = element.scrollWidth > element.clientWidth;
-      if (hasOverflow !== isTruncated) {
-        setIsTruncated(hasOverflow);
-      }
+      setIsTruncated((prev) => (prev === hasOverflow ? prev : hasOverflow));
     }
-  }, [isTruncated]);
+  }, []);
 
   useLayoutEffect(() => {
     checkTruncation();
-  }, [children, checkTruncation]);
+  }, [checkTruncation, title]);
 
   useEffect(() => {
     window.addEventListener("resize", checkTruncation);

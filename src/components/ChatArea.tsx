@@ -510,6 +510,244 @@ const CodeBlockWithCopy: React.FC<CodeBlockWithCopyProps> = ({ children, chatAre
   );
 };
 
+interface MessageRowProps {
+  msg: Message;
+  index: number;
+  isMessageStreaming: boolean;
+  isThinkingSummaryActive: boolean;
+  isToolbarHidden: boolean;
+  isCopied: boolean;
+  isLoading: boolean;
+  components: Components;
+  editingMessage: { index: number; message: Message } | null;
+  setEditingMessage: React.Dispatch<React.SetStateAction<{ index: number; message: Message } | null>>;
+  onEditSave: (index: number, newParts: MessagePart[]) => void;
+  getAuthHeaders: GetAuthHeaders;
+  onCopy: (msg: Message) => void;
+  onRegenerate: (index: number) => void;
+}
+
+const MessageRow = memo(function MessageRow({
+  msg,
+  index,
+  isMessageStreaming,
+  isThinkingSummaryActive,
+  isToolbarHidden,
+  isCopied,
+  isLoading,
+  components,
+  editingMessage,
+  setEditingMessage,
+  onEditSave,
+  getAuthHeaders,
+  onCopy,
+  onRegenerate,
+}: MessageRowProps) {
+  const isUserMessage = msg.role === "user";
+  const isBeingEdited = editingMessage?.index === index;
+
+  return (
+    <div
+      className={`group/message relative flex flex-col ${
+        isUserMessage && !isBeingEdited ? "items-end" : "items-start"
+      }`}
+    >
+      <div
+        className={`break-words overflow-hidden ${
+          isBeingEdited ? "w-full" : isUserMessage ? "max-w-xl" : "w-full"
+        }`}
+      >
+        {isBeingEdited ? (
+          <EditWrapper
+            editingMessage={editingMessage}
+            setEditingMessage={setEditingMessage}
+            onEditSave={onEditSave}
+            getAuthHeaders={getAuthHeaders}
+          />
+        ) : (
+          <div className={`p-4 rounded-3xl ${isUserMessage ? "bg-neutral-100 dark:bg-zinc-900" : ""}`}>
+            {msg.role === "model" && msg.thoughtSummary && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+              >
+                <ThinkingSummary summary={msg.thoughtSummary} isStreaming={isThinkingSummaryActive} />
+              </motion.div>
+            )}
+            {msg.parts.map((part, j) => {
+              if (part.type === "text" && part.text) {
+                return (
+                  <div
+                    key={j}
+                    className="prose dark:prose-invert prose-neutral prose-code:font-normal
+                      prose-code:text-black dark:prose-code:text-zinc-200
+                      prose-li:text-neutral-950 dark:prose-li:text-zinc-200
+                      prose-p:text-neutral-950 dark:prose-p:text-zinc-200
+                      prose-headings:text-black dark:prose-headings:text-zinc-200
+                      prose-pre:rounded-xl prose-code:rounded prose-pre:border
+                      prose-pre:bg-neutral-100 dark:prose-pre:bg-zinc-900
+                      prose-pre:border-neutral-400/30 dark:prose-pre:border-zinc-600/30
+                      prose-code:bg-neutral-200 dark:prose-code:bg-zinc-700
+                      max-w-none transition-colors duration-300 ease-in-out
+                      prose-code:before:content-none prose-code:after:content-none
+                      prose-code:py-0.5 prose-code:px-1"
+                  >
+                    {isUserMessage ? (
+                      <LazyMarkdownRenderer content={part.text} components={components} />
+                    ) : (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkMath, remarkGfm]}
+                        rehypePlugins={[rehypeRaw, [rehypeKatex, KATEX_OPTIONS], [rehypeHighlight, { detect: true }]]}
+                        components={components}
+                      >
+                        {preprocessMarkdown(part.text)}
+                      </ReactMarkdown>
+                    )}
+                  </div>
+                );
+              } else if (part.type === "file" && part.objectName && part.mimeType && part.fileName) {
+                if (part.mimeType.startsWith("image/")) {
+                  return (
+                    <div key={j} className="my-2">
+                      <ProtectedImage
+                        objectName={part.objectName}
+                        fileName={part.fileName}
+                        mimeType={part.mimeType}
+                        getAuthHeaders={getAuthHeaders}
+                      />
+                    </div>
+                  );
+                } else if (part.mimeType.startsWith("audio/")) {
+                  return (
+                    <div key={j} className="my-2">
+                      <ProtectedAudio objectName={part.objectName} getAuthHeaders={getAuthHeaders} />
+                    </div>
+                  );
+                } else {
+                  const fileUrl = `/api/files/${part.objectName}`;
+                  return (
+                    <div key={j} className="my-2">
+                      <a
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600
+                          break-all"
+                      >
+                        {part.fileName} ({part.size ? `${(part.size / 1024).toFixed(1)} KB` : ""})
+                      </a>
+                    </div>
+                  );
+                }
+              } else if (part.type === "scraped_url" && part.url) {
+                return (
+                  <div
+                    key={j}
+                    className="my-2 flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-zinc-800
+                      px-3 py-2"
+                  >
+                    <Globe className="size-4 flex-shrink-0 text-neutral-500" />
+                    <div className="min-w-0">
+                      <a
+                        href={part.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600
+                          break-all text-sm"
+                      >
+                        {part.url}
+                      </a>
+                      {part.text && (
+                        <details className="mt-1">
+                          <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-700
+                            dark:hover:text-neutral-300"
+                          >
+                            Show content preview
+                          </summary>
+                          <div className="mt-1 text-xs text-neutral-500 whitespace-pre-wrap">
+                            {part.text.slice(0, 500)}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })}
+            {msg.role === "model" && msg.sources && msg.sources.length > 0 && (
+              <div
+                className="mt-4 pt-3 border-t border-neutral-200 dark:border-zinc-800 text-xs
+                  text-neutral-600"
+              >
+                <p className="font-semibold mb-2">Sources:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  {msg.sources.map((source, k) => (
+                    <li key={k}>
+                      <a
+                        href={source.uri}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600
+                          break-all"
+                      >
+                        {source.title || source.uri}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {!isBeingEdited && !isToolbarHidden && (
+        <div
+          className="flex-shrink-0 flex items-center justify-center gap-1 opacity-0
+            group-hover/message:opacity-100 transition-opacity duration-200 h-8 mt-1"
+        >
+          <Tooltip text={isCopied ? "Copied!" : "Copy"}>
+            <button
+              onClick={() => onCopy(msg)}
+              disabled={isLoading}
+              className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
+                hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
+            >
+              {isCopied ? <Check className="size-4 text-green-500" /> : <ClipboardList className="size-4" />}
+            </button>
+          </Tooltip>
+          {isUserMessage && (
+            <Tooltip text="Edit">
+              <button
+                onClick={() => setEditingMessage({ index, message: msg })}
+                disabled={isLoading}
+                className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
+                  hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
+              >
+                <Pencil className="size-4" />
+              </button>
+            </Tooltip>
+          )}
+          {!isUserMessage && index > 0 && (
+            <Tooltip text="Regenerate">
+              <button
+                onClick={() => onRegenerate(index)}
+                disabled={isLoading}
+                className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
+                  hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
+              >
+                <RefreshCw className="size-4" />
+              </button>
+            </Tooltip>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
 export default memo(
   forwardRef<ChatAreaHandle, ChatAreaProps>(ChatAreaComponent),
   (prev, next) =>
@@ -547,6 +785,29 @@ function ChatAreaComponent(
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null);
 
+  const handleCopyMessage = useCallback((msg: Message) => {
+    const textToCopy = msg.parts
+      .filter((p) => p.type === "text" && p.text)
+      .map((p) => p.text)
+      .join("\n\n");
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setCopiedMessageId(msg.id);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    });
+  }, []);
+
+  const onEditSaveRef = useRef(onEditSave);
+  const onRegenerateRef = useRef(onRegenerate);
+  useEffect(() => {
+    onEditSaveRef.current = onEditSave;
+    onRegenerateRef.current = onRegenerate;
+  });
+  const handleEditSaveStable = useCallback(
+    (index: number, newParts: MessagePart[]) => onEditSaveRef.current(index, newParts),
+    [],
+  );
+  const handleRegenerateStable = useCallback((index: number) => onRegenerateRef.current(index), []);
+
   useImperativeHandle(ref, () => ({
     scrollToBottomAndEnableAutoscroll: () => {
       setAutoScrollEnabled(true);
@@ -564,17 +825,6 @@ function ChatAreaComponent(
       }
     },
   }));
-
-  const handleCopyMessage = (msg: Message) => {
-    const textToCopy = msg.parts
-      .filter((p) => p.type === "text" && p.text)
-      .map((p) => p.text)
-      .join("\n\n");
-    navigator.clipboard.writeText(textToCopy).then(() => {
-      setCopiedMessageId(msg.id);
-      setTimeout(() => setCopiedMessageId(null), 2000);
-    });
-  };
 
   useEffect(() => {
     const el = containerRef.current;
@@ -829,222 +1079,27 @@ function ChatAreaComponent(
     >
       <div className="mx-auto max-w-[52rem] p-4 space-y-4">
         {messages.map((msg, i) => {
-          const isUserMessage = msg.role === "user";
-          const isBeingEdited = editingMessage?.index === i;
-          // Only the last model message during loading is actually streaming
-          // All other messages always get isStreaming=false to prevent re-execution
-          const isLastMessage = i === messages.length - 1;
-          const isMessageStreaming = isLoading && isLastMessage && msg.role === "model";
-          // Select pre-memoized component set (stable reference)
-          const messageComponents = isMessageStreaming ? streamingComponents : notStreamingComponents;
+          const isLast = i === messages.length - 1;
+          const isMessageStreaming = isLoading && isLast && msg.role === "model";
 
           return (
-            <div
+            <MessageRow
               key={msg.id}
-              className={`group/message relative flex flex-col ${
-                isUserMessage && !isBeingEdited ? "items-end" : "items-start"
-              }`}
-            >
-              <div
-                className={`break-words overflow-hidden ${
-                  isBeingEdited ? "w-full" : isUserMessage ? "max-w-xl" : "w-full"
-                }`}
-              >
-                {isBeingEdited ? (
-                  <EditWrapper
-                    editingMessage={editingMessage}
-                    setEditingMessage={setEditingMessage}
-                    onEditSave={onEditSave}
-                    getAuthHeaders={getAuthHeaders}
-                  />
-                ) : (
-                  <div className={`p-4 rounded-3xl ${isUserMessage ? "bg-neutral-100 dark:bg-zinc-900" : ""}`}>
-                    {msg.role === "model" && msg.thoughtSummary && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                      >
-                        <ThinkingSummary
-                          summary={msg.thoughtSummary}
-                          isStreaming={isThinking && i === messages.length - 1}
-                        />
-                      </motion.div>
-                    )}
-                    {msg.parts.map((part, j) => {
-                      if (part.type === "text" && part.text) {
-                        return (
-                          <div
-                            key={j}
-                            className="prose dark:prose-invert prose-neutral prose-code:font-normal
-                              prose-code:text-black dark:prose-code:text-zinc-200
-                              prose-li:text-neutral-950 dark:prose-li:text-zinc-200
-                              prose-p:text-neutral-950 dark:prose-p:text-zinc-200
-                              prose-headings:text-black dark:prose-headings:text-zinc-200
-                              prose-pre:rounded-xl prose-code:rounded prose-pre:border
-                              prose-pre:bg-neutral-100 dark:prose-pre:bg-zinc-900
-                              prose-pre:border-neutral-400/30 dark:prose-pre:border-zinc-600/30
-                              prose-code:bg-neutral-200 dark:prose-code:bg-zinc-700
-                              max-w-none transition-colors duration-300 ease-in-out
-                              prose-code:before:content-none prose-code:after:content-none
-                              prose-code:py-0.5 prose-code:px-1"
-                          >
-                            {isUserMessage ? (
-                              <LazyMarkdownRenderer content={part.text} components={messageComponents} />
-                            ) : (
-                              <ReactMarkdown
-                                remarkPlugins={[remarkMath, remarkGfm]}
-                                rehypePlugins={[rehypeRaw, [rehypeKatex, KATEX_OPTIONS], [rehypeHighlight, { detect: true }]]}
-                                components={messageComponents}
-                              >
-                                {preprocessMarkdown(part.text)}
-                              </ReactMarkdown>
-                            )}
-                          </div>
-                        );
-                      } else if (part.type === "file" && part.objectName && part.mimeType && part.fileName) {
-                        if (part.mimeType.startsWith("image/")) {
-                          return (
-                            <div key={j} className="my-2">
-                              <ProtectedImage
-                                objectName={part.objectName}
-                                fileName={part.fileName}
-                                mimeType={part.mimeType}
-                                getAuthHeaders={getAuthHeaders}
-                              />
-                            </div>
-                          );
-                        } else if (part.mimeType.startsWith("audio/")) {
-                          return (
-                            <div key={j} className="my-2">
-                              <ProtectedAudio objectName={part.objectName} getAuthHeaders={getAuthHeaders} />
-                            </div>
-                          );
-                        } else {
-                          const fileUrl = `/api/files/${part.objectName}`;
-                          return (
-                            <div key={j} className="my-2">
-                              <a
-                                href={fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600
-                                  break-all"
-                              >
-                                {part.fileName} ({part.size ? `${(part.size / 1024).toFixed(1)} KB` : ""})
-                              </a>
-                            </div>
-                          );
-                        }
-                      } else if (part.type === "scraped_url" && part.url) {
-                        return (
-                          <div
-                            key={j}
-                            className="my-2 flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-zinc-800
-                              px-3 py-2"
-                          >
-                            <Globe className="size-4 flex-shrink-0 text-neutral-500" />
-                            <div className="min-w-0">
-                              <a
-                                href={part.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600
-                                  break-all text-sm"
-                              >
-                                {part.url}
-                              </a>
-                              {part.text && (
-                                <details className="mt-1">
-                                  <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-700
-                                    dark:hover:text-neutral-300"
-                                  >
-                                    Show content preview
-                                  </summary>
-                                  <div className="mt-1 text-xs text-neutral-500 whitespace-pre-wrap">
-                                    {part.text.slice(0, 500)}
-                                  </div>
-                                </details>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })}
-                    {msg.role === "model" && msg.sources && msg.sources.length > 0 && (
-                      <div
-                        className="mt-4 pt-3 border-t border-neutral-200 dark:border-zinc-800 text-xs
-                          text-neutral-600"
-                      >
-                        <p className="font-semibold mb-2">Sources:</p>
-                        <ul className="list-disc list-inside space-y-1">
-                          {msg.sources.map((source, k) => (
-                            <li key={k}>
-                              <a
-                                href={source.uri}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600
-                                  break-all"
-                              >
-                                {source.title || source.uri}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {!isBeingEdited && !(isLoading && !streamStarted && i === messages.length - 1) && (
-                <div
-                  className="flex-shrink-0 flex items-center justify-center gap-1 opacity-0
-                    group-hover/message:opacity-100 transition-opacity duration-200 h-8 mt-1"
-                >
-                  <Tooltip text={copiedMessageId === msg.id ? "Copied!" : "Copy"}>
-                    <button
-                      onClick={() => handleCopyMessage(msg)}
-                      disabled={isLoading}
-                      className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
-                        hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
-                    >
-                      {copiedMessageId === msg.id ? (
-                        <Check className="size-4 text-green-500" />
-                      ) : (
-                        <ClipboardList className="size-4" />
-                      )}
-                    </button>
-                  </Tooltip>
-                  {isUserMessage && (
-                    <Tooltip text="Edit">
-                      <button
-                        onClick={() => setEditingMessage({ index: i, message: msg })}
-                        disabled={isLoading}
-                        className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
-                          hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
-                      >
-                        <Pencil className="size-4" />
-                      </button>
-                    </Tooltip>
-                  )}
-                  {!isUserMessage && i > 0 && (
-                    <Tooltip text="Regenerate">
-                      <button
-                        onClick={() => onRegenerate(i)}
-                        disabled={isLoading}
-                        className="cursor-pointer size-7 flex items-center justify-center rounded-full text-neutral-500
-                          hover:bg-neutral-100 dark:hover:bg-zinc-900 transition-colors"
-                      >
-                        <RefreshCw className="size-4" />
-                      </button>
-                    </Tooltip>
-                  )}
-                </div>
-              )}
-            </div>
+              msg={msg}
+              index={i}
+              isMessageStreaming={isMessageStreaming}
+              isThinkingSummaryActive={isThinking && isLast}
+              isToolbarHidden={isLoading && !streamStarted && isLast}
+              isCopied={copiedMessageId === msg.id}
+              isLoading={isLoading}
+              components={isMessageStreaming ? streamingComponents : notStreamingComponents}
+              editingMessage={editingMessage}
+              setEditingMessage={setEditingMessage}
+              onEditSave={handleEditSaveStable}
+              getAuthHeaders={getAuthHeaders}
+              onCopy={handleCopyMessage}
+              onRegenerate={handleRegenerateStable}
+            />
           );
         })}
         {isLoading && !streamStarted && !editingMessage && <MessageSkeleton />}

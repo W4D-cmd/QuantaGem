@@ -15,8 +15,6 @@ export async function GET(request: NextRequest) {
       SELECT id
            , title
            , last_model      AS "lastModel"
-           , system_prompt   AS "systemPrompt"
-           , key_selection   AS "keySelection"
            , project_id      AS "projectId"
             , updated_at      AS "updatedAt"
             , thinking_budget AS "thinkingBudget"

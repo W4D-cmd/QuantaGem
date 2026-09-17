@@ -38,10 +38,17 @@ export default function DropdownMenu({
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const [menuWidth, setMenuWidth] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [portalMounted, setPortalMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      setPortalMounted(true);
+    }
+  }, [open]);
 
   useLayoutEffect(() => {
     if (!open || !anchorRef.current || !menuRef.current) return;
@@ -106,7 +113,7 @@ export default function DropdownMenu({
   }, [open, extraWidthPx]);
 
   const menu = (
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={() => setPortalMounted(false)}>
       {open && (
         <motion.div
           ref={menuRef}
@@ -158,7 +165,7 @@ export default function DropdownMenu({
     </AnimatePresence>
   );
 
-  if (!isMounted) {
+  if (!isMounted || !portalMounted) {
     return null;
   }
 

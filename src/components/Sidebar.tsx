@@ -1,4 +1,12 @@
-import React, { KeyboardEvent, useEffect, useRef, useState } from "react";
+import React, {
+  KeyboardEvent,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ChatListItem, ProjectListItem } from "@/app/page";
 import DropdownMenu from "@/components/DropdownMenu";
 import Tooltip from "@/components/Tooltip";
@@ -30,7 +38,7 @@ interface SidebarProps {
   onRenameChat: (chatId: number, newTitle: string) => void;
   onDeleteChat: (chatId: number) => void;
   onDeleteAllGlobalChats: () => void;
-  onOpenChatSettings: (chatId: number, initialPrompt: string) => void;
+  onOpenChatSettings: (chatId: number) => void;
   onNewProject: () => void;
   onSelectProject: (projectId: number) => void;
   onRenameProject: (projectId: number, newTitle: string) => void;
@@ -39,7 +47,7 @@ interface SidebarProps {
   expandedProjects: Set<number>;
   onToggleProjectExpansion: React.Dispatch<React.SetStateAction<Set<number>>>;
   onMoveChat?: (chatId: number, targetProjectId: number | null) => void;
-  onSaveAsSuggestion?: (chatId: number, title: string, systemPrompt: string) => void;
+  onSaveAsSuggestion?: (chatId: number, title: string) => void;
   onPinChat?: (chatId: number) => void;
 }
 
@@ -159,12 +167,7 @@ const animationVariants: {
 } = {
   container: {
     hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.05,
-      },
-    },
+    visible: { opacity: 1 },
   },
   item: {
     hidden: { opacity: 0, y: 10 },
@@ -185,7 +188,149 @@ const animationVariants: {
   },
 };
 
-export default function Sidebar({
+type ChatMenuAction = "rename" | "duplicate" | "settings" | "saveAsSuggestion" | "togglePin" | "delete";
+
+interface ChatRowProps {
+  chat: ChatListItem;
+  isActive: boolean;
+  isEditing: boolean;
+  isMenuOpen: boolean;
+  isDragging: boolean;
+  canDrag: boolean;
+  anchorRef: { current: HTMLElement | null };
+  onSelect: (chatId: number) => void;
+  onMenuToggle: (menuId: string, anchorEl: HTMLElement) => void;
+  onMenuAction: (action: ChatMenuAction, chat: ChatListItem) => void;
+  onCloseMenu: () => void;
+  onSaveEdit: (chatId: number, newTitle: string) => void;
+  onCancelEdit: () => void;
+  onDragStart: (e: React.DragEvent<HTMLElement>, chatId: number) => void;
+  onDragEnd: (e: React.DragEvent<HTMLElement>) => void;
+  onPrefetch: (chatId: number) => void;
+  onSaveAsSuggestion?: (chatId: number, title: string) => void;
+  onPinChat?: (chatId: number) => void;
+}
+
+const ChatRow = memo(function ChatRow({
+  chat,
+  isActive,
+  isEditing,
+  isMenuOpen,
+  isDragging,
+  canDrag,
+  anchorRef,
+  onSelect,
+  onMenuToggle,
+  onMenuAction,
+  onCloseMenu,
+  onSaveEdit,
+  onCancelEdit,
+  onDragStart,
+  onDragEnd,
+  onPrefetch,
+  onSaveAsSuggestion,
+  onPinChat,
+}: ChatRowProps) {
+  const menuId = `chat-${chat.id}`;
+
+  return (
+    <motion.li variants={animationVariants.item} exit="exit" className="mb-0.5">
+      <div
+        className={`relative group ${isDragging ? "opacity-50" : ""} ${
+          canDrag ? "cursor-grab active:cursor-grabbing" : ""
+        }`}
+        draggable={canDrag}
+        onDragStart={(e) => onDragStart(e, chat.id)}
+        onDragEnd={onDragEnd}
+        onMouseEnter={() => onPrefetch(chat.id)}
+      >
+        <EditableItem
+          item={chat}
+          isActive={isActive}
+          isEditing={isEditing}
+          onSelect={() => onSelect(chat.id)}
+          onStartEdit={() => onMenuAction("rename", chat)}
+          onSaveEdit={(newTitle) => onSaveEdit(chat.id, newTitle)}
+          onCancelEdit={onCancelEdit}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {chat.pinnedAt && <Pin className="size-4 flex-shrink-0 text-neutral-500 dark:text-zinc-500" />}
+            <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
+          </div>
+          <div
+            className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
+              group-hover:translate-x-0 transition-all duration-200 ease-in-out"
+          >
+            <button
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                e.stopPropagation();
+                onMenuToggle(menuId, e.currentTarget);
+              }}
+              className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-zinc-500"
+            >
+              <MoreHorizontal className="size-5" />
+            </button>
+            <DropdownMenu
+              open={isMenuOpen}
+              anchorRef={anchorRef}
+              onCloseAction={onCloseMenu}
+              position="left"
+              items={[
+                {
+                  id: "rename",
+                  icon: <Pencil className="size-4" />,
+                  label: "Rename",
+                  onClick: () => onMenuAction("rename", chat),
+                },
+                {
+                  id: "duplicate",
+                  icon: <Copy className="size-4" />,
+                  label: "Duplicate",
+                  onClick: () => onMenuAction("duplicate", chat),
+                },
+                {
+                  id: "settings",
+                  icon: <Settings className="size-4" />,
+                  label: "Settings",
+                  onClick: () => onMenuAction("settings", chat),
+                },
+                ...(onSaveAsSuggestion
+                  ? [
+                      {
+                        id: "save-as-suggestion",
+                        icon: <Bookmark className="size-4" />,
+                        label: "Save as Suggestion",
+                        onClick: () => onMenuAction("saveAsSuggestion", chat),
+                      },
+                    ]
+                  : []),
+                ...(onPinChat
+                  ? [
+                      {
+                        id: "pin",
+                        icon: chat.pinnedAt ? <PinOff className="size-4" /> : <Pin className="size-4" />,
+                        label: chat.pinnedAt ? "Unpin" : "Pin",
+                        onClick: () => onMenuAction("togglePin", chat),
+                      },
+                    ]
+                  : []),
+                {
+                  id: "delete",
+                  icon: <Trash2 className="size-4 text-red-500" />,
+                  label: "Delete",
+                  onClick: () => onMenuAction("delete", chat),
+                  className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
+                },
+              ]}
+            />
+          </div>
+        </EditableItem>
+      </div>
+    </motion.li>
+  );
+});
+
+function Sidebar({
   chats,
   projects,
   activeChatId,
@@ -210,7 +355,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<{ type: "chat" | "project"; id: number } | null>(null);
-  const menuAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const menuAnchorRef = useRef<HTMLElement | null>(null);
   const [draggedChatId, setDraggedChatId] = useState<number | null>(null);
   const [dropTargetProjectId, setDropTargetProjectId] = useState<number | null | "global">(null);
 
@@ -265,22 +410,119 @@ export default function Sidebar({
     };
   }, [draggedChatId]);
 
+  const globalChats = useMemo(() => chats.filter((chat) => chat.projectId === null), [chats]);
+  const pinnedGlobalChats = useMemo(
+    () => globalChats.filter((chat) => chat.pinnedAt !== null),
+    [globalChats],
+  );
+  const unpinnedGlobalChats = useMemo(
+    () => globalChats.filter((chat) => chat.pinnedAt === null),
+    [globalChats],
+  );
+  const groupedGlobalChats = useMemo(() => groupChatsByDate(unpinnedGlobalChats), [unpinnedGlobalChats]);
 
-  const handleDragStart = (e: React.DragEvent<HTMLLIElement>, chatId: number) => {
+  const chatsByProjectId = useMemo(() => {
+    const map = new Map<number, ChatListItem[]>();
+    for (const chat of chats) {
+      if (chat.projectId === null) continue;
+      const existing = map.get(chat.projectId);
+      if (existing) {
+        existing.push(chat);
+      } else {
+        map.set(chat.projectId, [chat]);
+      }
+    }
+    const byRecency = (a: ChatListItem, b: ChatListItem) => {
+      if (a.pinnedAt && !b.pinnedAt) return -1;
+      if (!a.pinnedAt && b.pinnedAt) return 1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    };
+    for (const list of map.values()) {
+      list.sort(byRecency);
+    }
+    return map;
+  }, [chats]);
+
+  const handleChatDragStart = useCallback((e: React.DragEvent<HTMLElement>, chatId: number) => {
     setDraggedChatId(chatId);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", chatId.toString());
-    const target = e.currentTarget;
+    const target = e.currentTarget as HTMLElement;
     setTimeout(() => {
       target.style.opacity = "0.5";
     }, 0);
-  };
+  }, []);
 
-  const handleDragEnd = (e: React.DragEvent<HTMLLIElement>) => {
-    e.currentTarget.style.opacity = "1";
+  const handleChatDragEnd = useCallback((e: React.DragEvent<HTMLElement>) => {
+    (e.currentTarget as HTMLElement).style.opacity = "1";
     setDraggedChatId(null);
     setDropTargetProjectId(null);
+  }, []);
+
+  const handleChatMenuToggle = useCallback((menuId: string, anchorEl: HTMLElement) => {
+    menuAnchorRef.current = anchorEl;
+    setOpenMenuId((prev) => (prev === menuId ? null : menuId));
+  }, []);
+
+  const handleChatMenuAction = useCallback(
+    (action: ChatMenuAction, chat: ChatListItem) => {
+      switch (action) {
+        case "rename":
+          setEditingItem({ type: "chat", id: chat.id });
+          setOpenMenuId(null);
+          break;
+        case "duplicate":
+          onDuplicateChat(chat.id);
+          break;
+        case "settings":
+          onOpenChatSettings(chat.id);
+          break;
+        case "saveAsSuggestion":
+          onSaveAsSuggestion?.(chat.id, chat.title);
+          break;
+        case "togglePin":
+          onPinChat?.(chat.id);
+          break;
+        case "delete":
+          onDeleteChat(chat.id);
+          break;
+      }
+    },
+    [onDuplicateChat, onOpenChatSettings, onSaveAsSuggestion, onPinChat, onDeleteChat],
+  );
+
+  const handleCloseChatMenu = useCallback(() => setOpenMenuId(null), []);
+
+  const handleChatSaveEdit = useCallback(
+    (chatId: number, newTitle: string) => {
+      onRenameChat(chatId, newTitle);
+      setEditingItem(null);
+    },
+    [onRenameChat],
+  );
+
+  const handleCancelEdit = useCallback(() => setEditingItem(null), []);
+
+  const handleSelectChatRow = useCallback((chatId: number) => onSelectChat(chatId), [onSelectChat]);
+
+  const toggleProjectExpansion = (projectId: number) => {
+    onToggleProjectExpansion((prev: Set<number>) => {
+      const newSet = new Set(prev);
+      if (newSet.has(projectId)) {
+        newSet.delete(projectId);
+      } else {
+        newSet.add(projectId);
+      }
+      return newSet;
+    });
   };
+
+  const handlePrefetchChat = useCallback(
+    (chatId: number) => {
+      onPrefetchChat?.(chatId);
+    },
+    [onPrefetchChat],
+  );
 
   const handleDragOver = (e: React.DragEvent<HTMLElement>, targetProjectId: number | null | "global") => {
     e.preventDefault();
@@ -330,39 +572,9 @@ export default function Sidebar({
     setDraggedChatId(null);
   };
 
-  const toggleProjectExpansion = (projectId: number) => {
-    onToggleProjectExpansion((prev: Set<number>) => {
-      const newSet = new Set(prev);
-      if (newSet.has(projectId)) {
-        newSet.delete(projectId);
-      } else {
-        newSet.add(projectId);
-      }
-      return newSet;
-    });
-  };
-
-  const globalChats = chats.filter((chat) => chat.projectId === null);
-  const pinnedGlobalChats = globalChats.filter((chat) => chat.pinnedAt !== null);
-  const unpinnedGlobalChats = globalChats.filter((chat) => chat.pinnedAt === null);
-  const groupedGlobalChats = groupChatsByDate(unpinnedGlobalChats);
-
-  const getChatsForProject = (projectId: number) =>
-    chats
-      .filter((chat) => chat.projectId === projectId)
-      .sort((a, b) => {
-        if (a.pinnedAt && !b.pinnedAt) return -1;
-        if (!a.pinnedAt && b.pinnedAt) return 1;
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      });
-
   const handleStartEdit = (type: "chat" | "project", id: number) => {
     setEditingItem({ type, id });
     setOpenMenuId(null);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingItem(null);
   };
 
   const handleSaveEdit = (type: "chat" | "project", id: number, newTitle: string) => {
@@ -373,6 +585,30 @@ export default function Sidebar({
     }
     handleCancelEdit();
   };
+
+  const renderChatRow = (chat: ChatListItem) => (
+    <ChatRow
+      key={chat.id}
+      chat={chat}
+      isActive={chat.id === activeChatId}
+      isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
+      isMenuOpen={openMenuId === `chat-${chat.id}`}
+      isDragging={draggedChatId === chat.id}
+      canDrag={!editingItem && !!onMoveChat}
+      anchorRef={menuAnchorRef}
+      onSelect={handleSelectChatRow}
+      onMenuToggle={handleChatMenuToggle}
+      onMenuAction={handleChatMenuAction}
+      onCloseMenu={handleCloseChatMenu}
+      onSaveEdit={handleChatSaveEdit}
+      onCancelEdit={handleCancelEdit}
+      onDragStart={handleChatDragStart}
+      onDragEnd={handleChatDragEnd}
+      onPrefetch={handlePrefetchChat}
+      onSaveAsSuggestion={onSaveAsSuggestion}
+      onPinChat={onPinChat}
+    />
+  );
 
   return (
     <div
@@ -440,224 +676,21 @@ export default function Sidebar({
                   Pinned
                 </h3>
                 <ul>
-                  <AnimatePresence>
-                    {pinnedGlobalChats.map((chat) => (
-                      <motion.li
-                        key={chat.id}
-                        variants={animationVariants.item}
-                        exit="exit"
-                        layout="position"
-                        className="mb-0.5"
-                      >
-                        <div
-                          className={`relative group ${draggedChatId === chat.id ? "opacity-50" : ""} ${
-                            !editingItem && onMoveChat ? "cursor-grab active:cursor-grabbing" : ""
-                          }`}
-                          draggable={!editingItem && !!onMoveChat}
-                          onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent<HTMLLIElement>, chat.id)}
-                          onDragEnd={(e) => handleDragEnd(e as unknown as React.DragEvent<HTMLLIElement>)}
-                          onMouseEnter={() => onPrefetchChat?.(chat.id)}
-                        >
-                        <EditableItem
-                          item={chat}
-                          isActive={chat.id === activeChatId}
-                          isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
-                          onSelect={() => onSelectChat(chat.id)}
-                          onStartEdit={() => handleStartEdit("chat", chat.id)}
-                          onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
-                          onCancelEdit={handleCancelEdit}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Pin className="size-4 flex-shrink-0 text-neutral-500 dark:text-zinc-500" />
-                            <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
-                          </div>
-                          <div
-                            className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
-                              group-hover:translate-x-0 transition-all duration-200 ease-in-out"
-                          >
-                            <button
-                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                e.stopPropagation();
-                                menuAnchorRef.current = e.currentTarget;
-                                setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
-                              }}
-                              className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-zinc-500"
-                            >
-                              <MoreHorizontal className="size-5" />
-                            </button>
-                            <DropdownMenu
-                              open={openMenuId === `chat-${chat.id}`}
-                              anchorRef={menuAnchorRef}
-                              onCloseAction={() => setOpenMenuId(null)}
-                              position="left"
-                              items={[
-                                {
-                                  id: "rename",
-                                  icon: <Pencil className="size-4" />,
-                                  label: "Rename",
-                                  onClick: () => handleStartEdit("chat", chat.id),
-                                },
-                                {
-                                  id: "duplicate",
-                                  icon: <Copy className="size-4" />,
-                                  label: "Duplicate",
-                                  onClick: () => onDuplicateChat(chat.id),
-                                },
-                                {
-                                  id: "settings",
-                                  icon: <Settings className="size-4" />,
-                                  label: "Settings",
-                                  onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
-                                },
-                                ...(onSaveAsSuggestion
-                                  ? [
-                                      {
-                                        id: "save-as-suggestion",
-                                        icon: <Bookmark className="size-4" />,
-                                        label: "Save as Suggestion",
-                                        onClick: () => onSaveAsSuggestion(chat.id, chat.title, chat.systemPrompt),
-                                      },
-                                    ]
-                                  : []),
-                                ...(onPinChat
-                                  ? [
-                                      {
-                                        id: "unpin",
-                                        icon: <PinOff className="size-4" />,
-                                        label: "Unpin",
-                                        onClick: () => onPinChat(chat.id),
-                                      },
-                                    ]
-                                  : []),
-                                {
-                                  id: "delete",
-                                  icon: <Trash2 className="size-4 text-red-500" />,
-                                  label: "Delete",
-                                  onClick: () => onDeleteChat(chat.id),
-                                  className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
-                                },
-                              ]}
-                            />
-                          </div>
-                        </EditableItem>
-                        </div>
-                      </motion.li>
-                  ))}
-                </AnimatePresence>
-              </ul>
-            </motion.div>
-          )}
+                  <AnimatePresence>{pinnedGlobalChats.map(renderChatRow)}</AnimatePresence>
+                </ul>
+              </motion.div>
+            )}
             {groupedGlobalChats.map((group) => (
               <motion.div key={group.label} variants={animationVariants.item} className="mb-4">
                 <h3 className="text-xs font-semibold text-neutral-500 dark:text-zinc-500 uppercase mb-2">
                   {group.label}
                 </h3>
                 <ul>
-                  <AnimatePresence>
-                    {group.chats.map((chat) => (
-                      <motion.li
-                        key={chat.id}
-                        variants={animationVariants.item}
-                        exit="exit"
-                        layout="position"
-                        className="mb-0.5"
-                      >
-                        <div
-                          className={`relative group ${draggedChatId === chat.id ? "opacity-50" : ""} ${
-                            !editingItem && onMoveChat ? "cursor-grab active:cursor-grabbing" : ""
-                          }`}
-                          draggable={!editingItem && !!onMoveChat}
-                          onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent<HTMLLIElement>, chat.id)}
-                          onDragEnd={(e) => handleDragEnd(e as unknown as React.DragEvent<HTMLLIElement>)}
-                          onMouseEnter={() => onPrefetchChat?.(chat.id)}
-                        >
-                        <EditableItem
-                          item={chat}
-                          isActive={chat.id === activeChatId}
-                          isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
-                          onSelect={() => onSelectChat(chat.id)}
-                          onStartEdit={() => handleStartEdit("chat", chat.id)}
-                          onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
-                          onCancelEdit={handleCancelEdit}
-                        >
-                          <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
-                          <div
-                            className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
-                              group-hover:translate-x-0 transition-all duration-200 ease-in-out"
-                          >
-                            <button
-                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                e.stopPropagation();
-                                menuAnchorRef.current = e.currentTarget;
-                                setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
-                              }}
-                              className="cursor-pointer p-1 rounded-full text-neutral-500 dark:text-zinc-500"
-                            >
-                              <MoreHorizontal className="size-5" />
-                            </button>
-                            <DropdownMenu
-                              open={openMenuId === `chat-${chat.id}`}
-                              anchorRef={menuAnchorRef}
-                              onCloseAction={() => setOpenMenuId(null)}
-                              position="left"
-                              items={[
-                                {
-                                  id: "rename",
-                                  icon: <Pencil className="size-4" />,
-                                  label: "Rename",
-                                  onClick: () => handleStartEdit("chat", chat.id),
-                                },
-                                {
-                                  id: "duplicate",
-                                  icon: <Copy className="size-4" />,
-                                  label: "Duplicate",
-                                  onClick: () => onDuplicateChat(chat.id),
-                                },
-                                {
-                                  id: "settings",
-                                  icon: <Settings className="size-4" />,
-                                  label: "Settings",
-                                  onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
-                                },
-                                ...(onSaveAsSuggestion
-                                  ? [
-                                      {
-                                        id: "save-as-suggestion",
-                                        icon: <Bookmark className="size-4" />,
-                                        label: "Save as Suggestion",
-                                        onClick: () => onSaveAsSuggestion(chat.id, chat.title, chat.systemPrompt),
-                                      },
-                                    ]
-                                  : []),
-                                ...(onPinChat
-                                  ? [
-                                      {
-                                        id: "pin",
-                                        icon: <Pin className="size-4" />,
-                                        label: "Pin",
-                                        onClick: () => onPinChat(chat.id),
-                                      },
-                                    ]
-                                  : []),
-                                {
-                                  id: "delete",
-                                  icon: <Trash2 className="size-4 text-red-500" />,
-                                  label: "Delete",
-                                  onClick: () => onDeleteChat(chat.id),
-                                  className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
-                                },
-                              ]}
-                            />
-                          </div>
-                        </EditableItem>
-                        </div>
-                      </motion.li>
-                  ))}
-                </AnimatePresence>
-              </ul>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+                  <AnimatePresence>{group.chats.map(renderChatRow)}</AnimatePresence>
+                </ul>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
 
         {projects.length > 0 && (
@@ -670,7 +703,6 @@ export default function Sidebar({
                     key={project.id}
                     variants={animationVariants.item}
                     exit="exit"
-                    layout="position"
                     className="mb-0.5"
                     onDragOver={(e) => handleDragOver(e, project.id)}
                     onDragLeave={handleDragLeave}
@@ -762,116 +794,16 @@ export default function Sidebar({
                         >
                           <ul>
                             <AnimatePresence>
-                              {getChatsForProject(project.id).length > 0 ? (
-                                getChatsForProject(project.id).map((chat) => (
-                                  <motion.li
-                                    key={chat.id}
-                                    variants={animationVariants.item}
-                                    exit="exit"
-                                    layout="position"
-                                    className="mb-0.5"
-                                  >
-                                    <div
-                                      className={`relative group ${draggedChatId === chat.id ? "opacity-50" : ""} ${
-                                        !editingItem && onMoveChat ? "cursor-grab active:cursor-grabbing" : ""
-                                      }`}
-                                      draggable={!editingItem && !!onMoveChat}
-                                      onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent<HTMLLIElement>, chat.id)}
-                                      onDragEnd={(e) => handleDragEnd(e as unknown as React.DragEvent<HTMLLIElement>)}
-                                      onMouseEnter={() => onPrefetchChat?.(chat.id)}
-                                    >
-                                    <EditableItem
-                                      item={chat}
-                                      isActive={chat.id === activeChatId}
-                                      isEditing={editingItem?.type === "chat" && editingItem.id === chat.id}
-                                      onSelect={() => onSelectChat(chat.id)}
-                                      onStartEdit={() => handleStartEdit("chat", chat.id)}
-                                      onSaveEdit={(newTitle) => handleSaveEdit("chat", chat.id, newTitle)}
-                                      onCancelEdit={handleCancelEdit}
-                                    >
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        {chat.pinnedAt && <Pin className="size-4 flex-shrink-0 text-neutral-500 dark:text-zinc-500" />}
-                                        <TruncatedTooltip title={chat.title}>{chat.title}</TruncatedTooltip>
-                                      </div>
-                                      <div
-                                        className="relative inline-block opacity-0 group-hover:opacity-100 translate-x-2
-                                          group-hover:translate-x-0 transition-all duration-200 ease-in-out"
-                                      >
-                                        <button
-                                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                            e.stopPropagation();
-                                            menuAnchorRef.current = e.currentTarget;
-                                            setOpenMenuId(openMenuId === `chat-${chat.id}` ? null : `chat-${chat.id}`);
-                                          }}
-                                          className="cursor-pointer p-1 rounded-full text-neutral-500
-                                            dark:text-zinc-500"
-                                        >
-                                          <MoreHorizontal className="size-5" />
-                                        </button>
-                                        <DropdownMenu
-                                          open={openMenuId === `chat-${chat.id}`}
-                                          anchorRef={menuAnchorRef}
-                                          onCloseAction={() => setOpenMenuId(null)}
-                                          position="left"
-                                          items={[
-                                            {
-                                              id: "rename",
-                                              icon: <Pencil className="size-4" />,
-                                              label: "Rename",
-                                              onClick: () => handleStartEdit("chat", chat.id),
-                                            },
-                                            {
-                                              id: "duplicate",
-                                              icon: <Copy className="size-4" />,
-                                              label: "Duplicate",
-                                              onClick: () => onDuplicateChat(chat.id),
-                                            },
-                                            {
-                                              id: "settings",
-                                              icon: <Settings className="size-4" />,
-                                              label: "Settings",
-                                              onClick: () => onOpenChatSettings(chat.id, chat.systemPrompt),
-                                            },
-                                            ...(onSaveAsSuggestion
-                                              ? [
-                                                  {
-                                                    id: "save-as-suggestion",
-                                                    icon: <Bookmark className="size-4" />,
-                                                    label: "Save as Suggestion",
-                                                    onClick: () =>
-                                                      onSaveAsSuggestion(chat.id, chat.title, chat.systemPrompt),
-                                                  },
-                                                ]
-                                              : []),
-                                            ...(onPinChat
-                                              ? [
-                                                  {
-                                                    id: "pin",
-                                                    icon: <Pin className="size-4" />,
-                                                    label: chat.pinnedAt ? "Unpin" : "Pin",
-                                                    onClick: () => onPinChat(chat.id),
-                                                  },
-                                                ]
-                                              : []),
-                                            {
-                                              id: "delete",
-                                              icon: <Trash2 className="size-4 text-red-500" />,
-                                              label: "Delete",
-                                              onClick: () => onDeleteChat(chat.id),
-                                              className: "text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10",
-                                            },
-                                          ]}
-                                        />
-                                      </div>
-                                    </EditableItem>
-                                    </div>
-                                  </motion.li>
-                                ))
-                              ) : (
-                                <li className="text-neutral-500 dark:text-zinc-500 text-sm py-2 ps-2">
-                                  No chats in this project.
-                                </li>
-                              )}
+                              {(() => {
+                                const projectChats = chatsByProjectId.get(project.id) ?? [];
+                                return projectChats.length > 0 ? (
+                                  projectChats.map(renderChatRow)
+                                ) : (
+                                  <li className="text-neutral-500 dark:text-zinc-500 text-sm py-2 ps-2">
+                                    No chats in this project.
+                                  </li>
+                                );
+                              })()}
                             </AnimatePresence>
                           </ul>
                         </motion.div>
@@ -887,3 +819,5 @@ export default function Sidebar({
     </div>
   );
 }
+
+export default memo(Sidebar);

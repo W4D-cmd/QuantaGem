@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_pinned_at ON chat_sessions (pinned_at DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_pinned_updated ON chat_sessions (user_id, pinned_at DESC NULLS LAST, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS messages (
   id BIGSERIAL PRIMARY KEY,

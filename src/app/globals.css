@@ -101,38 +101,35 @@ html.dark .max-h-96.overflow-y-auto {
     --ci-glow 300ms ease-in-out,
     --ci-glow-ring 300ms ease-in-out,
     --ci-glow-halo 300ms ease-in-out,
-    border-color 300ms ease-in-out,
-    border-width 300ms ease-in-out;
+    border-color 300ms ease-in-out;
 }
 
 .ci-glow:focus-within {
-  --ci-glow-ring: 0.3;
+  --ci-glow-ring: 1;
   --ci-glow-halo: 0.5;
   animation: ci-glow-breathe 3s ease-in-out infinite;
 }
 
 .ci-glow.ci-glow-refine {
   --ci-glow: 13 148 136;
-  --ci-glow-ring: 0.4;
+  --ci-glow-ring: 1;
   --ci-glow-halo: 0.65;
   animation: ci-glow-pulse 1.8s ease-in-out infinite;
 }
 
 .ci-glow.ci-glow-generate {
   --ci-glow: 99 102 241;
-  --ci-glow-ring: 0.4;
+  --ci-glow-ring: 1;
   --ci-glow-halo: 0.65;
   animation: ci-glow-pulse 1.8s ease-in-out infinite;
 }
 
 html.dark .ci-glow:focus-within {
-  --ci-glow-ring: 0.4;
   --ci-glow-halo: 0.68;
 }
 
 html.dark .ci-glow.ci-glow-refine,
 html.dark .ci-glow.ci-glow-generate {
-  --ci-glow-ring: 0.5;
   --ci-glow-halo: 0.8;
 }
 
@@ -178,7 +175,7 @@ html.dark .ci-glow.ci-glow-generate {
     box-shadow:
       0 10px 15px -3px rgb(0 0 0 / 0.08),
       0 4px 6px -4px rgb(0 0 0 / 0.08),
-      0 0 0 1px rgb(var(--ci-glow) / calc(var(--ci-glow-ring) + 0.06)),
+      0 0 0 1px rgb(var(--ci-glow) / var(--ci-glow-ring)),
       0 0 18px -2px rgb(var(--ci-glow) / calc(var(--ci-glow-halo) + 0.1));
   }
 }
@@ -189,14 +186,14 @@ html.dark .ci-glow.ci-glow-generate {
     box-shadow:
       0 10px 15px -3px rgb(0 0 0 / 0.08),
       0 4px 6px -4px rgb(0 0 0 / 0.08),
-      0 0 0 1px rgb(var(--ci-glow) / calc(var(--ci-glow-ring) - 0.08)),
+      0 0 0 1px rgb(var(--ci-glow) / var(--ci-glow-ring)),
       0 0 18px -2px rgb(var(--ci-glow) / calc(var(--ci-glow-halo) - 0.12));
   }
   50% {
     box-shadow:
       0 10px 15px -3px rgb(0 0 0 / 0.08),
       0 4px 6px -4px rgb(0 0 0 / 0.08),
-      0 0 0 1px rgb(var(--ci-glow) / calc(var(--ci-glow-ring) + 0.1)),
+      0 0 0 1px rgb(var(--ci-glow) / var(--ci-glow-ring)),
       0 0 18px -2px rgb(var(--ci-glow) / calc(var(--ci-glow-halo) + 0.15));
   }
 }

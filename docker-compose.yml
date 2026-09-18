@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
+    image: postgres:18-alpine@sha256:6c538e7206ea40ff740ef27883529390a690b6ead6ba96b44c67a9f7c638e8fd
     restart: unless-stopped
     env_file:
       - .env
@@ -17,7 +17,7 @@ services:
       retries: 5
 
   seaweedfs:
-    image: chrislusf/seaweedfs:4.46
+    image: chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
     restart: unless-stopped
     command: ["mini", "-webdav=false", "-master.telemetry=false"]
     environment:
@@ -61,7 +61,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
 
   migrate-storage:
-    image: rclone/rclone:1.75.1
+    image: rclone/rclone:1.75.1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5
     profiles: ["migrate"]
     depends_on:
       minio:
@@ -94,7 +94,7 @@ services:
       - app-network
 
   configure-storage:
-    image: amazon/aws-cli:2.36.44
+    image: amazon/aws-cli:2.36.48@sha256:45056897f7c47a84e3ef5a4f9095f748bd9f5a24c5d54e7d5cfc3d4da52c9331
     profiles: ["migrate"]
     depends_on:
       seaweedfs:
@@ -142,7 +142,7 @@ services:
       start_period: 300s
 
   redis:
-    image: redis:8-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
+    image: redis:8-alpine@sha256:bd999b5cfee25fb24b8320a31fddbd69f462df44c8138c66e369582937beebc0
     restart: unless-stopped
     networks:
       - app-network

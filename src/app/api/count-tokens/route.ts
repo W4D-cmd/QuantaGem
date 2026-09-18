@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Content, GoogleGenAI, Part } from "@google/genai";
-import Anthropic from "@anthropic-ai/sdk";
 import { getEncoding } from "js-tiktoken";
 import { pool } from "@/lib/db";
 import { MessagePart } from "@/app/page";
 import { storageClient, S3_BUCKET_NAME } from "@/lib/storage";
-import { getProviderForModel, isCustomModel } from "@/lib/custom-models";
+import { getProviderForModel } from "@/lib/custom-models";
 
 interface CountTokensRequest {
   history: Array<{ role: string; parts: MessagePart[] }>;
@@ -454,141 +453,6 @@ async function countTokensForOpenAI(
   return totalTokens;
 }
 
-const SUPPORTED_ANTHROPIC_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-
-type AnthropicCountContentBlock =
-  | { type: "text"; text: string }
-  | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
-  | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } };
-
-type AnthropicCountMessage = {
-  role: "user" | "assistant";
-  content: string | AnthropicCountContentBlock[];
-};
-
-async function countTokensForAnthropic(
-  history: Array<{ role: string; parts: MessagePart[] }>,
-  model: string,
-  systemPromptText: string | null,
-): Promise<number> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
-  }
-
-  const anthropic = new Anthropic({ apiKey });
-
-  const messages: AnthropicCountMessage[] = [];
-
-  if (systemPromptText && systemPromptText.trim() !== "") {
-    // System prompt is counted separately via the system parameter
-  }
-
-  if (history) {
-    for (const msg of history) {
-      const contentBlocks: AnthropicCountContentBlock[] = [];
-
-      for (const appPart of msg.parts) {
-        if (appPart.type === "text" && appPart.text) {
-          contentBlocks.push({ type: "text", text: appPart.text });
-        } else if (appPart.type === "file" && appPart.objectName && appPart.mimeType) {
-          if (msg.role !== "user") continue;
-
-          const mimeType = appPart.mimeType.toLowerCase();
-
-          if (SUPPORTED_ANTHROPIC_IMAGE_TYPES.includes(mimeType)) {
-            try {
-              const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
-              const chunks: Buffer[] = [];
-              for await (const chunk of fileStream) {
-                chunks.push(chunk as Buffer);
-              }
-              const fileBuffer = Buffer.concat(chunks);
-              contentBlocks.push({
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: mimeType,
-                  data: fileBuffer.toString("base64"),
-                },
-              });
-            } catch (fileError) {
-              console.error(`Could not retrieve file ${appPart.objectName} for token count:`, fileError);
-            }
-          } else if (mimeType === "application/pdf") {
-            try {
-              const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
-              const chunks: Buffer[] = [];
-              for await (const chunk of fileStream) {
-                chunks.push(chunk as Buffer);
-              }
-              const fileBuffer = Buffer.concat(chunks);
-              contentBlocks.push({
-                type: "document",
-                source: {
-                  type: "base64",
-                  media_type: "application/pdf",
-                  data: fileBuffer.toString("base64"),
-                },
-              });
-            } catch (fileError) {
-              console.error(`Could not retrieve file ${appPart.objectName} for token count:`, fileError);
-            }
-          } else if (isTextBasedFile(mimeType, appPart.fileName)) {
-            try {
-              const fileStream = await storageClient.getObject(S3_BUCKET_NAME, appPart.objectName);
-              const chunks: Buffer[] = [];
-              for await (const chunk of fileStream) {
-                chunks.push(chunk as Buffer);
-              }
-              const fileBuffer = Buffer.concat(chunks);
-              const textContent = fileBuffer.toString("utf-8");
-              const fileHeader = appPart.fileName ? `--- File: ${appPart.fileName} ---\n` : "";
-              contentBlocks.push({ type: "text", text: fileHeader + textContent });
-            } catch (fileError) {
-              console.error(`Could not retrieve file ${appPart.objectName} for token count:`, fileError);
-            }
-          }
-        }
-      }
-
-      if (contentBlocks.length > 0) {
-        const role = msg.role === "model" ? "assistant" : "user";
-        if (role === "assistant") {
-          const textContent = contentBlocks
-            .filter((b): b is { type: "text"; text: string } => b.type === "text")
-            .map((b) => b.text)
-            .join("\n");
-          if (textContent) {
-            messages.push({ role: "assistant", content: textContent });
-          }
-        } else {
-          messages.push({ role: "user", content: contentBlocks });
-        }
-      }
-    }
-  }
-
-  // If no messages, add a minimal one for counting
-  if (messages.length === 0) {
-    messages.push({ role: "user", content: "" });
-  }
-
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const countParams: any = {
-    model,
-    messages,
-  };
-  /* eslint-enable @typescript-eslint/no-explicit-any */
-
-  if (systemPromptText && systemPromptText.trim() !== "") {
-    countParams.system = systemPromptText;
-  }
-
-  const result = await anthropic.messages.countTokens(countParams);
-  return result.input_tokens;
-}
-
 export async function POST(request: NextRequest) {
   const userIdHeader = request.headers.get("x-user-id");
   if (!userIdHeader) {
@@ -610,12 +474,17 @@ export async function POST(request: NextRequest) {
       systemPromptText = await fetchSystemPrompt(chatSessionId, projectId, userId);
     }
 
+    if (/^(gpt-|o1-|o3-|chatgpt-|claude-)/.test(model)) {
+      return NextResponse.json(
+        { error: "This model provider (direct OpenAI/Anthropic) is no longer supported. Please select a Gemini or Custom provider model." },
+        { status: 400 },
+      );
+    }
+
     let totalTokens: number;
 
-    if (provider === "anthropic") {
-      totalTokens = await countTokensForAnthropic(history ?? [], model, systemPromptText);
-    } else if (provider === "openai" || provider === "custom-openai" || provider === "custom-anthropic") {
-      // Use tiktoken for both OpenAI and custom OpenAI-compatible providers
+    if (provider === "custom-openai" || provider === "custom-anthropic") {
+      // Use tiktoken for both custom OpenAI-compatible and custom Anthropic-compatible providers
       totalTokens = await countTokensForOpenAI(history ?? [], systemPromptText);
     } else {
       totalTokens = await countTokensForGemini(history ?? [], model, systemPromptText);

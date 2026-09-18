@@ -87,14 +87,14 @@ Request body for the main chat endpoint.
 - `history` - Array of previous messages with roles ("user" or "model")
 - `messageParts` - Parts of the new message to send
 - `chatSessionId` - ID of the chat session (optional for new chats)
-- `model` - Model identifier from `/api/models/list` (e.g., "gemini-2.5-pro", "gpt-5.2-2025-12-11", "claude-opus-4-6")
+- `model` - Model identifier from `/api/models/list` (e.g., "gemini-2.5-pro", "custom-openai:llama-3.2-3b")
 - `isSearchActive` - Enable Google Search integration (default: false)
 - `thinkingBudget` - Reasoning budget for supported models.
     - **Gemini 2.5 Pro**: 2048 to 32768 tokens (0 is not allowed).
     - **Gemini 2.5 Flash**: 0 (off) or 2048 to 24576 tokens.
     - **Gemini 3.1 Pro/Flash**: Currently uses defaults (budget control coming soon).
-    - **OpenAI**: Mapped levels: `0` (none), `1` (low), `2` (medium), `3` (high), `4` (xhigh).
-    - **Anthropic**: Mapped levels: `1` (low), `2` (medium), `3` (high).
+    - **Custom OpenAI-compatible**: Mapped levels: `0` (none), `1` (low), `2` (medium), `3` (high), `4` (xhigh) — only for manual models with reasoning enabled.
+    - **Custom Anthropic-compatible**: Mapped levels: `1` (low), `2` (medium), `3` (high), `4` (xhigh) — only for manual models with reasoning enabled.
 - `isRegeneration` - Flag to indicate if the message is a regeneration (default: false)
 - `systemPrompt` - Override system prompt for this request
 - `projectId` - Associate with a specific project
@@ -272,8 +272,8 @@ curl -X POST https://your-domain.com/api/chat \
 **Supported File Types by Model:**
 
 **Gemini:** PDF, PNG, JPEG, WEBP, HEIC, HEIF, text files, source code (mapped to `text/plain`), HTML, CSS, JS, Markdown, CSV, XML, RTF
-**OpenAI:** PNG, JPEG, WEBP, GIF, PDF (sent via `input_file` for GPT-5 family), text files, source code, JSON
-**Anthropic:** JPEG, PNG, GIF, WEBP, PDF, text files, source code, JSON
+**Custom OpenAI-compatible endpoints:** PNG, JPEG, WEBP, GIF (as base64 image parts), text files
+**Custom Anthropic-compatible endpoints:** JPEG, PNG, GIF, WEBP, PDF (as base64 blocks), text files
 
 ---
 
@@ -942,7 +942,7 @@ Get available AI models from Google Gemini.
 
 ### List Custom Models
 
-Get configured custom models (hardcoded Gemini, OpenAI, Anthropic entries).
+Get configured built-in models (hardcoded Gemini entries).
 
 **Endpoint:** `GET /api/models/list`
 
@@ -970,7 +970,7 @@ Get configured custom models (hardcoded Gemini, OpenAI, Anthropic entries).
 **Fields:**
 - `modelId` - Model identifier used in chat requests (prefixed with `custom:` for custom models)
 - `displayName` - Human-readable model name
-- `provider` - Provider type: `"gemini"`, `"openai"`, `"anthropic"`, or `"custom-openai"`
+- `provider` - Provider type: `"gemini"`, `"custom-openai"`, or `"custom-anthropic"`
 - `inputTokenLimit` - Maximum input tokens supported
 - `outputTokenLimit` - Maximum output tokens supported
 - `supportsReasoning` - Whether the model supports a reasoning budget (Optional)
@@ -1180,7 +1180,7 @@ Update user settings including custom provider configuration.
 
 ### Count Tokens
 
-Count tokens for a chat request (supports Gemini, OpenAI, Anthropic).
+Count tokens for a chat request (supports Gemini and custom endpoints).
 
 **Endpoint:** `POST /api/count-tokens`
 
@@ -1234,7 +1234,7 @@ Generate a system prompt from user input using AI (streaming response).
 {"type": "text", "value": "<chat_system_prompt>..."}
 ```
 
-Supports all providers: Gemini, OpenAI, Anthropic, and custom-openai.
+Supports Gemini, custom-openai, and custom-anthropic providers.
 
 ---
 
@@ -1261,7 +1261,7 @@ Refine a user prompt for clarity and precision (streaming response).
 {"type": "text", "value": "Refined prompt content..."}
 ```
 
-Supports Gemini and OpenAI providers. Other providers will fall back to Gemini.
+Supports Gemini and custom endpoint providers (custom-openai, custom-anthropic).
 
 ---
 
@@ -1448,24 +1448,6 @@ audio_file: <binary audio data>
 
 **Response (200 OK):**
 Plain text transcription.
-
----
-
-### Generate Live Streaming Token
-
-Generate an ephemeral token for live streaming features.
-
-**Endpoint:** `POST /api/live/token`
-
-**Authentication Required:** Yes (`x-user-id` header)
-
-**Response (200 OK):**
-
-```json
-{
-  "token": "ephemeral_token_here"
-}
-```
 
 ---
 

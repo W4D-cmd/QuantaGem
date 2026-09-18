@@ -4,7 +4,7 @@ Guide for AI agents working in the QuantaGem codebase.
 
 ## Project Overview
 
-QuantaGem is a production-grade WebUI for Google's Gemini AI, built with a full-stack architecture using Next.js 16, PostgreSQL, SeaweedFS (S3-compatible storage), and Redis. It supports multiple AI providers (Google Vertex AI, OpenAI, Anthropic) and includes speech-to-text capabilities.
+QuantaGem is a production-grade WebUI for Google's Gemini AI, built with a full-stack architecture using Next.js 16, PostgreSQL, SeaweedFS (S3-compatible storage), and Redis. It supports Google Vertex AI plus user-configured custom endpoints (OpenAI-compatible and Anthropic-compatible) and includes speech-to-text capabilities.
 
 ## Essential Commands
 
@@ -73,11 +73,10 @@ QuantaGem/
 │   │   ├── thinking.ts         # Thinking budget/verbosity
 │   │   └── webr/               # WebR R execution
 │   ├── hooks/                  # React hooks
-│   │   ├── useLiveSession.ts   # Real-time streaming
 │   │   └── useWebR.ts          # R code execution
 │   └── types/                  # TypeScript declarations
-├── stt-service/                # whisper.cpp STT microservice
-│   ├── entrypoint.sh          # Model download + whisper-server startup
+├── stt-service/                # ONNX ASR (onnx-asr) STT microservice
+│   ├── main.py
 │   └── Dockerfile
 ├── public/                     # Static assets
 │   └── fonts/                  # JetBrains Mono, Roboto
@@ -100,8 +99,8 @@ QuantaGem/
 - **Cache/Rate Limiting**: Redis 8
 - **AI SDKs**:
   - `@google/genai` - Google Vertex AI
-  - `openai` - OpenAI API
-  - `@anthropic-ai/sdk` - Anthropic API
+  - `openai` - Custom OpenAI-compatible endpoints
+  - `@anthropic-ai/sdk` - Custom Anthropic-compatible endpoints
 - **Auth**: JWT with `jose`, bcryptjs for passwords
 - **Markdown**: `react-markdown`, `rehype-katex`, `remark-math`
 
@@ -163,9 +162,9 @@ Use the standard Conventional Commits specification:
 The `getProviderForModel()` function in `src/lib/custom-models.ts` routes requests:
 
 - Models starting with `gemini-` -> Vertex AI
-- Models starting with `gpt-`, `o1-`, `o3-`, `chatgpt-` -> OpenAI
-- Models starting with `claude-` -> Anthropic
-- Models prefixed with `custom:` -> Custom OpenAI-compatible endpoint
+- Models prefixed with `custom-openai:` (or legacy `custom:`) -> Custom OpenAI-compatible endpoint
+- Models prefixed with `custom-anthropic:` -> Custom Anthropic-compatible endpoint
+- Legacy `gpt-*`, `o1-*`, `o3-*`, `chatgpt-*`, `claude-*` model IDs (direct OpenAI/Anthropic, removed) are rejected with an error
 
 ### Streaming Response Format
 
@@ -182,22 +181,21 @@ All chat endpoints return JSONL with these event types:
 ### Supported File Types by Provider
 
 - **Gemini**: PDF, PNG, JPEG, WEBP, HEIC, HEIF, text files, source code
-- **OpenAI**: PNG, JPEG, WEBP, GIF, PDF (via base64), text files
-- **Anthropic**: JPEG, PNG, GIF, WEBP, PDF, text files
+- **Custom OpenAI-compatible endpoints**: PNG, JPEG, WEBP, GIF (as base64 image parts), text files
+- **Custom Anthropic-compatible endpoints**: JPEG, PNG, GIF, WEBP, PDF (as base64 blocks), text files
 
 ## Microservices
 
 ### STT Service (`stt-service/`)
 
-- FastAPI Python server running Voxtral-Mini-4B ONNX models
-- Model: `onnx-community/Voxtral-Mini-4B-Realtime-2602-ONNX` (q4 variant, CPU-only inference via `onnxruntime`)
-- Model downloaded from Hugging Face on first start, persisted via Docker volume
+- FastAPI Python server (uvicorn) listening on port `50800`
+- Model loaded via `onnx-asr` with CPU inference through `onnxruntime`, started in a background thread on startup (returns 503 until ready)
+- Model selected by the `MODEL_NAME` environment variable (default `nemo-parakeet-tdt-0.6b-v3`), downloaded from Hugging Face on first start and persisted via the `stt_models` Docker volume (`HF_HOME`)
 - Endpoints:
-  - `POST /inference` (multipart audio, field name `file` or raw POST body)
-  - `POST /stream` (chunked HTTP stream for real-time audio input and SSE text output)
-  - `GET /health`
-- Configurable via `VARIANT` and `STT_THREADS` environment variables
-- Uses ffmpeg (subprocess) for audio conversion (webm, mp3, etc.) when needed
+  - `POST /transcribe` (multipart audio field `audio_file`, returns plain-text transcription)
+  - `GET /ping` (healthcheck, responds once the model is loaded)
+- Configurable via `MODEL_NAME` and `STT_THREADS` environment variables (`STT_THREADS` default: auto-detect)
+- Uses ffmpeg (subprocess) to convert uploaded audio to 16 kHz mono WAV (mp3, webm, m4a, ogg, flac, etc.)
 
 ## Authentication Flow
 
@@ -214,8 +212,6 @@ Required for production:
 GOOGLE_CLOUD_PROJECT="your-project-id"
 GOOGLE_CLOUD_LOCATION="global"
 GOOGLE_GENAI_USE_VERTEXAI="True"
-OPENAI_API_KEY="your-key"              # Optional
-ANTHROPIC_API_KEY="your-key"           # Optional
 JWT_SECRET="32-char-random-string"
 DATABASE_URL="postgresql://..."        # Auto-set in Docker
 POSTGRES_USER=quantagemuser

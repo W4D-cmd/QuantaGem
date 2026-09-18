@@ -45,8 +45,6 @@ import {
   getThinkingConfigForModel,
   isOpenAIReasoningModel,
   isAnthropicReasoningModel,
-  getAnthropicReasoningConfig,
-  getOpenAIReasoningConfig,
   modelUsesGeminiThinkingLevel,
   getGeminiSupportedLevels,
 } from "@/lib/thinking";
@@ -485,30 +483,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       let options: ThinkingOption[];
 
       if (isOpenAIReasoningModel(modelName, manualCustomModels)) {
-        if (modelName?.startsWith("custom-openai:")) {
-          options = ["dynamic", "off", "low", "medium", "high", "xhigh"];
-        } else {
-          const openaiConfig = getOpenAIReasoningConfig(modelName);
-          const efforts = openaiConfig?.supportedEfforts ?? [];
-          options = ["dynamic"];
-          if (efforts.includes("none")) options.push("off");
-          if (efforts.includes("low")) options.push("low");
-          if (efforts.includes("medium")) options.push("medium");
-          if (efforts.includes("high")) options.push("high");
-          if (efforts.includes("xhigh")) options.push("xhigh");
-        }
+        options = ["dynamic", "off", "low", "medium", "high", "xhigh"];
       } else if (isAnthropicReasoningModel(modelName, manualCustomModels)) {
-        if (modelName?.startsWith("custom-anthropic:")) {
-          options = ["dynamic", "low", "medium", "high", "xhigh"];
-        } else {
-          const anthropicConfig = getAnthropicReasoningConfig(modelName);
-          const efforts = anthropicConfig?.supportedEfforts ?? [];
-          options = ["dynamic"];
-          if (efforts.includes("low")) options.push("low");
-          if (efforts.includes("medium")) options.push("medium");
-          if (efforts.includes("high")) options.push("high");
-          if (efforts.includes("xhigh")) options.push("xhigh");
-        }
+        options = ["dynamic", "low", "medium", "high", "xhigh"];
       } else if (modelUsesGeminiThinkingLevel(modelName, manualCustomModels)) {
         const supportedLevels = getGeminiSupportedLevels(modelName, manualCustomModels);
         options = ["dynamic", ...supportedLevels];

@@ -25,8 +25,6 @@ interface ModelWithProvider extends Model {
 
 interface GroupedModels {
   gemini: ModelWithProvider[];
-  openai: ModelWithProvider[];
-  anthropic: ModelWithProvider[];
   custom: ModelWithProvider[];
 }
 
@@ -60,8 +58,6 @@ export default function ModelSelector({
   const groupedModels = useMemo((): GroupedModels => {
     const result: GroupedModels = {
       gemini: [],
-      openai: [],
-      anthropic: [],
       custom: [],
     };
 
@@ -73,8 +69,6 @@ export default function ModelSelector({
     const modelsWithProvider = models as ModelWithProvider[];
 
     result.gemini = modelsWithProvider.filter((m) => m.provider === "gemini");
-    result.openai = modelsWithProvider.filter((m) => m.provider === "openai");
-    result.anthropic = modelsWithProvider.filter((m) => m.provider === "anthropic");
 
     // Process custom models from the custom provider
     if (customModelsList.length > 0) {
@@ -149,8 +143,6 @@ export default function ModelSelector({
 
   const getProviderLabel = (): string => {
     if (selectedProvider === "custom-openai" || selectedProvider === "custom-anthropic") return "Custom";
-    if (selectedProvider === "openai") return "OpenAI";
-    if (selectedProvider === "anthropic") return "Anthropic";
     return "Google";
   };
 
@@ -158,20 +150,12 @@ export default function ModelSelector({
     if (selectedProvider === "custom-openai" || selectedProvider === "custom-anthropic") {
       return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
     }
-    if (selectedProvider === "openai") {
-      return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
-    }
-    if (selectedProvider === "anthropic") {
-      return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
-    }
     return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
   };
 
   // Check if there are any models available
   const hasModels =
     groupedModels.gemini.length > 0 ||
-    groupedModels.openai.length > 0 ||
-    groupedModels.anthropic.length > 0 ||
     groupedModels.custom.length > 0;
 
   return (
@@ -230,24 +214,6 @@ export default function ModelSelector({
                     Google Gemini
                   </div>
                   {groupedModels.gemini.map(renderModelButton)}
-                </>
-              )}
-              {groupedModels.openai.length > 0 && (
-                <>
-                  <div className="px-4 py-1.5 mt-2 text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500" />
-                    OpenAI
-                  </div>
-                  {groupedModels.openai.map(renderModelButton)}
-                </>
-              )}
-              {groupedModels.anthropic.length > 0 && (
-                <>
-                  <div className="px-4 py-1.5 mt-2 text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    Anthropic
-                  </div>
-                  {groupedModels.anthropic.map(renderModelButton)}
                 </>
               )}
               {/* Custom Provider Section - Always show loading state or models */}

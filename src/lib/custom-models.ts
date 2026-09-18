@@ -1,4 +1,4 @@
-export type ModelProvider = "gemini" | "openai" | "anthropic" | "custom-openai" | "custom-anthropic";
+export type ModelProvider = "gemini" | "custom-openai" | "custom-anthropic";
 
 // Prefix used to identify custom provider models
 export const CUSTOM_PROVIDER_PREFIX = "custom:";
@@ -100,8 +100,6 @@ export function getProviderForModel(modelId: string): ModelProvider | undefined 
   if (model?.provider) return model.provider;
 
   if (cleanModelId.startsWith("gemini-") || cleanModelId.startsWith("gemini")) return "gemini";
-  if (cleanModelId.startsWith("gpt-") || cleanModelId.startsWith("o1-") || cleanModelId.startsWith("o3-") || cleanModelId.startsWith("chatgpt-")) return "openai";
-  if (cleanModelId.startsWith("claude-")) return "anthropic";
 
   return undefined;
 }
@@ -349,26 +347,5 @@ export const customModels: CustomModelEntry[] = [
     pricePer1MOutputTokens: 10.00,
     inputTokenThreshold: 200000,
     secondaryPricePer1MInputTokens: 2.50,
-  },
-  {
-    displayName: "GPT-5.4",
-    modelId: "gpt-5.4-2026-03-05",
-    inputTokenLimit: 400000,
-    outputTokenLimit: 128000,
-    provider: "openai",
-    supportsReasoning: true,
-    supportsVerbosity: true,
-    pricePer1MInputTokens: 2.50,
-    pricePer1MOutputTokens: 15.00,
-  },
-  {
-    displayName: "Claude Opus 4.8",
-    modelId: "claude-opus-4-8",
-    inputTokenLimit: 1000000,
-    outputTokenLimit: 128000,
-    provider: "anthropic",
-    supportsReasoning: true,
-    pricePer1MInputTokens: 5.00,
-    pricePer1MOutputTokens: 25.00,
   },
 ];

@@ -121,60 +121,6 @@ async function handleGeminiRefine(model: string, userPrompt: string): Promise<Re
   });
 }
 
-async function handleOpenAIRefine(model: string, userPrompt: string): Promise<Response> {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json({ error: "OPENAI_API_KEY is not configured." }, { status: 500 });
-  }
-
-  const openai = new OpenAI({ apiKey });
-
-  const stream = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: "system", content: REFINE_SYSTEM_PROMPT },
-      { role: "user", content: userPrompt },
-    ],
-    stream: true,
-  });
-
-  const encoder = new TextEncoder();
-  const readableStream = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const chunk of stream) {
-          const delta = chunk.choices[0]?.delta;
-          if (delta?.content) {
-            const jsonChunk = { type: "text", value: delta.content };
-            controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
-          }
-        }
-      } catch (streamError) {
-        console.error("Error during OpenAI stream processing:", streamError);
-        const errorMessage = {
-          type: "error",
-          value: "An error occurred during refinement. Please try again.",
-        };
-        controller.enqueue(encoder.encode(JSON.stringify(errorMessage) + "\n"));
-      } finally {
-        controller.close();
-      }
-    },
-    cancel() {
-      console.log("OpenAI refinement stream cancelled");
-    },
-  });
-
-  return new Response(readableStream, {
-    headers: {
-      "Content-Type": "application/jsonl; charset=utf-8",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
-}
-
 async function resolveCustomAnthropicMaxTokens(userId: number, model: string): Promise<number> {
   try {
     const result = await pool.query(
@@ -189,58 +135,6 @@ async function resolveCustomAnthropicMaxTokens(userId: number, model: string): P
     console.error("Failed to resolve custom Anthropic max tokens:", error);
   }
   return 8192;
-}
-
-async function handleAnthropicRefine(model: string, userPrompt: string): Promise<Response> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured." }, { status: 500 });
-  }
-
-  const anthropic = new Anthropic({ apiKey });
-
-  const stream = anthropic.messages.stream({
-    model,
-    max_tokens: 8192,
-    messages: [{ role: "user", content: userPrompt }],
-    system: REFINE_SYSTEM_PROMPT,
-  });
-
-  const encoder = new TextEncoder();
-  const readableStream = new ReadableStream({
-    async start(controller) {
-      try {
-        stream.on("text", (text) => {
-          const jsonChunk = { type: "text", value: text };
-          controller.enqueue(encoder.encode(JSON.stringify(jsonChunk) + "\n"));
-        });
-
-        await stream.finalMessage();
-      } catch (streamError) {
-        console.error("Error during Anthropic refinement stream processing:", streamError);
-        const errorMessage = {
-          type: "error",
-          value: "An error occurred during refinement. Please try again.",
-        };
-        controller.enqueue(encoder.encode(JSON.stringify(errorMessage) + "\n"));
-      } finally {
-        controller.close();
-      }
-    },
-    cancel() {
-      stream.abort();
-      console.log("Anthropic refinement stream cancelled");
-    },
-  });
-
-  return new Response(readableStream, {
-    headers: {
-      "Content-Type": "application/jsonl; charset=utf-8",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
 }
 
 async function handleCustomOpenAIRefine(
@@ -404,12 +298,15 @@ export async function POST(request: NextRequest) {
 
   const provider: ModelProvider = getProviderForModel(model) ?? "gemini";
 
+  if (/^(gpt-|o1-|o3-|chatgpt-|claude-)/.test(model)) {
+    return NextResponse.json(
+      { error: "This model provider (direct OpenAI/Anthropic) is no longer supported. Please select a Gemini or Custom provider model." },
+      { status: 400 },
+    );
+  }
+
   try {
-    if (provider === "openai") {
-      return await handleOpenAIRefine(model, prompt);
-    } else if (provider === "anthropic") {
-      return await handleAnthropicRefine(model, prompt);
-    } else if (provider === "custom-openai") {
+    if (provider === "custom-openai") {
       return await handleCustomOpenAIRefine(model, prompt, userId);
     } else if (provider === "custom-anthropic") {
       return await handleCustomAnthropicRefine(model, prompt, userId);

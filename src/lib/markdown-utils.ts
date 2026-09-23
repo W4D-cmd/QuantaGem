@@ -10,8 +10,12 @@
  * Processing phases:
  * 1. Protect fenced code blocks (```...```) with placeholders.
  * 1b. Normalize single-line display math ($$...$$ alone on a line) to the multiline fence
- *     form remark-math parses as flow (display) math, so \tag{...} renders; skipped for
- *     empty bodies, nested $$, trailing backslashes, bare unescaped $, and 4+ space indents.
+ *     form remark-math parses as flow (display) math, so \tag{...} renders; skipped for ANY
+ *     leading indentation (the line must start at column 0), empty bodies, nested $$,
+ *     trailing backslashes, and bare unescaped $. List-item continuation fences are indented
+ *     2–3 spaces; converting them produces a column-0 body line that micromark's math flow
+ *     rejects as a lazy line, aborting the flow and letting orphan $$ fences swallow the
+ *     remainder of the document.
  * 2. Protect block math ($$...$$) with placeholders — line-anchored: complete $$ fence
  *     blocks verbatim; same-line $$...$$ pairs (display-only commands \tag/\label stripped,
  *     since they render in inline context); an unclosed fence or unpaired same-line $$ is
@@ -25,7 +29,11 @@
  *    e. Escape pure currency pairs ($100$, $10 and $20, etc.).
  *    f. Escape prose-like pairs ("$shirt and those $pants") by escaping both delimiters.
  *    Every emission strips display-only commands (\tag, \label), which KaTeX rejects
- *    outside display mode. hasMathIndicators (4d) is deliberately left as-is: dropping
+ *    outside display mode; pairs whose content is ONLY tag/label commands unwrap to literal
+ *    reference text (\tag{N} → (N), \label{X} → removed) instead of emitting a bare $$ artifact,
+ *    and \eqref{X} is rewritten to \text{(X)} at inline emissions (KaTeX 0.16 has no \eqref;
+ *    verbatim $$ display blocks keep it — documented limitation).
+ *    hasMathIndicators (4d) is deliberately left as-is: dropping
  *    - * / from the indicator set was evaluated and rejected because it regresses
  *    $x - y$-style math; the prose guard covers the damaging multi-word cases at
  *    higher precision.
@@ -33,7 +41,8 @@
  *     the whitespace before the $.
  * 6. Restore all placeholders.
  *
- * Known limitation: display math inside blockquotes ("> $$x$$") stays inline.
+ * Known limitation: display math inside blockquotes ("> $$x$$") or list-item
+ * continuations (indented $$...$$) stays inline.
  */
 export function preprocessMarkdown(text: string): string {
   if (!text) return text;
@@ -49,6 +58,14 @@ export function preprocessMarkdown(text: string): string {
 
   function stripDisplayOnlyCommands(content: string): string {
     return content.replace(/[ \t]*\\(?:tag|label)\{[^{}]*\}/g, "");
+  }
+
+  function tagReferenceText(content: string): string {
+    return content.replace(/\\tag\{([^{}]*)\}/g, "($1)").replace(/[ \t]*\\label\{[^{}]*\}/g, "").trim();
+  }
+
+  function rewriteEqref(content: string): string {
+    return content.replace(/\\eqref\{([^{}]*)\}/g, "\\text{($1)}");
   }
 
   function findDoubleDollar(line: string, from: number): number {
@@ -71,8 +88,13 @@ export function preprocessMarkdown(text: string): string {
         cursor = line.length;
         break;
       }
-      const body = stripDisplayOnlyCommands(line.slice(open + 2, close));
-      result += line.slice(cursor, open) + addPlaceholder(`$$${body}$$`);
+      const rawBody = line.slice(open + 2, close);
+      const stripped = stripDisplayOnlyCommands(rawBody);
+      if (stripped.trim() === "" && /\\(?:tag|label)\{/.test(rawBody)) {
+        result += line.slice(cursor, open) + tagReferenceText(rawBody);
+      } else {
+        result += line.slice(cursor, open) + addPlaceholder(`$$${rewriteEqref(stripped)}$$`);
+      }
       cursor = close + 2;
     }
     return result + line.slice(cursor);
@@ -94,7 +116,7 @@ export function preprocessMarkdown(text: string): string {
       if (body.length === 0 || body.includes("$$") || body.endsWith("\\") || /(?<!\\)\$/.test(body)) {
         return line;
       }
-      if (leading.length >= 4 || leading.includes("\t")) return line;
+      if (leading.length !== 0) return line;
       return `${leading}$$\n${body}\n$$${trailing}`;
     })
     .join("\n");
@@ -196,7 +218,11 @@ export function preprocessMarkdown(text: string): string {
     // Display-only commands (\tag, \label) are removed on every inline emission:
     // KaTeX rejects them outside display mode, which would discard the whole equation.
     if (hasLatexCommands) {
-      const safeContent = stripDisplayOnlyCommands(content).replace(/\\\$/g, "\\dollar ");
+      const stripped = stripDisplayOnlyCommands(content);
+      if (stripped.trim() === "") {
+        return tagReferenceText(content);
+      }
+      const safeContent = rewriteEqref(stripped).replace(/\\\$/g, "\\dollar ");
       return addPlaceholder(`$${safeContent}$`);
     }
 

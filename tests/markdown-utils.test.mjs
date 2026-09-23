@@ -21,12 +21,46 @@ function collectMathNodes(root) {
   return nodes;
 }
 
+function collectHeadingTexts(root) {
+  const texts = [];
+  const walk = (node) => {
+    if (node.type === "heading") {
+      texts.push((node.children ?? []).filter((child) => child.type === "text").map((child) => child.value).join(""));
+    }
+    if (Array.isArray(node.children)) for (const child of node.children) walk(child);
+  };
+  walk(root);
+  return texts;
+}
+
+function collectOutsideMathText(root) {
+  const texts = [];
+  const walk = (node) => {
+    if (node.type === "math" || node.type === "inlineMath") return;
+    if (node.type === "text") texts.push(node.value);
+    if (Array.isArray(node.children)) for (const child of node.children) walk(child);
+  };
+  walk(root);
+  return texts;
+}
+
 const FMR_EQ =
   "\\mathrm{FMR}_g(\\tau) = \\frac{\\sum_{(i,j) \\in \\mathcal{P}_{\\text{neg}}^g} \\mathbb{I}(\\mathcal{S}_{\\text{sim}}(\\mathbf{z}_i, \\mathbf{z}_j) \\geq \\tau)}{|\\mathcal{P}_{\\text{neg}}^g|}, \\tag{13}";
 const D4_EQ =
   "\\hat{y}_\\tau(\\mathbf{x}_q, \\mathbf{x}_e) = \\mathbb{I}(\\mathcal{S}_{\\mathrm{sim}}(\\mathbf{z}_q, \\mathbf{z}_e) \\geq \\tau) \\in \\{0, 1\\}, \\tag{2}";
 const D5_EQ =
   "\\mathcal{L}_{\\text{reweight}}(\\theta) = \\sum_{g=1}^{|\\mathcal{G}|} \\frac{|\\mathcal{D}|}{|\\mathcal{G}| \\cdot N_g} \\sum_{\\mathbf{x}_i \\in \\mathcal{D}_g} \\ell(f_\\theta(\\mathbf{x}_i), y_i), \\tag{22}";
+
+const L1_INPUT = [
+  "1. First item with math $\\bar{p}_{b,e} = \\frac{1}{O}\\sum_{i=1}^{O} p_{i,b,e}$",
+  "2. Nested item with display math:",
+  "   $$\\Delta_{\\mathrm{FMRD}}(\\tau) = \\max_{g, g'} \\left| \\log_{10} \\mathrm{FMR}_g - \\log_{10} \\mathrm{FMR}_{g'} \\right|$$",
+  "3. Item with inline math $\\theta$.",
+  "",
+  "## After the list",
+].join("\n");
+
+const L2_INPUT = ["- Parent bullet", "  $$x = 1$$", "- Sibling bullet"].join("\n");
 
 const battery = [
   { id: "D1", input: `$$${FMR_EQ}$$`, expected: { flow: 1, inline: 0, contains: ["\\tag{13}"] } },
@@ -120,6 +154,33 @@ const battery = [
   { id: "P5a", input: "Consider $x - y$ and compute.", expected: { flow: 0, inline: 1 } },
   { id: "P5b", input: "Evaluate $2x + 1$ now.", expected: { flow: 0, inline: 1 } },
   { id: "P5c", input: "So $P(A) = 0.8$ holds.", expected: { flow: 0, inline: 1 } },
+  { id: "L1", input: L1_INPUT, expected: { output: L1_INPUT, flow: 0, inline: 3, hasHeading: "After the list" } },
+  { id: "L2", input: L2_INPUT, expected: { output: L2_INPUT, flow: 0, inline: 1 } },
+  {
+    id: "T3",
+    input: "Back-reference in text: Eq. $\\tag{1}$ (literal tag text).",
+    expected: { output: "Back-reference in text: Eq. (1) (literal tag text).", flow: 0, inline: 0, notContains: ["\\tag", "$$"] },
+  },
+  {
+    id: "T4",
+    input: "Ref $$\\tag{7}$$ mid-sentence.",
+    expected: { output: "Ref (7) mid-sentence.", flow: 0, inline: 0, notContains: ["\\tag", "$$"] },
+  },
+  {
+    id: "T5",
+    input: "See $\\label{eq:x}$ here.",
+    expected: { output: "See  here.", flow: 0, inline: 0, notContains: ["\\label", "$"] },
+  },
+  {
+    id: "R1",
+    input: "See Eq. $\\eqref{eq:1}$ for details.",
+    expected: { flow: 0, inline: 1, contains: ["\\text{(eq:1)}"], notContains: ["\\eqref"] },
+  },
+  {
+    id: "J1",
+    input: "Adjacent $\\alpha$$\\beta$ pairs here.",
+    expected: { output: "Adjacent $\\alpha$$\\beta$ pairs here.", outsideMathText: ["pairs here"], katexSkip: true },
+  },
 ];
 
 for (const { id, input, expected } of battery) {
@@ -134,7 +195,8 @@ for (const { id, input, expected } of battery) {
     for (const fragment of expected.notContains ?? []) {
       assert.ok(!output.includes(fragment), `${id}: output should not contain ${JSON.stringify(fragment)}, got ${JSON.stringify(output)}`);
     }
-    const nodes = collectMathNodes(processor.parse(output));
+    const tree = processor.parse(output);
+    const nodes = collectMathNodes(tree);
     if (expected.flow !== undefined) {
       assert.equal(
         nodes.filter((node) => node.type === "math").length,
@@ -157,16 +219,34 @@ for (const { id, input, expected } of battery) {
         );
       }
     }
-    const throwOnError = expected.katexStrict === false ? false : true;
-    for (const node of nodes) {
-      try {
-        katex.renderToString(node.value, {
-          displayMode: node.type === "math",
-          throwOnError,
-          ...KATEX_OPTIONS,
-        });
-      } catch (error) {
-        assert.fail(`${id}: KaTeX rejected ${node.type} ${JSON.stringify(node.value)} — ${error.message}`);
+    if (expected.hasHeading !== undefined) {
+      const headings = collectHeadingTexts(tree);
+      assert.ok(
+        headings.some((text) => text.includes(expected.hasHeading)),
+        `${id}: heading containing ${JSON.stringify(expected.hasHeading)} must survive (headings: ${JSON.stringify(headings)})`,
+      );
+    }
+    if (expected.outsideMathText !== undefined) {
+      const outsideTexts = collectOutsideMathText(tree);
+      for (const fragment of expected.outsideMathText) {
+        assert.ok(
+          outsideTexts.some((text) => text.includes(fragment)),
+          `${id}: text ${JSON.stringify(fragment)} must survive outside math subtrees (texts: ${JSON.stringify(outsideTexts)})`,
+        );
+      }
+    }
+    if (!expected.katexSkip) {
+      const throwOnError = expected.katexStrict === false ? false : true;
+      for (const node of nodes) {
+        try {
+          katex.renderToString(node.value, {
+            displayMode: node.type === "math",
+            throwOnError,
+            ...KATEX_OPTIONS,
+          });
+        } catch (error) {
+          assert.fail(`${id}: KaTeX rejected ${node.type} ${JSON.stringify(node.value)} — ${error.message}`);
+        }
       }
     }
   });

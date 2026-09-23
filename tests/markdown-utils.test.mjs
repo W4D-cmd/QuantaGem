@@ -1,0 +1,173 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { unified } from "unified";
+import remarkParse from "remark-parse";
+import remarkMath from "remark-math";
+import remarkGfm from "remark-gfm";
+import katex from "katex";
+import { preprocessMarkdown } from "../src/lib/markdown-utils.ts";
+
+const processor = unified().use(remarkParse).use(remarkMath).use(remarkGfm);
+
+const KATEX_OPTIONS = { macros: { "\\dollar": "\\$" } };
+
+function collectMathNodes(root) {
+  const nodes = [];
+  const walk = (node) => {
+    if (node.type === "math" || node.type === "inlineMath") nodes.push(node);
+    if (Array.isArray(node.children)) for (const child of node.children) walk(child);
+  };
+  walk(root);
+  return nodes;
+}
+
+const FMR_EQ =
+  "\\mathrm{FMR}_g(\\tau) = \\frac{\\sum_{(i,j) \\in \\mathcal{P}_{\\text{neg}}^g} \\mathbb{I}(\\mathcal{S}_{\\text{sim}}(\\mathbf{z}_i, \\mathbf{z}_j) \\geq \\tau)}{|\\mathcal{P}_{\\text{neg}}^g|}, \\tag{13}";
+const D4_EQ =
+  "\\hat{y}_\\tau(\\mathbf{x}_q, \\mathbf{x}_e) = \\mathbb{I}(\\mathcal{S}_{\\mathrm{sim}}(\\mathbf{z}_q, \\mathbf{z}_e) \\geq \\tau) \\in \\{0, 1\\}, \\tag{2}";
+const D5_EQ =
+  "\\mathcal{L}_{\\text{reweight}}(\\theta) = \\sum_{g=1}^{|\\mathcal{G}|} \\frac{|\\mathcal{D}|}{|\\mathcal{G}| \\cdot N_g} \\sum_{\\mathbf{x}_i \\in \\mathcal{D}_g} \\ell(f_\\theta(\\mathbf{x}_i), y_i), \\tag{22}";
+
+const battery = [
+  { id: "D1", input: `$$${FMR_EQ}$$`, expected: { flow: 1, inline: 0, contains: ["\\tag{13}"] } },
+  { id: "D2", input: `$$\n${FMR_EQ}\n$$`, expected: { flow: 1, inline: 0, contains: ["\\tag{13}"] } },
+  { id: "D3", input: "$$B_g = B / |\\mathcal{G}|$$", expected: { flow: 1, inline: 0 } },
+  { id: "D4", input: `$$${D4_EQ}$$`, expected: { flow: 1, inline: 0 } },
+  { id: "D5", input: `$$${D5_EQ}$$`, expected: { flow: 1, inline: 0 } },
+  {
+    id: "D6",
+    input: `$$${FMR_EQ}$$\n\nBetween the two equations, the estimator compares similarity scores.\n\n$$${D4_EQ}$$`,
+    expected: { flow: 2, inline: 0, contains: ["Between the two equations"] },
+  },
+  { id: "D7", input: "$$\\begin{aligned} a &= b \\\\ c &= d \\end{aligned}$$", expected: { flow: 1, inline: 0 } },
+  {
+    id: "D8",
+    input: "Intro\n\n$$\\mathrm{FMR}_g(\\tau) = \\frac{",
+    expected: { output: "Intro\n\n$$\\mathrm{FMR}_g(\\tau) = \\frac{", outsideMath: ["Intro"] },
+  },
+  { id: "I1", input: "The range is $\\tau \\in [-1, 1]$ inclusive.", expected: { flow: 0, inline: 1 } },
+  {
+    id: "I2",
+    input: "an FMR of $10^{-5}$ implies high sensitivity in $10^5$ comparisons",
+    expected: { flow: 0, inline: 2 },
+  },
+  {
+    id: "I3",
+    input: "$\\mathrm{Acc}_g(\\tau) = 1 - \\frac{1}{2}(\\mathrm{FMR}_g(\\tau) + \\mathrm{FNMR}_g(\\tau))$",
+    expected: { flow: 0, inline: 1 },
+  },
+  { id: "I4", input: "($\\sigma = 19.6\\%, 8.3\\%$)", expected: { flow: 0, inline: 1 } },
+  { id: "I5", input: "Use $$x$$ and $$y$$ inline here.", expected: { flow: 0, inline: 2 } },
+  { id: "I6", input: "$$a$$ $$b$$", expected: { flow: 0, inline: 2 } },
+  {
+    id: "C1",
+    input: "US pricing runs $35 million to $100 million.",
+    expected: { flow: 0, inline: 0, output: "US pricing runs \\$35 million to \\$100 million." },
+  },
+  { id: "C2", input: "A GPU costs $999.", expected: { flow: 0, inline: 0, output: "A GPU costs \\$999." } },
+  {
+    id: "C3",
+    input: "Items cost $3, $4, and $7 in total.",
+    expected: { flow: 0, inline: 0, output: "Items cost \\$3, \\$4, and \\$7 in total." },
+  },
+  {
+    id: "C4",
+    input: "50$ refund and 60 $ credit.",
+    expected: { flow: 0, inline: 0, output: "50\\$ refund and 60 \\$ credit." },
+  },
+  {
+    id: "C5",
+    input: "The subscription costs $\\$120 - \\$130$ per month.",
+    expected: { flow: 0, inline: 1, contains: ["\\dollar"] },
+  },
+  {
+    id: "C6",
+    input: "Range: $\\$10 und \\$20$ im Store.",
+    expected: { flow: 0, inline: 0, output: "Range: \\$10 und \\$20 im Store." },
+  },
+  {
+    id: "C7",
+    input: "I love this $shirt and those $pants a lot.",
+    expected: { flow: 0, inline: 0, output: "I love this \\$shirt and those \\$pants a lot." },
+  },
+  {
+    id: "C8",
+    input: "He said $5 is cheap, and $10 is not.",
+    expected: { flow: 0, inline: 0, output: "He said \\$5 is cheap, and \\$10 is not." },
+  },
+  {
+    id: "T1",
+    input: "As shown, $$\\mathrm{SER}(\\tau) = 1.0, \\tag{15}$$ concludes the proof.",
+    expected: { flow: 0, inline: 1, notContains: ["\\tag{15}"] },
+  },
+  {
+    id: "T2",
+    input: "Given $\\hat{y} = \\mathbb{I}(\\cdot), \\tag{3}$ we decide.",
+    expected: { flow: 0, inline: 1, notContains: ["\\tag{3}"] },
+  },
+  {
+    id: "P1",
+    input: "```python\n$$x = 1$$\n```",
+    expected: { flow: 0, inline: 0, output: "```python\n$$x = 1$$\n```" },
+  },
+  {
+    id: "P2",
+    input: "Intro text.\n\n    $$x = 1$$",
+    expected: { flow: 0, inline: 0, output: "Intro text.\n\n    $$x = 1$$" },
+  },
+  { id: "P3", input: "$$$$", expected: { output: "$$$$" } },
+  { id: "P4", input: "$$x\\$$", expected: { output: "$$x\\$$", inline: 1, katexStrict: false } },
+  { id: "P5a", input: "Consider $x - y$ and compute.", expected: { flow: 0, inline: 1 } },
+  { id: "P5b", input: "Evaluate $2x + 1$ now.", expected: { flow: 0, inline: 1 } },
+  { id: "P5c", input: "So $P(A) = 0.8$ holds.", expected: { flow: 0, inline: 1 } },
+];
+
+for (const { id, input, expected } of battery) {
+  test(`battery ${id}`, () => {
+    const output = preprocessMarkdown(input);
+    if (expected.output !== undefined) {
+      assert.equal(output, expected.output, `${id}: preprocess output mismatch`);
+    }
+    for (const fragment of expected.contains ?? []) {
+      assert.ok(output.includes(fragment), `${id}: output should contain ${JSON.stringify(fragment)}, got ${JSON.stringify(output)}`);
+    }
+    for (const fragment of expected.notContains ?? []) {
+      assert.ok(!output.includes(fragment), `${id}: output should not contain ${JSON.stringify(fragment)}, got ${JSON.stringify(output)}`);
+    }
+    const nodes = collectMathNodes(processor.parse(output));
+    if (expected.flow !== undefined) {
+      assert.equal(
+        nodes.filter((node) => node.type === "math").length,
+        expected.flow,
+        `${id}: flow math node count (nodes: ${nodes.map((n) => `${n.type}:${JSON.stringify(n.value.slice(0, 40))}`).join(", ")})`,
+      );
+    }
+    if (expected.inline !== undefined) {
+      assert.equal(
+        nodes.filter((node) => node.type === "inlineMath").length,
+        expected.inline,
+        `${id}: inlineMath node count (nodes: ${nodes.map((n) => `${n.type}:${JSON.stringify(n.value.slice(0, 40))}`).join(", ")})`,
+      );
+    }
+    for (const fragment of expected.outsideMath ?? []) {
+      for (const node of nodes) {
+        assert.ok(
+          !node.value.includes(fragment),
+          `${id}: ${JSON.stringify(fragment)} must remain outside math nodes (found in ${node.type} ${JSON.stringify(node.value.slice(0, 40))})`,
+        );
+      }
+    }
+    const throwOnError = expected.katexStrict === false ? false : true;
+    for (const node of nodes) {
+      try {
+        katex.renderToString(node.value, {
+          displayMode: node.type === "math",
+          throwOnError,
+          ...KATEX_OPTIONS,
+        });
+      } catch (error) {
+        assert.fail(`${id}: KaTeX rejected ${node.type} ${JSON.stringify(node.value)} — ${error.message}`);
+      }
+    }
+  });
+}

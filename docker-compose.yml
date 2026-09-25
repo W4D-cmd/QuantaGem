@@ -94,7 +94,7 @@ services:
       - app-network
 
   configure-storage:
-    image: amazon/aws-cli:2.37.1@sha256:b0dd5a4d216a1786863541a201baa7b7b4c5032bec9c6e72c38d01cafd7e8db8
+    image: amazon/aws-cli:2.37.3@sha256:83f8ffe939569070c5b66d22231862ab78718766d9d8e4c44ca84dd0be5569a5
     profiles: ["migrate"]
     depends_on:
       seaweedfs:
@@ -142,7 +142,7 @@ services:
       start_period: 300s
 
   redis:
-    image: redis:8-alpine@sha256:ba6e394f6acc2a695ef1b6944f161b9ca813711739be68319fa0db3470673f1d
+    image: redis:8-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
     restart: unless-stopped
     networks:
       - app-network

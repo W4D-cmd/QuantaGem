@@ -62,6 +62,12 @@
       "groupName": "Docker image updates",
       "groupSlug": "docker-images",
       "matchDatasources": ["docker"]
+    },
+    {
+      "description": "Hold python docker base below 3.15 - onnxruntime has no 3.15 wheels yet",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["python"],
+      "allowedVersions": "<3.15"
     }
   ],
   "dockerfile": {

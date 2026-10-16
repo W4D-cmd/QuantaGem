@@ -20,6 +20,12 @@ interface ThinkingModelConfig {
 }
 
 const modelConfigs: Record<string, ThinkingModelConfig> = {
+  "4-argon": {
+    min: 0, max: 0, canBeOff: false, medium: 0,
+    useThinkingLevel: true,
+    supportedLevels: ["low", "medium", "high"],
+    defaultLevel: "medium",
+  },
   "2.5-pro": { min: 2048, max: 32768, canBeOff: false, medium: 8192 },
   "2.5-flash": { min: 2048, max: 24576, canBeOff: true, medium: 8192 },
   "3.7-flash": {
@@ -101,6 +107,7 @@ export function getThinkingConfigForModel(modelName: string | null | undefined, 
       return { min: 0, max: 0, canBeOff: apiType === "openai", medium: 0 };
     }
   }
+  if (modelName.includes("4-argon")) return modelConfigs["4-argon"];
   if (modelName.includes("2.5-pro")) return modelConfigs["2.5-pro"];
   if (modelName.includes("3.1-pro")) return modelConfigs["3.1-pro"];
   if (modelName.includes("3.8-flash")) return modelConfigs["3.8-flash"];

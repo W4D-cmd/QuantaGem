@@ -25,7 +25,8 @@
  *    a. Unwrap currency amounts that the model wrapped in LaTeX math mode ($\$120 - \$130$).
  *    b. Protect expressions containing LaTeX commands (\text, \frac, etc.).
  *    c. Unwrap non-dollar currency symbols (€, £, ¥, etc.) that cause KaTeX failures.
- *    d. Protect weaker math indicators (operators, braces) when no currency signal present.
+   *    d. Protect weaker math indicators (operators, braces) and digit-led
+   *       factorial/degree tokens ($13!$, $45°$) when no currency signal present.
  *    e. Escape pure currency pairs ($100$, $10 and $20, etc.).
  *    f. Escape prose-like pairs ("$shirt and those $pants") by escaping both delimiters.
  *    Every emission strips display-only commands (\tag, \label), which KaTeX rejects
@@ -213,6 +214,16 @@ export function preprocessMarkdown(text: string): string {
     const isRange = /^\s*\d+([.,]\d+)*\s*[-–—]\s*\d+([.,]\d+)*\s*$/.test(content);
     const hasCurrencyText = /\s+(and|or|to|bis|und|oder)\s+/i.test(content);
 
+    // Digit-led tokens whose ONLY trailing symbol is a factorial bang or degree
+    // sign ("$13!$", "$45°$") fire no operator/brace indicator and fail the
+    // prose guard (no whitespace) — they would reach Phase 5, whose currency
+    // escape eats the OPENING dollar while the closing survives, rendering the
+    // pair literally with a dangling $. The token must END with the marker, so
+    // prose pairs like "$20! Heute nur $" keep their currency handling. KaTeX
+    // renders all covered forms cleanly (13!, 13!!, 4,5!, 45°); % is excluded
+    // because KaTeX treats it as a comment start.
+    const isFactorialOrDegree = /^\s*\d+(?:[.,]\d+)*\s*(?:!+|°)\s*$/.test(content);
+
     // LaTeX commands are a definitive math signal — they override currency-text
     // heuristics because words like "und" or "and" can appear inside \text{...}.
     // Display-only commands (\tag, \label) are removed on every inline emission:
@@ -228,7 +239,7 @@ export function preprocessMarkdown(text: string): string {
 
     // Weaker math indicators (operators, braces) count as math only when no
     // currency signals (range, or connector words) are present. Pure numbers are protected.
-    if (isPureNumber || (hasMathIndicators && !isRange && !hasCurrencyText)) {
+    if (isPureNumber || isFactorialOrDegree || (hasMathIndicators && !isRange && !hasCurrencyText)) {
       const safeContent = stripDisplayOnlyCommands(content).replace(/\\\$/g, "\\dollar ");
       return addPlaceholder(`$${safeContent}$`);
     }

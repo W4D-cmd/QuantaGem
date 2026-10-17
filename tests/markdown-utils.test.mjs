@@ -181,6 +181,12 @@ const battery = [
     input: "Adjacent $\\alpha$$\\beta$ pairs here.",
     expected: { output: "Adjacent $\\alpha$$\\beta$ pairs here.", outsideMathText: ["pairs here"], katexSkip: true },
   },
+  { id: "F1", input: "z. B. $13!$ Möglichkeiten, 13 Bücher zu sortieren.", expected: { flow: 0, inline: 1, output: "z. B. $13!$ Möglichkeiten, 13 Bücher zu sortieren." } },
+  { id: "F2", input: "$5!$ und $10 im Angebot.", expected: { flow: 0, inline: 1, output: "$5!$ und \\$10 im Angebot." } },
+  { id: "F3", input: "Der Rabatt: $20! Heute nur $10.", expected: { flow: 0, inline: 0, output: "Der Rabatt: \\$20! Heute nur \\$10." } },
+  { id: "F4", input: "Der Winkel beträgt $45°$ genau.", expected: { flow: 0, inline: 1, output: "Der Winkel beträgt $45°$ genau." } },
+  { id: "F5", input: "Double: $13!!$ und dezimal $4,5!$.", expected: { flow: 0, inline: 2, output: "Double: $13!!$ und dezimal $4,5!$." } },
+  { id: "F6", input: "Aktion! Nur $13! heute!", expected: { flow: 0, inline: 0, output: "Aktion! Nur \\$13! heute!" } },
 ];
 
 for (const { id, input, expected } of battery) {

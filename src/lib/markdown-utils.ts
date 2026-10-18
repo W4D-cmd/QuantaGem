@@ -21,6 +21,12 @@
  *     since they render in inline context); an unclosed fence or unpaired same-line $$ is
  *     protected verbatim for its own line only, never swallowing following prose.
  * 3. Protect inline code (`...`) with placeholders.
+ * 3b. Convert LaTeX bracket delimiters (\[...\], \(...\)) to their dollar forms —
+ *     ONLY when the body carries a LaTeX signature (a \command with 2+ letters,
+ *     or a caret superscript like B^2 / x^{2}). Unsigned bodies (escaped-bracket
+ *     prose "Siehe \[Anhang\]", link/image labels "!\[alt\](url)", operator-only
+ *     "x = 1") pass through untouched, so nothing that renders correctly today
+ *     can regress; see the phase comment in the function body.
  * 4. Evaluate inline math pairs ($...$):
  *    a. Unwrap currency amounts that the model wrapped in LaTeX math mode ($\$120 - \$130$).
  *    b. Protect expressions containing LaTeX commands (\text, \frac, etc.).
@@ -45,6 +51,10 @@
  * Known limitation: display math inside blockquotes ("> $$x$$") or list-item
  * continuations (indented $$...$$) stays inline.
  */
+// A \[...\] span longer than this is almost certainly a stray opener pairing
+// with an unrelated closer — abort and pass through verbatim.
+const MAX_BRACKET_PAIR_LINES = 25;
+
 export function preprocessMarkdown(text: string): string {
   if (!text) return text;
 
@@ -158,6 +168,163 @@ export function preprocessMarkdown(text: string): string {
 
   // Phase 3: Protect Inline Code (`...`)
   processed = processed.replace(/`[^`\n]*?`/g, (match) => addPlaceholder(match));
+
+  // Phase 3b: remark-math's grammar is dollar-only, but models routinely emit
+  // LaTeX-style \[...\] (display) and \(...\) (inline) delimiters. Convert a
+  // pair to its dollar form ONLY when the body carries a LaTeX signature — a
+  // \command with 2+ letters or a caret superscript (B^2, x^{2}). Prose pairs
+  // (escaped brackets "Siehe \[Anhang\]", image/link labels "!\[alt\](url)")
+  // carry no signature and pass through untouched, so anything that renders
+  // correctly today cannot regress; underscores alone are deliberately not a
+  // signal (\[siehe_Sektion_3\] would otherwise flip from literal text into
+  // KaTeX). Runs after Phase 3, so fences and inline code are placeholders
+  // here. Unclosed openers (streaming), blank lines, raw $, or nested bracket
+  // delimiters inside the body abort the pair (verbatim passthrough) — the
+  // Phase 2 doctrine: never swallow following prose on partial input. A closer
+  // immediately followed by "(" is ignored (link-target shape, \[x^2\](url)).
+  function findBracketDelim(line: string, delim: string, from: number): number {
+    for (let i = Math.max(from, 0); i <= line.length - delim.length; i++) {
+      if (line.startsWith(delim, i) && (i === 0 || line[i - 1] !== "\\")) return i;
+    }
+    return -1;
+  }
+
+  function isMathLikeBracketBody(body: string): boolean {
+    if (body.includes("$$")) return false;
+    if (/(?<!\\)\$/.test(body)) return false;
+    if (/\\[[\]()]/.test(body)) return false;
+    return /\\[a-zA-Z]{2,}/.test(body) || /\^[{}0-9a-zA-Z]/.test(body);
+  }
+
+  function bracketInlineEmission(body: string): string {
+    const stripped = stripDisplayOnlyCommands(body);
+    if (stripped.trim() === "" && /\\(?:tag|label)\{/.test(body)) {
+      return addPlaceholder(tagReferenceText(body));
+    }
+    return addPlaceholder(`$${rewriteEqref(stripped)}$`);
+  }
+
+  function convertSameLineDisplayPairs(line: string): string | null {
+    if (!line.includes("\\[")) return null;
+    let result = "";
+    let cursor = 0;
+    let converted = false;
+    while (cursor < line.length) {
+      const open = findBracketDelim(line, "\\[", cursor);
+      if (open === -1) break;
+      const close = findBracketDelim(line, "\\]", open + 2);
+      if (close === -1 || line[close + 2] === "(") break;
+      const body = line.slice(open + 2, close);
+      if (!isMathLikeBracketBody(body)) {
+        result += line.slice(cursor, close + 2);
+        cursor = close + 2;
+        continue;
+      }
+      const prefix = line.slice(cursor, open);
+      const suffix = line.slice(close + 2);
+      if (/^[ \t\r]*$/.test(prefix) && /^[ \t\r]*$/.test(suffix)) {
+        // Line-anchored pair: emit the multiline fence form remark-math parses
+        // as flow (display) math, so \tag renders and the equation is centered.
+        result += addPlaceholder(`${prefix}$$\n${body}\n${prefix}$$`);
+        cursor = line.length;
+        converted = true;
+        break;
+      }
+      // Mid-paragraph pair: true display fences would split the paragraph, so
+      // emit inline math (tag/label stripped, matching Phase 2's inline rule).
+      result += prefix + bracketInlineEmission(body);
+      cursor = close + 2;
+      converted = true;
+    }
+    return converted ? result + line.slice(cursor) : null;
+  }
+
+  function convertBracketDisplayPairs(text: string): string {
+    const lines = text.split("\n");
+    const out: string[] = [];
+    let i = 0;
+    while (i < lines.length) {
+      const sameLine = convertSameLineDisplayPairs(lines[i]);
+      if (sameLine !== null) {
+        out.push(sameLine);
+        i += 1;
+        continue;
+      }
+      const open = findBracketDelim(lines[i], "\\[", 0);
+      if (open === -1 || !/^[ \t]{0,3}$/.test(lines[i].slice(0, open))) {
+        out.push(lines[i]);
+        i += 1;
+        continue;
+      }
+      // Line-anchored opener without a same-line closer: gather a multi-line
+      // display block. Indentation is preserved verbatim — micromark accepts
+      // fence indents up to 3 spaces, and deeper indents stay in their
+      // indented-code-block context either way.
+      const indent = lines[i].slice(0, open);
+      const bodyLines: string[] = [lines[i].slice(open + 2)];
+      let closeIndex = -1;
+      let closeSuffix = "";
+      let ok = true;
+      let j = i;
+      while (++j < lines.length) {
+        if (lines[j].trim() === "") {
+          ok = false;
+          break;
+        }
+        const close = findBracketDelim(lines[j], "\\]", 0);
+        if (close !== -1 && lines[j][close + 2] !== "(") {
+          closeIndex = j;
+          closeSuffix = lines[j].slice(close + 2);
+          bodyLines.push(lines[j].slice(0, close));
+          break;
+        }
+        bodyLines.push(lines[j]);
+        if (j - i > MAX_BRACKET_PAIR_LINES) {
+          ok = false;
+          break;
+        }
+      }
+      const body = bodyLines
+        .join("\n")
+        .replace(/^[ \t\r]*\n+/, "")
+        .replace(/(?:\n[ \t\r]*)+$/, "");
+      if (!ok || closeIndex === -1 || !isMathLikeBracketBody(body)) {
+        out.push(lines[i]);
+        i += 1;
+        continue;
+      }
+      out.push(addPlaceholder(`${indent}$$\n${body}\n${indent}$$`) + (closeSuffix ? `\n${closeSuffix}` : ""));
+      i = closeIndex + 1;
+    }
+    return out.join("\n");
+  }
+
+  function convertBracketInlinePairs(line: string): string {
+    if (!line.includes("\\(")) return line;
+    let result = "";
+    let cursor = 0;
+    while (cursor < line.length) {
+      const open = findBracketDelim(line, "\\(", cursor);
+      if (open === -1) break;
+      const close = findBracketDelim(line, "\\)", open + 2);
+      if (close === -1 || line[close + 2] === "(") break;
+      const body = line.slice(open + 2, close);
+      result += line.slice(cursor, open);
+      if (isMathLikeBracketBody(body)) {
+        result += bracketInlineEmission(body);
+      } else {
+        result += line.slice(open, close + 2);
+      }
+      cursor = close + 2;
+    }
+    return result + line.slice(cursor);
+  }
+
+  processed = convertBracketDisplayPairs(processed);
+  processed = processed
+    .split("\n")
+    .map((line) => convertBracketInlinePairs(line))
+    .join("\n");
 
   // Phase 4: Process potential Inline Math pairs ($...$)
   processed = processed.replace(/(?<!\\)\$(?!\$)(.+?)(?<!\\)\$/g, (match, content, offset, fullString) => {

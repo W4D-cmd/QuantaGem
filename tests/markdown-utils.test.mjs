@@ -187,6 +187,61 @@ const battery = [
   { id: "F4", input: "Der Winkel beträgt $45°$ genau.", expected: { flow: 0, inline: 1, output: "Der Winkel beträgt $45°$ genau." } },
   { id: "F5", input: "Double: $13!!$ und dezimal $4,5!$.", expected: { flow: 0, inline: 2, output: "Double: $13!!$ und dezimal $4,5!$." } },
   { id: "F6", input: "Aktion! Nur $13! heute!", expected: { flow: 0, inline: 0, output: "Aktion! Nur \\$13! heute!" } },
+  // LaTeX bracket delimiters (\[...\] / \(...\)) — Phase 3b in markdown-utils.ts:
+  // converted only when the body carries a LaTeX signature; prose pairs must
+  // pass through untouched so currently-correct renders cannot regress.
+  {
+    id: "B1",
+    input: "Betrachten wir: \\[ A \\cdot \\Phi_{xx} = 0 \\] als Fließtext.",
+    expected: { flow: 0, inline: 1, contains: ["\\cdot"], outsideMathText: ["Betrachten wir:", "als Fließtext"] },
+  },
+  { id: "B2", input: "\\[D = B^2 - 4AC\\]", expected: { flow: 1, inline: 0, output: "$$\nD = B^2 - 4AC\n$$" } },
+  { id: "B3", input: "\\[\nE = mc^2 \\tag{1}\n\\]", expected: { flow: 1, inline: 0, output: "$$\nE = mc^2 \\tag{1}\n$$" } },
+  { id: "B4", input: "Siehe \\[Anhang\\] für Details.", expected: { flow: 0, inline: 0, output: "Siehe \\[Anhang\\] für Details." } },
+  {
+    id: "B5",
+    input: "Logo !\\[alt text\\](https://example.com/a.png) und \\[x^2\\](https://example.com).",
+    expected: { flow: 0, inline: 0, output: "Logo !\\[alt text\\](https://example.com/a.png) und \\[x^2\\](https://example.com)." },
+  },
+  { id: "B6", input: "Siehe \\( Ma_\\infty \\) hier.", expected: { flow: 0, inline: 1, output: "Siehe $ Ma_\\infty $ hier." } },
+  { id: "B7", input: "Kurzform \\( Ma < 1 \\) im Text.", expected: { flow: 0, inline: 0, output: "Kurzform \\( Ma < 1 \\) im Text." } },
+  { id: "B8", input: "Index \\[siehe_Sektion_3\\] beachten.", expected: { flow: 0, inline: 0, output: "Index \\[siehe_Sektion_3\\] beachten." } },
+  { id: "B9a", input: "Der Code `\\[x^2\\]` bleibt roh.", expected: { flow: 0, inline: 0, output: "Der Code `\\[x^2\\]` bleibt roh." } },
+  { id: "B9b", input: "```latex\n\\[x^2\\]\n```", expected: { flow: 0, inline: 0, output: "```latex\n\\[x^2\\]\n```" } },
+  { id: "B10", input: "Berechne \\[ x^2 (unvollständig", expected: { flow: 0, inline: 0, output: "Berechne \\[ x^2 (unvollständig" } },
+  {
+    id: "B11",
+    input: "\\[Anhang\n\nNeuer Absatz \\frac{x}{y}\n\\]",
+    expected: { flow: 0, inline: 0, output: "\\[Anhang\n\nNeuer Absatz \\frac{x}{y}\n\\]" },
+  },
+  {
+    id: "B12",
+    input: "\\[\n\\alpha = 1\n\\]\n\nUnd hier normaler Text.",
+    expected: { flow: 1, inline: 0, output: "$$\n\\alpha = 1\n$$\n\nUnd hier normaler Text.", contains: ["Und hier normaler Text"] },
+  },
+  // Operators alone are not a LaTeX signature — a bare "x = 1" body stays raw
+  // (safe direction: an unsigned miss renders exactly like today).
+  { id: "B17", input: "\\[\nx = 1\n\\]", expected: { flow: 0, inline: 0, output: "\\[\nx = 1\n\\]" } },
+  { id: "B13", input: "Pfad \\\\[Server\\\\] geht.", expected: { flow: 0, inline: 0, output: "Pfad \\\\[Server\\\\] geht." } },
+  { id: "B14", input: "Ergebnis \\[ x \\tag{2} \\] fertig.", expected: { flow: 0, inline: 1, notContains: ["\\tag{2}"] } },
+  { id: "B15", input: "\\[x^2\\](a) und \\[y^2\\]", expected: { flow: 0, inline: 0, output: "\\[x^2\\](a) und \\[y^2\\]" } },
+  {
+    id: "B16",
+    input: [
+      "Ausgangspunkt ist die Potentialgleichung: \\[ (1 - Ma_\\infty^2) \\frac{\\partial^2 \\Phi}{\\partial x^2} = 0 \\]",
+      "",
+      "Betrachten wir den 2D-Fall: \\[ A \\cdot \\Phi_{xx} + B \\cdot \\Phi_{xy} + C \\cdot \\Phi_{yy} = 0 \\]",
+      "",
+      "Hier ist $A = (1 - Ma_\\infty^2)$, $B = 0$ und $C = 1$. Die Diskriminante lautet:",
+      "\\[ D = B^2 - 4AC \\]",
+    ].join("\n"),
+    expected: {
+      flow: 1,
+      inline: 5,
+      notContains: ["\\["],
+      outsideMathText: ["Ausgangspunkt ist die Potentialgleichung:", "Hier ist"],
+    },
+  },
 ];
 
 for (const { id, input, expected } of battery) {

@@ -48,7 +48,7 @@ export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className, isStrea
     if (result?.svg) {
       downloadSVG(result.svg);
     }
-  }, [result?.svg]);
+  }, [result]);
 
   const handleDownloadPNG = useCallback(async () => {
     if (result?.svg) {
@@ -58,7 +58,7 @@ export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className, isStrea
         console.error("PNG download failed:", error);
       }
     }
-  }, [result?.svg]);
+  }, [result]);
 
   const handleDownloadPDF = useCallback(async () => {
     if (result?.svg) {
@@ -68,7 +68,7 @@ export const RCodeBlock: React.FC<RCodeBlockProps> = ({ code, className, isStrea
         console.error("PDF download failed:", error);
       }
     }
-  }, [result?.svg]);
+  }, [result]);
 
   const isLoading = status === "initializing" || status === "executing";
   const hasOutput = result?.hasGraphicalOutput === true && result?.svg !== undefined;

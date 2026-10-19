@@ -295,6 +295,71 @@ const battery = [
     input: "*item text*\n\n  \\[ x = y \\]",
     expected: { flow: 1, inline: 0 },
   },
+  // Multi-line $$ blocks with content on the fence lines: micromark parses the text after
+  // an opening $$ as fence meta (the "$$asciimath" slot) and DROPS it, then swallows every
+  // following line until the next bare $$ (or EOF) into one broken math node. The
+  // normalization must move the fence-line fragments back into the math value.
+  {
+    id: "D9",
+    input: "$$\\begin{array}{c|ccccc}\n & F \\,(b_1) & d \\\\\n\\hline\nM & 1 & 0 \\\\\n\\end{array}$$",
+    expected: { flow: 1, inline: 0, contains: ["\\begin{array}{c|ccccc}", "\\end{array}"] },
+  },
+  {
+    id: "D10",
+    input: "$$\n\\begin{array}{c}\na\n\\end{array}$$\n\nProse after.",
+    expected: { flow: 1, inline: 0, contains: ["\\end{array}"], outsideMath: ["Prose after."] },
+  },
+  {
+    id: "D11",
+    input: "$$\\begin{array}{c}\na\n\\end{array}$$\n\nProse after.",
+    expected: { flow: 1, inline: 0, outsideMath: ["Prose after."] },
+  },
+  {
+    // No closing line anywhere (mid-stream): keeps the verbatim per-line handling.
+    id: "D12",
+    input: "Intro\n\n$$\\begin{array}{c}\na\n",
+    expected: { output: "Intro\n\n$$\\begin{array}{c}\na\n" },
+  },
+  {
+    // A $ in the opening-line fragment makes micromark reject the flow opening — the line
+    // is same-line/inline territory and must not be paired into a display block.
+    id: "D13",
+    input: "$$\\Pi = $x\nbody\nend$$\n\nProse.",
+    expected: { output: "$$\\Pi = $x\nbody\nend$$\n\nProse.", katexStrict: false },
+  },
+  {
+    id: "D14",
+    input: "$$\\begin{array}{c}\na\nend$x$$\n\nProse.",
+    expected: { output: "$$\\begin{array}{c}\na\nend$x$$\n\nProse.", katexStrict: false },
+  },
+  // Matrix/vector environments in the fence-line shapes (the reported bug was an array
+  // matrix). The normalization is shape-based, so every environment gets it.
+  {
+    id: "D15",
+    input: "$$\\vec{v} = \\begin{pmatrix}\nv_1 \\\\\nv_2 \\\\\nv_3\n\\end{pmatrix}$$",
+    expected: { flow: 1, inline: 0, contains: ["\\begin{pmatrix}"] },
+  },
+  {
+    id: "D16",
+    input: "$$A = \\begin{bmatrix}\n1 & 2 \\\\\n3 & 4\n\\end{bmatrix} \\cdot \\vec{x}$$",
+    expected: { flow: 1, inline: 0, contains: ["\\begin{bmatrix}", "\\vec{x}"] },
+  },
+  {
+    id: "D17",
+    input: "$$f(x) = \\begin{cases}\nx^2 & \\text{if } x \\geq 0 \\\\\n0 & \\text{otherwise}\n\\end{cases}$$",
+    expected: { flow: 1, inline: 0, contains: ["\\begin{cases}"] },
+  },
+  // Bare-fence matrix block (already-working path) must stay untouched.
+  {
+    id: "D18",
+    input: "$$\n\\begin{vmatrix}\na & b \\\\\nc & d\n\\end{vmatrix} = ad - bc\n$$",
+    expected: { flow: 1, inline: 0 },
+  },
+  {
+    id: "D19",
+    input: "$$\\vec{u} = \\begin{pmatrix}\n1 \\\\\n2\n\\end{pmatrix}$$\n\nThe vector $\\vec{u}$ has norm $\\|\\vec{u}\\| = \\sqrt{5}$.",
+    expected: { flow: 1, inline: 2, outsideMath: ["The vector"] },
+  },
 ];
 
 for (const { id, input, expected } of battery) {
@@ -365,3 +430,105 @@ for (const { id, input, expected } of battery) {
     }
   });
 }
+
+// Regression: the Buckingham-Pi message. Its dimensions matrix is a multi-line
+// $$\begin{array}{c|ccccc}...\end{array}$$ block; before the fence-line-content
+// normalization the opening line's content was eaten as micromark fence meta and the
+// flow swallowed prose, lists, headers and thematic breaks until the next bare $$,
+// whose fences then alternately closed/opened new broken flows down to EOF (red raw-TeX
+// error spans interleaved with dollar-stripped plain text in the chat UI).
+test("bug: multi-line array $$ block no longer cascades through the document", () => {
+  const input = [
+    "Intro with inline $\\Pi$ math.",
+    "",
+    "### 3. Die Dimensionsmatrix und das Gleichungssystem",
+    "",
+    "Wir tragen die Potenzen spaltenweise ein:",
+    "",
+    "$$\\begin{array}{c|ccccc}",
+    " & F \\,(b_1) & d \\,(b_2) & v \\,(b_3) & \\rho \\,(b_4) & \\mu \\,(b_5) \\\\",
+    "\\hline",
+    "M & 1 & 0 & 0 & 1 & 1 \\\\",
+    "L & 1 & 1 & 1 & -3 & -1 \\\\",
+    "T & -2 & 0 & -1 & 0 & -1",
+    "\\end{array}$$",
+    "",
+    "Damit $\\Pi$ dimensionslos wird, muss die Summe der Exponenten genau **$0$** ergeben:",
+    "1. **(Masse $M$):** $1\\cdot b_1 + 1\\cdot b_4 + 1\\cdot b_5 = 0$",
+    "2. **(Länge $L$):** $b_1 + b_2 + b_3 - 3b_4 - b_5 = 0$",
+    "",
+    "---",
+    "",
+    "### 4. Wie kommt man jetzt auf $\\Pi_1$ und $\\Pi_2$? (Der entscheidende Schritt!)",
+    "",
+    "Das Buckingham-Theorem sagt:",
+    "$$\\text{Anzahl der Kennzahlen} = n - r = 5 - 3 = \\mathbf{2}$$",
+    "Es gibt also **2 frei wählbare Variablen** in unserem Gleichungssystem!",
+    "",
+    "Jetzt haben wir unseren ersten Satz an $b$-Werten:",
+    "$$(b_1, b_2, b_3, b_4, b_5) = (1, -2, -2, -1, 0)$$",
+    "",
+    "Man setzt diese 5 Zahlen in die Produktformel $\\Pi = F^{b_1} \\cdot d^{b_2}$ ein!",
+    "$$\\Pi_1 = F^{\\mathbf{1}} \\cdot d^{\\mathbf{-2}} \\cdot v^{\\mathbf{-2}} \\cdot \\rho^{\\mathbf{-1}} \\cdot \\mu^{\\mathbf{0}}$$",
+    "",
+    "Da negative Hochzahlen in den Nenner wandern und $\\mu^0 = 1$ ist, steht da:",
+    "$$\\mathbf{\\Pi_1 = \\frac{F}{d^2 \\cdot v^2 \\cdot \\rho}}$$",
+    "",
+    "Damit lautet unser zweiter Satz an $b$-Werten:",
+    "$$(b_1, b_2, b_3, b_4, b_5) = (0, -1, -1, -1, 1)$$",
+    "",
+    "Wieder stur in die Produktformel einsetzen:",
+    "$$\\Pi_2 = F^{\\mathbf{0}} \\cdot d^{\\mathbf{-1}} \\cdot v^{\\mathbf{-1}} \\cdot \\rho^{\\mathbf{-1}} \\cdot \\mu^{\\mathbf{1}}$$",
+    "",
+    "Negative Exponenten in den Nenner schreiben ($F^0 = 1$ fällt weg):",
+    "$$\\mathbf{\\Pi_2 = \\frac{\\mu}{d \\cdot v \\cdot \\rho}}$$",
+    "",
+    "### Zusammenfassung des Kochrezepts (SOP)",
+    "1. **Einheiten aufschreiben** und als Potenzen von $M, L, T$ ausdrücken.",
+    "2. **Hochzahlen ablesen:** Positive $b_j$ kommen in den **Zähler**, negative in den **Nenner**. Fertig!",
+  ].join("\n");
+
+  const output = preprocessMarkdown(input);
+  const tree = processor.parse(output);
+  const nodes = collectMathNodes(tree);
+  const flowNodes = nodes.filter((node) => node.type === "math");
+
+  // Eight display blocks, each its own node — none may contain document prose.
+  assert.equal(flowNodes.length, 8, `flow math count (values: ${flowNodes.map((n) => JSON.stringify(n.value.slice(0, 40))).join(", ")})`);
+  // The matrix opener must be part of the math value, not dropped as fence meta.
+  assert.ok(
+    flowNodes[0].value.startsWith("\\begin{array}{c|ccccc}"),
+    `array content must survive in the math value (got ${JSON.stringify(flowNodes[0].value.slice(0, 60))})`,
+  );
+  for (const fragment of [
+    "Damit $\\Pi$ dimensionslos",
+    "Das Buckingham-Theorem sagt",
+    "Es gibt also",
+    "Man setzt diese 5 Zahlen",
+    "Da negative Hochzahlen",
+    "Wieder stur in die Produktformel",
+    "Negative Exponenten in den Nenner",
+  ]) {
+    assert.ok(
+      !flowNodes.some((node) => node.value.includes(fragment)),
+      `${JSON.stringify(fragment)} must stay outside math nodes`,
+    );
+  }
+  const headings = collectHeadingTexts(tree);
+  for (const heading of ["3. Die Dimensionsmatrix und das Gleichungssystem", "4. Wie kommt man jetzt auf", "Zusammenfassung des Kochrezepts (SOP)"]) {
+    assert.ok(headings.some((text) => text.includes(heading)), `heading ${JSON.stringify(heading)} must survive (headings: ${JSON.stringify(headings)})`);
+  }
+  assert.ok(collectOutsideMathText(tree).some((text) => text.includes("Zusammenfassung des Kochrezepts (SOP)")), "summary heading text must exist outside math");
+  // Every node renders — no KaTeX error spans (the red raw-TeX blocks from the bug).
+  for (const node of nodes) {
+    try {
+      katex.renderToString(node.value, {
+        displayMode: node.type === "math",
+        throwOnError: true,
+        ...KATEX_OPTIONS,
+      });
+    } catch (error) {
+      assert.fail(`KaTeX rejected ${node.type} ${JSON.stringify(node.value.slice(0, 60))} — ${error.message}`);
+    }
+  }
+});

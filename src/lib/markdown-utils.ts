@@ -21,7 +21,12 @@ import katex from "katex";
  * 2. Protect block math ($$...$$) with placeholders — line-anchored: complete $$ fence
  *     blocks verbatim; same-line $$...$$ pairs (display-only commands \tag/\label stripped,
  *     since they render in inline context); an unclosed fence or unpaired same-line $$ is
- *     protected verbatim for its own line only, never swallowing following prose.
+ *     protected verbatim for its own line only, never swallowing following prose. Multi-line
+ *     blocks whose fences carry content ("$$\begin{array}..." opening, "...$$" bare opening
+ *     with "\end{array}$$" closing, or both) are normalized to the bare-fence form: micromark
+ *     parses the text after an opening $$ as fence meta (the "$$asciimath" slot) and drops it,
+ *     then eats following lines until the next bare $$ line or EOF, destroying everything
+ *     between.
  * 3. Protect inline code (`...`) with placeholders.
  * 3b. Convert bracket-delimited LaTeX (\[...\] display, \(...\) inline) to $/$$ math.
  *     remark-math only knows $/$$, and CommonMark unescapes \[ to a literal [, so without
@@ -150,27 +155,76 @@ export function preprocessMarkdown(text: string): string {
   // output can never swallow unrelated prose — the old document-wide lazy pairing did exactly
   // that — and never leaks into the inline-pair heuristics below.
   const fenceLine = /^[ \t]*\$\$[ \t]*\r?$/;
+  // micromark's math flow reads a column-0 "$$<content>" line as an opening fence whose
+  // content is fence META (the "$$asciimath" slot) and drops it, then consumes every
+  // following line until the next bare $$ line or EOF — one broken math node that swallows
+  // prose, lists and headers. A "<content>$$" line is not a closing fence for micromark
+  // either, so it feeds the same cascade. Both shapes are normalized into the bare-fence
+  // form remark parses as a display block. Gates keep this off every line micromark would
+  // NOT open a flow fence on: column 0 only (Phase 1b parity — list-item continuations keep
+  // their documented inline handling), and both fragments $-free (a $ makes micromark reject
+  // the flow opening, so those lines are same-line/inline territory). A bare fence line ends
+  // the closer scan without closing: the bare-fence walk above owns it, and pairing must not
+  // reach across one. No closer found (e.g. mid-stream) → the line keeps today's handling.
+  const mathOpenLine = /^\$\$([^$\r]+)\r?$/;
+  const mathCloseLine = /^([^$\r]+)\$\$[ \t]*\r?$/;
   const mathLines = processed.split("\n");
+
+  // Closing line of a $$ block: the next bare $$ line (content null), or — nearer to the
+  // block — a "<content>$$" line whose fragment folds into the math. null when neither.
+  function findBlockClose(from: number): { index: number; content: string | null } | null {
+    for (let j = from; j < mathLines.length; j++) {
+      if (fenceLine.test(mathLines[j])) return { index: j, content: null };
+      const contentMatch = mathCloseLine.exec(mathLines[j]);
+      if (contentMatch) return { index: j, content: contentMatch[1] };
+    }
+    return null;
+  }
+
+  // Like findBlockClose, but a bare $$ line aborts the search instead of closing, since
+  // the existing bare-fence walk owns it and pairing must not reach across one.
+  function findContentBlockClose(from: number): { index: number; content: string } | null {
+    for (let j = from; j < mathLines.length; j++) {
+      if (fenceLine.test(mathLines[j])) return null;
+      const contentMatch = mathCloseLine.exec(mathLines[j]);
+      if (contentMatch) return { index: j, content: contentMatch[1] };
+    }
+    return null;
+  }
+
   const protectedLines: string[] = [];
   let lineIndex = 0;
   while (lineIndex < mathLines.length) {
     const line = mathLines[lineIndex];
     if (fenceLine.test(line)) {
-      let close = -1;
-      for (let j = lineIndex + 1; j < mathLines.length; j++) {
-        if (fenceLine.test(mathLines[j])) {
-          close = j;
-          break;
-        }
-      }
-      if (close !== -1) {
-        protectedLines.push(addPlaceholder(mathLines.slice(lineIndex, close + 1).join("\n")));
-        lineIndex = close + 1;
-      } else {
+      const close = findBlockClose(lineIndex + 1);
+      if (close === null) {
         protectedLines.push(addPlaceholder(line));
         lineIndex += 1;
+        continue;
       }
+      protectedLines.push(
+        addPlaceholder(
+          close.content === null
+            ? mathLines.slice(lineIndex, close.index + 1).join("\n")
+            : `$$\n${mathLines.slice(lineIndex + 1, close.index).join("\n")}\n${close.content}\n$$`,
+        ),
+      );
+      lineIndex = close.index + 1;
       continue;
+    }
+    const openMatch = mathOpenLine.exec(line);
+    if (openMatch) {
+      const close = findContentBlockClose(lineIndex + 1);
+      if (close !== null) {
+        protectedLines.push(
+          addPlaceholder(
+            `$$\n${[openMatch[1], ...mathLines.slice(lineIndex + 1, close.index), close.content].join("\n")}\n$$`,
+          ),
+        );
+        lineIndex = close.index + 1;
+        continue;
+      }
     }
     protectedLines.push(protectSameLineMathPairs(line));
     lineIndex += 1;

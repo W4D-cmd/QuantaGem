@@ -36,6 +36,11 @@
       "automerge": true
     },
     {
+      "description": "katex is pinned to 0.16.47 on purpose: react-katex, rehype-katex and micromark-extension-math peer-depend on ^0.16, and 0.19 changed CSS class names (base/strut -> katex-base/katex-strut), splitting the install into two copies. Renovate must not touch it; re-enable when the renderer ecosystem supports 0.19.",
+      "matchPackageNames": ["katex"],
+      "enabled": false
+    },
+    {
       "groupName": "Next.js and React stack",
       "groupSlug": "nextjs-react-stack",
       "matchPackageNames": [

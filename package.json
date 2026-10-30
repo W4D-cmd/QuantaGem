@@ -61,7 +61,7 @@
     "eslint-config-next": "16.4.3",
     "katex": "0.16.47",
     "prettier": "3.9.10",
-    "prettier-plugin-classnames": "0.10.4",
+    "prettier-plugin-classnames": "0.10.5",
     "remark-parse": "11.0.0",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",

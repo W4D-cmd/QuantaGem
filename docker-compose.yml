@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
+    image: postgres:18-alpine@sha256:ff64c9e3bdf8e2120107d3559de8db314e8305f7e38c5105903c6295876738ff
     restart: unless-stopped
     env_file:
       - .env
@@ -94,7 +94,7 @@ services:
       - app-network
 
   configure-storage:
-    image: amazon/aws-cli:2.41.0@sha256:c5d442efed03350a3c3d7a42b23f42a8e7b76acf5dbb4b021f2641bcd36680ea
+    image: amazon/aws-cli:2.41.1@sha256:538a9a80bc7c78e3228bc65100404a5dbd89ad812a547004c05ea20109543432
     profiles: ["migrate"]
     depends_on:
       seaweedfs:

@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18-alpine@sha256:ff64c9e3bdf8e2120107d3559de8db314e8305f7e38c5105903c6295876738ff
+    image: postgres:18-alpine@sha256:0115267ab5a509022df9319c77be365cef335adb71556c75f60f5360ee247e71
     restart: unless-stopped
     env_file:
       - .env
@@ -17,7 +17,7 @@ services:
       retries: 5
 
   seaweedfs:
-    image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
+    image: chrislusf/seaweedfs:4.55@sha256:7ca46aeae2f223b37e5d91593c17ab37738eec6df6ab69b48a0487f7643342b9
     restart: unless-stopped
     command: ["mini", "-webdav=false", "-master.telemetry=false"]
     environment:
@@ -94,7 +94,7 @@ services:
       - app-network
 
   configure-storage:
-    image: amazon/aws-cli:2.41.1@sha256:538a9a80bc7c78e3228bc65100404a5dbd89ad812a547004c05ea20109543432
+    image: amazon/aws-cli:2.42.5@sha256:4e569d37c0b93893f660946f9b00a442b1172b1c4ba86338a3a1af3937ed62b5
     profiles: ["migrate"]
     depends_on:
       seaweedfs:
@@ -142,7 +142,7 @@ services:
       start_period: 300s
 
   redis:
-    image: redis:8-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
+    image: redis:8-alpine@sha256:5af80107c1eeecb484a2269b80a26d12bfa6521787da4663bd9f19f60a163483
     restart: unless-stopped
     networks:
       - app-network
